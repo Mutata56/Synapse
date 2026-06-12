@@ -6,17 +6,12 @@
 
 **Стек:** Tauri 2 (Rust) · React · TypeScript · Vite · Zustand · BlockNote · Pixi.js
 
-## Скриншоты
-
-<!-- Положите картинки в docs/screenshots/ — и они подтянутся сюда. -->
-
-| Редактор | Граф связей |
-| --- | --- |
-| ![Редактор](docs/screenshots/editor.png) | ![Граф связей](docs/screenshots/graph.png) |
-
-| Календарь | Дашборд статистики |
-| --- | --- |
-| ![Календарь](docs/screenshots/calendar.png) | ![Дашборд](docs/screenshots/dashboard.png) |
+<!-- Демо / скриншоты добавлю позже. Заготовка на будущее:
+     • короткие клипы лучше гифок — перетащи .mp4/.webm прямо в README через веб-редактор
+       GitHub, он зальёт их в user-attachments и встроит плеером (с паузой и перемоткой);
+     • либо обычные картинки в docs/screenshots/:
+       ![Редактор](docs/screenshots/editor.png)
+-->
 
 ## Возможности
 
