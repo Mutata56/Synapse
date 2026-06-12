@@ -33,6 +33,7 @@ import { getWorkspaceDir } from "../lib/storage";
 import { useCalendarStore } from "../store/calendar";
 import { useNotesStore } from "../store/notes";
 import { useToastStore } from "../store/toasts";
+import { discover, yandexHome, type CalCollection } from "../lib/caldav";
 
 // Клавиши, которые являются ТОЛЬКО модификаторами: игнорируются при записи
 // комбинации, ждём реальную клавишу перед сборкой хоткея.
@@ -69,6 +70,7 @@ export function SettingsView() {
             onChange={(accel) => void updateSettings({ captureShortcut: accel })}
           />
           <CalendarSection />
+          <CaldavSection />
           <StorageSection />
         </div>
       </div>
@@ -429,6 +431,138 @@ function CalendarSection() {
       <p className="text-[12px] text-zinc-600 mt-2 leading-relaxed">
         В Яндекс.Календаре: «Настройки» , нужный календарь , скопируйте приватную
         ссылку (iCal). Ссылка содержит секретный токен , не делитесь ей.
+      </p>
+    </Section>
+  );
+}
+
+function CaldavSection() {
+  const login = useNotesStore((s) => s.settings.caldavLogin);
+  const password = useNotesStore((s) => s.settings.caldavPassword);
+  const url = useNotesStore((s) => s.settings.caldavUrl);
+  const updateSettings = useNotesStore((s) => s.updateSettings);
+
+  // Локальные зеркала: даём свободно печатать, в настройки коммитим на blur.
+  const [loginDraft, setLoginDraft] = useState(login);
+  const [pwDraft, setPwDraft] = useState(password);
+  const [finding, setFinding] = useState(false);
+  const [collections, setCollections] = useState<CalCollection[] | null>(null);
+
+  useEffect(() => setLoginDraft(login), [login]);
+  useEffect(() => setPwDraft(password), [password]);
+
+  const saveCreds = () => {
+    if (loginDraft.trim() !== login) {
+      void updateSettings({ caldavLogin: loginDraft.trim() });
+    }
+    if (pwDraft !== password) void updateSettings({ caldavPassword: pwDraft });
+  };
+
+  const find = async () => {
+    const l = loginDraft.trim();
+    const p = pwDraft;
+    if (!l || !p) {
+      useToastStore.getState().push("Укажите логин и пароль приложения", "error");
+      return;
+    }
+    await updateSettings({ caldavLogin: l, caldavPassword: p });
+    setFinding(true);
+    setCollections(null);
+    try {
+      const list = await discover(yandexHome(l), l, p);
+      setCollections(list);
+      if (list.length === 0) {
+        useToastStore.getState().push("Календари не найдены", "info");
+      }
+    } catch (e) {
+      useToastStore.getState().push(`CalDAV: ${String(e)}`, "error");
+    } finally {
+      setFinding(false);
+    }
+  };
+
+  return (
+    <Section
+      icon={Upload}
+      title={t("Пуш в Яндекс.Календарь (CalDAV)")}
+      description={t(
+        "Отправлять свои задачи как события. Нужен пароль приложения, не пароль аккаунта.",
+      )}
+    >
+      <div className="space-y-2">
+        <input
+          type="text"
+          value={loginDraft}
+          spellCheck={false}
+          placeholder="логин@yandex.ru"
+          onChange={(e) => setLoginDraft(e.target.value)}
+          onBlur={saveCreds}
+          className="w-full px-3 py-1.5 rounded-md bg-white/[0.04] border border-[var(--color-border-strong)] text-[13px] text-zinc-200 font-mono outline-none focus:border-[var(--color-accent-border)]"
+        />
+        <input
+          type="password"
+          value={pwDraft}
+          spellCheck={false}
+          placeholder={t("пароль приложения")}
+          onChange={(e) => setPwDraft(e.target.value)}
+          onBlur={saveCreds}
+          className="w-full px-3 py-1.5 rounded-md bg-white/[0.04] border border-[var(--color-border-strong)] text-[13px] text-zinc-200 font-mono outline-none focus:border-[var(--color-accent-border)]"
+        />
+        <button
+          type="button"
+          disabled={finding}
+          onClick={() => void find()}
+          className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-md text-[13px] font-medium bg-white/[0.04] border border-[var(--color-border-strong)] text-zinc-200 hover:bg-white/[0.08] transition-colors disabled:opacity-50 disabled:cursor-default"
+        >
+          <RefreshCw
+            size={14}
+            strokeWidth={2}
+            className={cn(finding && "animate-spin")}
+          />
+          {t("Найти календари")}
+        </button>
+      </div>
+
+      {collections && collections.length > 0 && (
+        <div className="mt-3 space-y-1">
+          <div className="text-[12px] text-zinc-500">{t("Куда отправлять")}:</div>
+          {collections.map((c) => (
+            <button
+              key={c.href}
+              type="button"
+              onClick={() => void updateSettings({ caldavUrl: c.href })}
+              className={cn(
+                "w-full text-left px-3 py-1.5 rounded-md border text-[12.5px] transition-colors",
+                c.href === url
+                  ? "border-[var(--color-accent-border)] bg-[var(--color-accent-bg)] text-zinc-100"
+                  : "border-[var(--color-border)] text-zinc-300 hover:bg-white/[0.05]",
+              )}
+            >
+              <span className="font-medium">{c.name || t("(без имени)")}</span>
+              {c.href === url && (
+                <Check
+                  size={13}
+                  className="inline ml-2 text-[var(--color-accent)]"
+                />
+              )}
+              <div className="text-[11px] text-zinc-600 font-mono truncate">
+                {c.href}
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {url && !collections && (
+        <p className="mt-2 text-[12px] text-zinc-500 break-all">
+          {t("Выбран")}: <span className="font-mono text-zinc-400">{url}</span>
+        </p>
+      )}
+
+      <p className="text-[12px] text-zinc-600 mt-2 leading-relaxed">
+        Пароль приложения: id.yandex.ru , Безопасность , Пароли приложений ,
+        «Календарь CalDAV». Хранится локально в файле настроек рядом с заметками,
+        не делитесь им.
       </p>
     </Section>
   );

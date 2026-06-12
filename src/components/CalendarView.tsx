@@ -1,14 +1,20 @@
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Check,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
   FileText,
   Flame,
-  LayoutTemplate,
+  HelpCircle,
   Plus,
+  Repeat,
   RefreshCw,
+  Tag,
   Trash2,
+  Upload,
   X,
 } from "lucide-react";
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
@@ -18,11 +24,24 @@ import { DEFAULT_NOTE_TITLE, EMOJI_FONT_STACK } from "../lib/format";
 import { expandEvents, type CalEvent } from "../lib/ics";
 import { t } from "../lib/i18n";
 import { moodColor, moodFace } from "../lib/mood";
-import { type Task } from "../lib/tasks";
+import {
+  compareTasks,
+  isTaskDoneOn,
+  occurrencesInRange,
+  type Recurrence,
+  type RecurrenceFreq,
+  type Task,
+} from "../lib/tasks";
+import { FOLDER_COLORS } from "../lib/folderColors";
+
+/** Частичная правка задачи из UI календаря (уходит в стор `update`). */
+type TaskPatch = Partial<Pick<Task, "title" | "repeat" | "color" | "tags">>;
 import { flattenNotes } from "../lib/treeUtils";
 import { useCalendarStore } from "../store/calendar";
 import { useNotesStore } from "../store/notes";
 import { useTasksStore } from "../store/tasks";
+import { useToastStore } from "../store/toasts";
+import { pushAll } from "../lib/caldav";
 import { ContextMenu, type ContextMenuItem } from "./ContextMenu";
 
 const WEEKDAYS = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
@@ -52,12 +71,14 @@ function heatAlpha(count: number): number {
 export function CalendarView() {
   const tree = useNotesStore((s) => s.tree);
   const openDailyNote = useNotesStore((s) => s.openDailyNote);
-  const openDailyTemplate = useNotesStore((s) => s.openDailyTemplate);
   const selectNote = useNotesStore((s) => s.selectNote);
   const setView = useNotesStore((s) => s.setView);
 
   // Внешний календарь поверх (только чтение): Яндекс и прочие через фид iCalendar.
   const calendarUrl = useNotesStore((s) => s.settings.calendarIcsUrl);
+  const caldavLogin = useNotesStore((s) => s.settings.caldavLogin);
+  const caldavPassword = useNotesStore((s) => s.settings.caldavPassword);
+  const caldavUrl = useNotesStore((s) => s.settings.caldavUrl);
   const calEvents = useCalendarStore((s) => s.events);
   const calStatus = useCalendarStore((s) => s.status);
   const calError = useCalendarStore((s) => s.error);
@@ -80,6 +101,9 @@ export function CalendarView() {
   const [cursor, setCursor] = useState({ y: today.getFullYear(), m: today.getMonth() });
   // Любой день внутри видимой недели (в раскладке привязка к понедельнику).
   const [weekAnchor, setWeekAnchor] = useState<Date>(() => today);
+  const [datePickOpen, setDatePickOpen] = useState(false);
+  const [pushing, setPushing] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
   // День, у которого открыта модалка (ISO `YYYY-MM-DD`), или null.
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
   // Если задано, модалка дня сразу открывается со строкой добавления на это
@@ -205,26 +229,54 @@ export function CalendarView() {
   // Локальные задачи по дням (для маркера на сетке). `tasks` уже глобально
   // отсортирован, так что срез каждого дня сохраняет порядок показа.
   const tasksByDay = useMemo(() => {
+    // Видимый диапазон: сетка месяца (6 недель) или текущая неделя. Повторы
+    // разворачиваем только на него, бесконечные вхождения не плодим.
+    let fromIso: string;
+    let toIso: string;
+    if (mode === "week") {
+      const ws = startOfWeek(weekAnchor);
+      const we = new Date(ws);
+      we.setDate(ws.getDate() + 6);
+      fromIso = toISODate(ws);
+      toIso = toISODate(we);
+    } else {
+      const gridStart = startOfWeek(new Date(cursor.y, cursor.m, 1));
+      const gridEnd = new Date(gridStart);
+      gridEnd.setDate(gridStart.getDate() + 41);
+      fromIso = toISODate(gridStart);
+      toIso = toISODate(gridEnd);
+    }
     const m = new Map<string, Task[]>();
     for (const t of tasks) {
-      const arr = m.get(t.day);
-      if (arr) arr.push(t);
-      else m.set(t.day, [t]);
+      for (const day of occurrencesInRange(t, fromIso, toIso)) {
+        const arr = m.get(day);
+        if (arr) arr.push(t);
+        else m.set(day, [t]);
+      }
     }
     return m;
-  }, [tasks]);
+  }, [tasks, mode, cursor, weekAnchor]);
 
   // Задачи видимого месяца, сгруппированы по дням для редактируемой повестки.
   const monthTaskGroups = useMemo(() => {
-    const prefix = `${cursor.y}-${String(cursor.m + 1).padStart(2, "0")}-`;
-    const groups: { key: string; date: Date; tasks: Task[] }[] = [];
+    const fromIso = toISODate(new Date(cursor.y, cursor.m, 1));
+    const toIso = toISODate(new Date(cursor.y, cursor.m + 1, 0));
+    const byDay = new Map<string, Task[]>();
     for (const t of tasks) {
-      if (!t.day.startsWith(prefix)) continue;
-      const last = groups[groups.length - 1];
-      if (last && last.key === t.day) last.tasks.push(t);
-      else groups.push({ key: t.day, date: dateOfDay(t.day), tasks: [t] });
+      // Повтор в списке не дублируем: одна запись на задачу, на её первое
+      // вхождение в месяце. На сетке дни всё равно отмечаются (см. tasksByDay).
+      const occ = occurrencesInRange(t, fromIso, toIso);
+      if (occ.length === 0) continue;
+      const day = occ[0];
+      const arr = byDay.get(day);
+      if (arr) arr.push(t);
+      else byDay.set(day, [t]);
     }
-    return groups;
+    return [...byDay.keys()].sort().map((day) => ({
+      key: day,
+      date: dateOfDay(day),
+      tasks: byDay.get(day)!.slice().sort(compareTasks),
+    }));
   }, [tasks, cursor]);
 
   // ─ Режим недели ─
@@ -293,6 +345,32 @@ export function CalendarView() {
   const goNext = () => (mode === "week" ? shiftWeek(1) : shiftMonth(1));
   const goCurrent = () => (mode === "week" ? setWeekAnchor(today) : goToday());
 
+  // Пуш всех задач в Яндекс.Календарь по CalDAV. Кнопка видна, только когда
+  // настроены логин, пароль и календарь (см. Настройки).
+  const caldavReady = Boolean(caldavLogin && caldavPassword && caldavUrl);
+  const pushToYandex = async () => {
+    if (!caldavReady) return;
+    setPushing(true);
+    try {
+      const res = await pushAll(
+        { login: caldavLogin, password: caldavPassword, url: caldavUrl },
+        tasks,
+      );
+      if (res.failed.length === 0) {
+        useToastStore.getState().push(`Отправлено в Яндекс: ${res.ok}`, "success");
+      } else {
+        useToastStore
+          .getState()
+          .push(
+            `Отправлено ${res.ok}, ошибок ${res.failed.length}: ${res.failed[0].error}`,
+            "error",
+          );
+      }
+    } finally {
+      setPushing(false);
+    }
+  };
+
   const openNote = (id: string) => {
     setView("notes");
     void selectNote(id);
@@ -352,6 +430,15 @@ export function CalendarView() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setHelpOpen(true)}
+            title={t("Как пользоваться календарём")}
+            aria-label={t("Подсказка")}
+            className="flex items-center justify-center w-8 h-8 rounded-md text-zinc-400 hover:text-zinc-100 hover:bg-white/[0.05] transition-colors"
+          >
+            <HelpCircle size={15} strokeWidth={2} />
+          </button>
           {hasCalendar && (
             <button
               type="button"
@@ -376,15 +463,22 @@ export function CalendarView() {
               />
             </button>
           )}
-          <button
-            type="button"
-            onClick={() => void openDailyTemplate()}
-            title="Изменить шаблон заметки дня"
-            className="flex items-center gap-1.5 text-[13px] text-zinc-400 hover:text-zinc-100 px-3 py-1.5 rounded-md hover:bg-white/[0.05] transition-colors font-medium"
-          >
-            <LayoutTemplate size={14} strokeWidth={2} />
-            Шаблон
-          </button>
+          {caldavReady && (
+            <button
+              type="button"
+              onClick={() => void pushToYandex()}
+              disabled={pushing}
+              title="Отправить задачи в Яндекс.Календарь"
+              aria-label="Отправить в Яндекс"
+              className="flex items-center justify-center w-8 h-8 rounded-md text-zinc-400 hover:text-zinc-100 hover:bg-white/[0.05] transition-colors disabled:opacity-50"
+            >
+              <Upload
+                size={14}
+                strokeWidth={2}
+                className={cn(pushing && "animate-pulse")}
+              />
+            </button>
+          )}
           <button
             type="button"
             onClick={() => void openDailyNote(new Date())}
@@ -399,8 +493,35 @@ export function CalendarView() {
       <div className="px-10 pt-6 pb-4 shrink-0">
         <div className={cn(mode === "month" && "max-w-3xl mx-auto")}>
           <div className="flex items-center justify-between gap-3">
-            <div className="text-lg font-semibold text-zinc-200 truncate min-w-0">
-              {mode === "week" ? weekLabel : `${MONTHS[cursor.m]} ${cursor.y}`}
+            <div className="relative min-w-0">
+              <button
+                type="button"
+                onClick={() => setDatePickOpen((v) => !v)}
+                title="Перейти к дате"
+                className="flex items-center gap-1.5 max-w-full text-lg font-semibold text-zinc-200 hover:text-white transition-colors"
+              >
+                <span className="truncate">
+                  {mode === "week" ? weekLabel : `${MONTHS[cursor.m]} ${cursor.y}`}
+                </span>
+                <ChevronDown
+                  size={16}
+                  strokeWidth={2}
+                  className="shrink-0 text-zinc-500"
+                />
+              </button>
+              {datePickOpen && (
+                <DatePickerPopover
+                  initial={
+                    mode === "week" ? weekAnchor : new Date(cursor.y, cursor.m, 1)
+                  }
+                  onPick={(d) => {
+                    setCursor({ y: d.getFullYear(), m: d.getMonth() });
+                    setWeekAnchor(d);
+                    setDatePickOpen(false);
+                  }}
+                  onClose={() => setDatePickOpen(false)}
+                />
+              )}
             </div>
             <div className="flex items-center gap-2 shrink-0">
               <div className="flex items-center gap-0.5 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-elevated)] p-0.5">
@@ -445,7 +566,7 @@ export function CalendarView() {
           eventsByDay={weekEventsByDay}
           onOpenDay={(day) => setSelectedDay(day)}
           onPlan={planOnDay}
-          onToggle={(id) => void toggleTask(id)}
+          onToggle={(id, date) => void toggleTask(id, date)}
         />
       ) : (
         <div className="flex-1 overflow-y-auto px-10 pb-6">
@@ -541,9 +662,10 @@ export function CalendarView() {
               здесь, а в модалке дня (клик по дню). */}
           <TasksSection
             groups={monthTaskGroups}
-            onToggle={(id) => void toggleTask(id)}
+            onToggle={(id, date) => void toggleTask(id, date)}
             onRemove={(id) => void removeTask(id)}
             onRename={(id, title) => void updateTask(id, { title })}
+            onPatch={(id, patch) => void updateTask(id, patch)}
           />
 
           {/* События внешнего календаря за видимый месяц */}
@@ -599,6 +721,8 @@ export function CalendarView() {
         </div>
       )}
 
+      {helpOpen && <CalendarHelpModal onClose={() => setHelpOpen(false)} />}
+
       <AnimatePresence>
         {selectedDay && (
           <DayDetailModal
@@ -610,9 +734,10 @@ export function CalendarView() {
             events={selEvents}
             onClose={closeDay}
             onAdd={(time, title) => void addTask(selectedDay, title, time)}
-            onToggle={(id) => void toggleTask(id)}
+            onToggle={(id, date) => void toggleTask(id, date)}
             onRemove={(id) => void removeTask(id)}
             onRename={(id, title) => void updateTask(id, { title })}
+            onPatch={(id, patch) => void updateTask(id, patch)}
             onOpenDailyNote={() => {
               const d = dateOfDay(selectedDay);
               closeDay();
@@ -780,11 +905,13 @@ function TasksSection({
   onToggle,
   onRemove,
   onRename,
+  onPatch,
 }: {
   groups: { key: string; date: Date; tasks: Task[] }[];
-  onToggle: (id: string) => void;
+  onToggle: (id: string, date: string) => void;
   onRemove: (id: string) => void;
   onRename: (id: string, title: string) => void;
+  onPatch: (id: string, patch: TaskPatch) => void;
 }) {
   return (
     <section className="mt-8">
@@ -811,9 +938,11 @@ function TasksSection({
                   <TaskRow
                     key={t.id}
                     task={t}
+                    date={g.key}
                     onToggle={onToggle}
                     onRemove={onRemove}
                     onRename={onRename}
+                    onPatch={onPatch}
                   />
                 ))}
               </div>
@@ -825,21 +954,283 @@ function TasksSection({
   );
 }
 
-/** Одна задача: чекбокс для выполнения, заголовок (клик переименовывает),
- *  необязательное время и удаление, которое всплывает при наведении. */
+const REPEAT_FREQS: { freq: RecurrenceFreq; label: string; unit: string }[] = [
+  { freq: "daily", label: "День", unit: "дн." },
+  { freq: "weekly", label: "Неделя", unit: "нед." },
+  { freq: "monthly", label: "Месяц", unit: "мес." },
+];
+
+/** Короткая подпись повтора для строки задачи, или null если разовая. */
+function repeatShort(rep: Recurrence | null | undefined): string | null {
+  if (!rep) return null;
+  if (rep.freq === "daily") {
+    return rep.every === 1 ? "каждый день" : `каждые ${rep.every} дн.`;
+  }
+  if (rep.freq === "weekly") {
+    return rep.every === 1 ? "каждую нед." : `каждые ${rep.every} нед.`;
+  }
+  return rep.every === 1 ? "каждый мес." : `каждые ${rep.every} мес.`;
+}
+
+/** Видимый контрол повтора: чип со статусом + поповер (день/неделя/месяц и
+ *  свой интервал «каждые N»). */
+function RepeatPicker({
+  repeat,
+  onChange,
+}: {
+  repeat: Recurrence | null | undefined;
+  onChange: (repeat: Recurrence | null) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const btnRef = useRef<HTMLButtonElement>(null);
+
+  const freq = repeat?.freq ?? "daily";
+  const every = repeat?.every ?? 1;
+  const unit = REPEAT_FREQS.find((f) => f.freq === freq)?.unit ?? "дн.";
+
+  const openMenu = () => {
+    const r = btnRef.current?.getBoundingClientRect();
+    if (r) setPos({ x: r.left, y: r.bottom + 4 });
+    setOpen(true);
+  };
+
+  return (
+    <>
+      <button
+        ref={btnRef}
+        type="button"
+        onClick={openMenu}
+        title="Повтор"
+        className={cn(
+          "shrink-0 flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded transition-colors",
+          repeat
+            ? "text-[var(--color-accent)] hover:bg-[var(--color-accent-bg)]"
+            : "text-zinc-500 hover:text-zinc-300 hover:bg-white/[0.05]",
+        )}
+      >
+        <Repeat size={12} strokeWidth={2} />
+        {repeat ? repeatShort(repeat) : "повтор"}
+      </button>
+
+      {open && (
+        <>
+          <div
+            className="fixed inset-0 z-[290]"
+            onClick={() => setOpen(false)}
+          />
+          <div
+            style={{ left: pos.x, top: pos.y, zIndex: 300 }}
+            className="fixed w-56 p-2.5 rounded-lg border border-[var(--color-border-strong)] bg-[var(--color-bg-elevated)] shadow-[var(--shadow-float)]"
+          >
+            <div className="flex items-center gap-1 mb-2">
+              {REPEAT_FREQS.map((f) => (
+                <button
+                  key={f.freq}
+                  type="button"
+                  onClick={() => onChange({ freq: f.freq, every })}
+                  className={cn(
+                    "flex-1 text-[12px] py-1 rounded-md border transition-colors",
+                    repeat && freq === f.freq
+                      ? "border-[var(--color-accent-border)] bg-[var(--color-accent-bg)] text-[var(--color-accent)]"
+                      : "border-[var(--color-border)] text-zinc-300 hover:bg-white/[0.05]",
+                  )}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
+            <div className="flex items-center gap-2 text-[12px] text-zinc-400">
+              <span>каждые</span>
+              <input
+                type="number"
+                min={1}
+                max={99}
+                value={every}
+                onChange={(e) => {
+                  const n = Math.floor(Number(e.target.value));
+                  if (n >= 1) onChange({ freq, every: n });
+                }}
+                className="w-14 bg-[var(--color-bg-overlay)] border border-[var(--color-border-strong)] rounded px-1.5 py-0.5 text-[12px] text-zinc-100 text-center focus:outline-none"
+              />
+              <span>{unit}</span>
+            </div>
+            {repeat && (
+              <button
+                type="button"
+                onClick={() => {
+                  onChange(null);
+                  setOpen(false);
+                }}
+                className="w-full mt-2 text-[12px] text-zinc-400 hover:text-red-300 py-1 rounded-md hover:bg-white/[0.05] transition-colors"
+              >
+                Не повторять
+              </button>
+            )}
+          </div>
+        </>
+      )}
+    </>
+  );
+}
+
+/** Поповер цвета и меток задачи: палитра-кружки + свободные текстовые метки. */
+function TagColorPicker({
+  color,
+  tags,
+  onSetColor,
+  onSetTags,
+}: {
+  color: string | null | undefined;
+  tags: string[];
+  onSetColor: (color: string | null) => void;
+  onSetTags: (tags: string[]) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState({ x: 0, y: 0 });
+  const [draft, setDraft] = useState("");
+  const btnRef = useRef<HTMLButtonElement>(null);
+
+  const openMenu = () => {
+    const r = btnRef.current?.getBoundingClientRect();
+    if (r) setPos({ x: r.left, y: r.bottom + 4 });
+    setOpen(true);
+  };
+
+  const addTag = () => {
+    const tag = draft.trim().replace(/^#+/, "").trim();
+    if (tag && !tags.includes(tag)) onSetTags([...tags, tag]);
+    setDraft("");
+  };
+
+  return (
+    <>
+      <button
+        ref={btnRef}
+        type="button"
+        onClick={openMenu}
+        title="Цвет и метки"
+        className={cn(
+          "shrink-0 transition-colors",
+          color || tags.length > 0
+            ? "text-zinc-300"
+            : "text-zinc-500 hover:text-zinc-300",
+        )}
+      >
+        {color ? (
+          <span
+            className="block w-3.5 h-3.5 rounded-full border border-black/30"
+            style={{ backgroundColor: color }}
+          />
+        ) : (
+          <Tag size={13} strokeWidth={2} />
+        )}
+      </button>
+
+      {open && (
+        <>
+          <div
+            className="fixed inset-0 z-[290]"
+            onClick={() => setOpen(false)}
+          />
+          <div
+            style={{ left: pos.x, top: pos.y, zIndex: 300 }}
+            className="fixed w-60 p-3 rounded-lg border border-[var(--color-border-strong)] bg-[var(--color-bg-elevated)] shadow-[var(--shadow-float)]"
+          >
+            <div className="text-[11px] text-zinc-500 mb-1.5">Цвет</div>
+            <div className="flex items-center gap-1.5 flex-wrap mb-3">
+              <button
+                type="button"
+                onClick={() => onSetColor(null)}
+                title="По умолчанию"
+                className={cn(
+                  "w-5 h-5 rounded-full border flex items-center justify-center transition-transform hover:scale-110",
+                  !color
+                    ? "border-white/70 ring-1 ring-white/40"
+                    : "border-white/20",
+                )}
+              >
+                <X size={11} strokeWidth={2.4} className="text-zinc-400" />
+              </button>
+              {FOLDER_COLORS.map((c) => (
+                <button
+                  key={c.hex}
+                  type="button"
+                  onClick={() => onSetColor(c.hex)}
+                  title={c.label}
+                  style={{ backgroundColor: c.hex }}
+                  className={cn(
+                    "w-5 h-5 rounded-full border transition-transform hover:scale-110",
+                    color === c.hex
+                      ? "border-white ring-2 ring-white/50"
+                      : "border-black/20",
+                  )}
+                />
+              ))}
+            </div>
+
+            <div className="text-[11px] text-zinc-500 mb-1.5">Метки</div>
+            {tags.length > 0 && (
+              <div className="flex items-center gap-1 flex-wrap mb-2">
+                {tags.map((tag) => (
+                  <span
+                    key={tag}
+                    className="inline-flex items-center gap-1 text-[11px] text-zinc-300 bg-white/[0.06] rounded px-1.5 py-0.5"
+                  >
+                    #{tag}
+                    <button
+                      type="button"
+                      onClick={() => onSetTags(tags.filter((x) => x !== tag))}
+                      aria-label={`Убрать метку ${tag}`}
+                      className="text-zinc-500 hover:text-red-300"
+                    >
+                      <X size={10} strokeWidth={2.5} />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+            <input
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  addTag();
+                }
+              }}
+              onBlur={addTag}
+              placeholder="Добавить метку…"
+              className="w-full bg-[var(--color-bg-overlay)] border border-[var(--color-border-strong)] rounded px-2 py-1 text-[12px] text-zinc-100 placeholder:text-zinc-600 focus:outline-none"
+            />
+          </div>
+        </>
+      )}
+    </>
+  );
+}
+
+/** Одна задача: чекбокс выполнения (у повтора по дате `date`), заголовок
+ *  (клик переименовывает), время, цвет+метки, повтор и удаление. */
 function TaskRow({
   task,
+  date,
   onToggle,
   onRemove,
   onRename,
+  onPatch,
 }: {
   task: Task;
-  onToggle: (id: string) => void;
+  date: string;
+  onToggle: (id: string, date: string) => void;
   onRemove: (id: string) => void;
   onRename: (id: string, title: string) => void;
+  onPatch: (id: string, patch: TaskPatch) => void;
 }) {
   const [editing, setEditing] = useState(false);
   const [val, setVal] = useState(task.title);
+
+  const done = isTaskDoneOn(task, date);
 
   const startEdit = () => {
     setVal(task.title);
@@ -852,14 +1243,21 @@ function TaskRow({
   };
 
   return (
-    <div className="group flex items-center gap-2.5 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-elevated)] px-3 py-2">
+    <div
+      className="group flex items-center gap-2.5 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-elevated)] px-3 py-2"
+      style={
+        task.color
+          ? { borderLeftColor: task.color, borderLeftWidth: 3 }
+          : undefined
+      }
+    >
       <button
         type="button"
-        onClick={() => onToggle(task.id)}
-        aria-label={task.done ? "Снять отметку" : "Отметить выполненной"}
+        onClick={() => onToggle(task.id, date)}
+        aria-label={done ? "Снять отметку" : "Отметить выполненной"}
         className={cn(
           "shrink-0 flex items-center justify-center w-[18px] h-[18px] rounded border transition-colors",
-          task.done
+          done
             ? "bg-[var(--color-accent)] border-[var(--color-accent)] text-white"
             : "border-[var(--color-border-strong)] text-transparent hover:border-zinc-400",
         )}
@@ -891,12 +1289,37 @@ function TaskRow({
           onClick={startEdit}
           className={cn(
             "flex-1 min-w-0 text-left text-[13px] break-words",
-            task.done ? "line-through text-zinc-600" : "text-zinc-200",
+            done ? "line-through text-zinc-600" : "text-zinc-200",
           )}
         >
           {task.title}
         </button>
       )}
+
+      {task.tags && task.tags.length > 0 && (
+        <div className="hidden md:flex items-center gap-1 shrink-0">
+          {task.tags.map((tag) => (
+            <span
+              key={tag}
+              className="text-[10px] text-zinc-400 bg-white/[0.05] rounded px-1.5 py-0.5"
+            >
+              #{tag}
+            </span>
+          ))}
+        </div>
+      )}
+
+      <TagColorPicker
+        color={task.color}
+        tags={task.tags ?? []}
+        onSetColor={(c) => onPatch(task.id, { color: c })}
+        onSetTags={(tg) => onPatch(task.id, { tags: tg })}
+      />
+
+      <RepeatPicker
+        repeat={task.repeat}
+        onChange={(r) => onPatch(task.id, { repeat: r })}
+      />
 
       <button
         type="button"
@@ -929,7 +1352,7 @@ function WeekView({
   eventsByDay: Map<string, CalEvent[]>;
   onOpenDay: (day: string) => void;
   onPlan: (day: string, time: string | null) => void;
-  onToggle: (id: string) => void;
+  onToggle: (id: string, date: string) => void;
 }) {
   const gridRef = useRef<HTMLDivElement>(null);
   const [menu, setMenu] = useState<{
@@ -1106,8 +1529,11 @@ function WeekView({
                     key={t.id}
                     kind="task"
                     title={t.title}
-                    done={t.done}
-                    onToggle={() => onToggle(t.id)}
+                    color={t.color ?? undefined}
+                    allDay
+                    repeating={t.repeat != null}
+                    done={isTaskDoneOn(t, c.key)}
+                    onToggle={() => onToggle(t.id, c.key)}
                     onClick={() => onOpenDay(c.key)}
                   />
                 ))}
@@ -1118,7 +1544,7 @@ function WeekView({
           </div>
 
           {/* Часовая сетка */}
-          <div className="grid" style={{ gridTemplateColumns: grid7 }}>
+          <div className="relative grid" style={{ gridTemplateColumns: grid7 }}>
             {HOURS.map((h) => (
               <Fragment key={h}>
                 <div
@@ -1155,8 +1581,10 @@ function WeekView({
                           kind="task"
                           title={t.title}
                           time={t.time ?? undefined}
-                          done={t.done}
-                          onToggle={() => onToggle(t.id)}
+                          color={t.color ?? undefined}
+                          repeating={t.repeat != null}
+                          done={isTaskDoneOn(t, c.key)}
+                          onToggle={() => onToggle(t.id, c.key)}
                           onClick={() => onOpenDay(c.key)}
                         />
                       ))}
@@ -1165,6 +1593,22 @@ function WeekView({
                 })}
               </Fragment>
             ))}
+            {/* Плёнка "весь день": полупрозрачная полоса на всю высоту колонки
+                для дней, где есть дела на весь день. Лежит под чипами и не ловит
+                клики, так что часы под ней кликаются как обычно. */}
+            <div className="pointer-events-none absolute inset-0 flex">
+              <div className="w-12 shrink-0" />
+              {cols.map((c) => (
+                <div
+                  key={c.key}
+                  className={cn(
+                    "flex-1",
+                    c.allDay.tasks.length > 0 &&
+                      "bg-[rgba(245,158,11,0.08)] border-l-2 border-[rgba(245,158,11,0.55)]",
+                  )}
+                />
+              ))}
+            </div>
           </div>
         </div>
       </div>
@@ -1188,6 +1632,9 @@ function WeekChip({
   title,
   time,
   done,
+  allDay,
+  repeating,
+  color,
   onToggle,
   onClick,
 }: {
@@ -1195,6 +1642,9 @@ function WeekChip({
   title: string;
   time?: string;
   done?: boolean;
+  allDay?: boolean;
+  repeating?: boolean;
+  color?: string;
   onToggle?: () => void;
   onClick?: () => void;
 }) {
@@ -1216,11 +1666,14 @@ function WeekChip({
         onClick?.();
       }}
       title={time ? `${time} · ${title}` : title}
+      style={color && !done ? { borderLeftColor: color } : undefined}
       className={cn(
-        "shrink-0 flex items-center gap-1 rounded px-1 py-0.5 text-[10.5px] leading-tight cursor-pointer",
+        "shrink-0 flex items-center gap-1.5 rounded-md border-l-2 pl-1 pr-1.5 py-1 text-[10.5px] leading-tight cursor-pointer",
         done
-          ? "bg-[rgba(99,102,241,0.10)] text-zinc-500"
-          : "bg-[rgba(99,102,241,0.18)] text-indigo-100 border border-[rgba(99,102,241,0.28)]",
+          ? "bg-[rgba(99,102,241,0.06)] text-zinc-500 border-l-[rgba(99,102,241,0.35)]"
+          : allDay
+            ? "bg-[rgba(245,158,11,0.16)] text-amber-100 border-l-[rgba(245,158,11,0.75)]"
+            : "bg-[rgba(99,102,241,0.14)] text-indigo-100 border-l-[var(--color-accent)]",
       )}
     >
       <button
@@ -1240,7 +1693,12 @@ function WeekChip({
         <Check size={8} strokeWidth={3.5} />
       </button>
       {time && <span className="tabular-nums opacity-80 shrink-0">{time}</span>}
-      <span className={cn("truncate", done && "line-through")}>{title}</span>
+      <span className={cn("truncate flex-1", done && "line-through")}>
+        {title}
+      </span>
+      {repeating && (
+        <Repeat size={9} strokeWidth={2.5} className="shrink-0 opacity-70" />
+      )}
     </div>
   );
 }
@@ -1259,6 +1717,7 @@ function DayDetailModal({
   onToggle,
   onRemove,
   onRename,
+  onPatch,
   onOpenDailyNote,
 }: {
   date: Date;
@@ -1268,9 +1727,10 @@ function DayDetailModal({
   events: CalEvent[];
   onClose: () => void;
   onAdd: (time: string | null, title: string) => void;
-  onToggle: (id: string) => void;
+  onToggle: (id: string, date: string) => void;
   onRemove: (id: string) => void;
   onRename: (id: string, title: string) => void;
+  onPatch: (id: string, patch: TaskPatch) => void;
   onOpenDailyNote: () => void;
 }) {
   const hoursRef = useRef<HTMLDivElement>(null);
@@ -1432,9 +1892,11 @@ function DayDetailModal({
                 <TaskRow
                   key={t.id}
                   task={t}
+                  date={toISODate(date)}
                   onToggle={onToggle}
                   onRemove={onRemove}
                   onRename={onRename}
+                  onPatch={onPatch}
                 />
               ))}
               {addingAllDay && (
@@ -1478,9 +1940,11 @@ function DayDetailModal({
                       <TaskRow
                         key={t.id}
                         task={t}
+                        date={toISODate(date)}
                         onToggle={onToggle}
                         onRemove={onRemove}
                         onRename={onRename}
+                        onPatch={onPatch}
                       />
                     ))}
                     {addingHere && (
@@ -1649,6 +2113,226 @@ function NavBtn({
     >
       {children}
     </button>
+  );
+}
+
+/** Поповер прыжка к дате: мини-календарь со стрелками месяц/год, клик по дню
+ *  переносит и месячный, и недельный вид на эту дату. */
+function DatePickerPopover({
+  initial,
+  onPick,
+  onClose,
+}: {
+  initial: Date;
+  onPick: (date: Date) => void;
+  onClose: () => void;
+}) {
+  const [view, setView] = useState(
+    () => new Date(initial.getFullYear(), initial.getMonth(), 1),
+  );
+  const y = view.getFullYear();
+  const m = view.getMonth();
+  const shift = (dM: number, dY: number) => setView(new Date(y + dY, m + dM, 1));
+
+  const lead = (new Date(y, m, 1).getDay() + 6) % 7; // Пн=0
+  const daysInMonth = new Date(y, m + 1, 0).getDate();
+  const cells: (number | null)[] = [];
+  for (let i = 0; i < lead; i++) cells.push(null);
+  for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+
+  const now = new Date();
+  const isToday = (d: number) =>
+    y === now.getFullYear() && m === now.getMonth() && d === now.getDate();
+
+  return (
+    <>
+      <div className="fixed inset-0 z-[290]" onClick={onClose} />
+      <div className="absolute left-0 top-full mt-2 z-[300] w-64 p-3 rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-bg-elevated)] shadow-[var(--shadow-float)]">
+        <div className="flex items-center justify-between mb-2.5">
+          <div className="flex items-center gap-0.5">
+            <PickerNav onClick={() => shift(0, -1)} label="Предыдущий год">
+              <ChevronsLeft size={15} strokeWidth={2} />
+            </PickerNav>
+            <PickerNav onClick={() => shift(-1, 0)} label="Предыдущий месяц">
+              <ChevronLeft size={15} strokeWidth={2} />
+            </PickerNav>
+          </div>
+          <div className="text-[13px] font-semibold text-zinc-200 tabular-nums">
+            {MONTHS[m]} {y}
+          </div>
+          <div className="flex items-center gap-0.5">
+            <PickerNav onClick={() => shift(1, 0)} label="Следующий месяц">
+              <ChevronRight size={15} strokeWidth={2} />
+            </PickerNav>
+            <PickerNav onClick={() => shift(0, 1)} label="Следующий год">
+              <ChevronsRight size={15} strokeWidth={2} />
+            </PickerNav>
+          </div>
+        </div>
+        <div className="grid grid-cols-7 gap-0.5 mb-1">
+          {WEEKDAYS.map((w) => (
+            <div
+              key={w}
+              className="text-[9px] uppercase tracking-wider text-zinc-600 text-center"
+            >
+              {w}
+            </div>
+          ))}
+        </div>
+        <div className="grid grid-cols-7 gap-0.5">
+          {cells.map((d, i) =>
+            d == null ? (
+              <div key={i} />
+            ) : (
+              <button
+                key={i}
+                type="button"
+                onClick={() => onPick(new Date(y, m, d))}
+                className={cn(
+                  "h-7 rounded-md text-[12px] tabular-nums transition-colors",
+                  isToday(d)
+                    ? "bg-[var(--color-accent)] text-white font-semibold"
+                    : "text-zinc-300 hover:bg-white/[0.06]",
+                )}
+              >
+                {d}
+              </button>
+            ),
+          )}
+        </div>
+      </div>
+    </>
+  );
+}
+
+function PickerNav({
+  children,
+  onClick,
+  label,
+}: {
+  children: React.ReactNode;
+  onClick: () => void;
+  label: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={label}
+      aria-label={label}
+      className="p-1 rounded-md text-zinc-500 hover:text-zinc-100 hover:bg-white/[0.05] transition-colors"
+    >
+      {children}
+    </button>
+  );
+}
+
+/** Модалка-подсказка по календарю: как пользоваться, подписка iCal и пуш CalDAV.
+ *  Весь текст через t(), так что язык следует за интерфейсом. */
+function CalendarHelpModal({ onClose }: { onClose: () => void }) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  return (
+    <div
+      onClick={onClose}
+      className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-lg max-h-[82vh] flex flex-col rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-bg-overlay)] shadow-2xl shadow-black/60 overflow-hidden"
+      >
+        <div className="shrink-0 px-5 py-3.5 border-b border-[var(--color-border)] flex items-center justify-between">
+          <h2 className="text-[15px] font-semibold text-zinc-100">
+            {t("Как пользоваться календарём")}
+          </h2>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label={t("Закрыть")}
+            className="flex items-center justify-center w-7 h-7 rounded-md text-zinc-500 hover:text-zinc-200 hover:bg-white/[0.06] transition-colors"
+          >
+            <X size={16} strokeWidth={2} />
+          </button>
+        </div>
+        <div className="overflow-y-auto px-5 py-4 space-y-5 text-[13px] text-zinc-300 leading-relaxed">
+          <HelpBlock title={t("Задачи")}>
+            <p>
+              {t(
+                "Кликните по дню, чтобы добавить дело: без времени - на весь день, со временем - в часовую сетку.",
+              )}
+            </p>
+            <p>
+              {t(
+                "Месяц и Неделя переключаются кнопками сверху. Клик по заголовку с датой открывает выбор любой даты.",
+              )}
+            </p>
+            <p>{t("Галочка слева отмечает выполнение.")}</p>
+          </HelpBlock>
+
+          <HelpBlock title={t("Повторы, цвета и метки")}>
+            <p>
+              {t(
+                "Повтор: кнопка повтора на задаче - день, неделя или месяц и свой интервал «каждые N».",
+              )}
+            </p>
+            <p>
+              {t(
+                "Цвет и метки: кнопка-метка на задаче - цвет из палитры и произвольные теги.",
+              )}
+            </p>
+          </HelpBlock>
+
+          <HelpBlock title={t("Подписка на календарь (iCal, только чтение)")}>
+            <p>
+              {t(
+                "Настройки → Календарь: вставьте приватную ссылку iCal (.ics), например из Яндекс.Календаря. Чужие события лягут поверх календаря, без изменения.",
+              )}
+            </p>
+          </HelpBlock>
+
+          <HelpBlock title={t("Пуш в Яндекс.Календарь (CalDAV)")}>
+            <p>
+              {t(
+                "Настройки → Пуш в Яндекс.Календарь: укажите логин и пароль приложения (id.yandex.ru → Пароли приложений → CalDAV), нажмите «Найти календари» и выберите календарь.",
+              )}
+            </p>
+            <p>
+              {t(
+                "Кнопка отправки вверху календаря шлёт ваши задачи как события. Повторная отправка обновляет их.",
+              )}
+            </p>
+            <p className="text-zinc-500">
+              {t(
+                "Разница: подписка iCal - только чтение (видеть чужой календарь), CalDAV - запись (отправлять свои задачи в Яндекс).",
+              )}
+            </p>
+          </HelpBlock>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function HelpBlock({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="space-y-1.5">
+      <h3 className="text-[12px] uppercase tracking-wider font-semibold text-zinc-500">
+        {title}
+      </h3>
+      {children}
+    </section>
   );
 }
 

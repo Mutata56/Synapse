@@ -59,6 +59,39 @@ const en: Record<string, string> = {
 
   // ─── Настройки ───
   "Внешний вид, быстрая заметка и хранилище": "Appearance, quick note and storage",
+
+  // ─── Календарь: подсказка и CalDAV ───
+  "Подсказка": "Help",
+  "Как пользоваться календарём": "How to use the calendar",
+  "Задачи": "Tasks",
+  "Кликните по дню, чтобы добавить дело: без времени - на весь день, со временем - в часовую сетку.":
+    "Click a day to add a task: without a time it is all-day, with a time it goes into the hourly grid.",
+  "Месяц и Неделя переключаются кнопками сверху. Клик по заголовку с датой открывает выбор любой даты.":
+    "Switch Month and Week with the buttons on top. Click the date title to jump to any date.",
+  "Галочка слева отмечает выполнение.": "The checkbox on the left marks a task done.",
+  "Повторы, цвета и метки": "Recurrence, colors and tags",
+  "Повтор: кнопка повтора на задаче - день, неделя или месяц и свой интервал «каждые N».":
+    'Recurrence: the repeat button on a task - day, week or month with a custom "every N" interval.',
+  "Цвет и метки: кнопка-метка на задаче - цвет из палитры и произвольные теги.":
+    "Color and tags: the tag button on a task - a color from the palette and free-form tags.",
+  "Подписка на календарь (iCal, только чтение)":
+    "Calendar subscription (iCal, read-only)",
+  "Настройки → Календарь: вставьте приватную ссылку iCal (.ics), например из Яндекс.Календаря. Чужие события лягут поверх календаря, без изменения.":
+    "Settings → Calendar: paste a private iCal (.ics) link, e.g. from Yandex Calendar. External events show on top of the calendar, read-only.",
+  "Пуш в Яндекс.Календарь (CalDAV)": "Push to Yandex Calendar (CalDAV)",
+  "Настройки → Пуш в Яндекс.Календарь: укажите логин и пароль приложения (id.yandex.ru → Пароли приложений → CalDAV), нажмите «Найти календари» и выберите календарь.":
+    'Settings → Push to Yandex Calendar: enter your login and an app password (id.yandex.ru → App passwords → CalDAV), click "Find calendars" and pick one.',
+  "Кнопка отправки вверху календаря шлёт ваши задачи как события. Повторная отправка обновляет их.":
+    "The upload button at the top of the calendar sends your tasks as events. Sending again updates them.",
+  "Разница: подписка iCal - только чтение (видеть чужой календарь), CalDAV - запись (отправлять свои задачи в Яндекс).":
+    "The difference: an iCal subscription is read-only (view someone's calendar), CalDAV writes (send your tasks to Yandex).",
+  "Отправлять свои задачи как события. Нужен пароль приложения, не пароль аккаунта.":
+    "Send your tasks as events. Needs an app password, not your account password.",
+  "пароль приложения": "app password",
+  "Найти календари": "Find calendars",
+  "Куда отправлять": "Where to send",
+  "(без имени)": "(no name)",
+  "Выбран": "Selected",
   "Акцентный цвет": "Accent color",
   "Цвет выделения, ссылок и активных элементов": "Color for highlights, links and active elements",
   "Свой цвет (HEX)": "Custom color (HEX)",

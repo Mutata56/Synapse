@@ -118,6 +118,212 @@ async fn fetch_ics(url: String) -> Result<String, String> {
     String::from_utf8(bytes.to_vec()).map_err(|e| e.to_string())
 }
 
+// ─── CalDAV: пуш своих задач как событий (Яндекс.Календарь и любой CalDAV) ───
+//
+// Всё в Rust, чтобы не упереться в CORS вебвью и иметь basic-auth. Ошибки
+// возвращаем со статусом И телом ответа: тело обычно объясняет причину, иначе
+// отлаживать вслепую через пользователя.
+
+/// HTTP-клиент CalDAV: те же таймаут и user-agent, что у fetch_ics.
+#[cfg(desktop)]
+fn caldav_client() -> Result<reqwest::Client, String> {
+    reqwest::Client::builder()
+        .user_agent("synapse/1.0")
+        .timeout(Duration::from_secs(30))
+        .build()
+        .map_err(|e| e.to_string())
+}
+
+/// Календарная коллекция, найденная при discovery (абсолютный URL + имя).
+#[cfg(desktop)]
+#[derive(serde::Serialize)]
+struct CalCollection {
+    href: String,
+    name: String,
+}
+
+/// Локальное имя XML-тега без namespace-префикса (`d:href` -> `href`).
+#[cfg(desktop)]
+fn local_name(tag: &str) -> &str {
+    tag.rsplit(':').next().unwrap_or(tag)
+}
+
+/// Внутренняя разметка каждого элемента с локальным именем `name`. Грубый разбор
+/// без XML-зависимости: CalDAV multistatus плоский (одноимённые элементы не
+/// вложены друг в друга), этого хватает для href/resourcetype/displayname.
+#[cfg(desktop)]
+fn elements<'a>(xml: &'a str, name: &str) -> Vec<&'a str> {
+    let mut out = Vec::new();
+    let mut i = 0usize;
+    while let Some(rel) = xml[i..].find('<') {
+        let lt = i + rel;
+        let after = &xml[lt + 1..];
+        // закрывающие теги, комментарии, объявления пропускаем
+        if matches!(after.as_bytes().first(), Some(b'/') | Some(b'!') | Some(b'?')) {
+            i = lt + 1;
+            continue;
+        }
+        let name_end = match after.find(|c: char| {
+            c == '>' || c == ' ' || c == '/' || c == '\t' || c == '\n' || c == '\r'
+        }) {
+            Some(e) => e,
+            None => break,
+        };
+        let tag = &after[..name_end];
+        let gt = match after.find('>') {
+            Some(g) => g,
+            None => break,
+        };
+        let self_closing = gt > 0 && after.as_bytes()[gt - 1] == b'/';
+        let content_start = lt + 1 + gt + 1;
+        if local_name(tag) == name {
+            if self_closing {
+                out.push("");
+            } else if let Some(end_rel) = find_close(&xml[content_start..], name) {
+                out.push(&xml[content_start..content_start + end_rel]);
+                i = content_start + end_rel;
+                continue;
+            } else {
+                break;
+            }
+        }
+        i = content_start;
+    }
+    out
+}
+
+/// Смещение начала закрывающего тега `</...name>` от начала `s`.
+#[cfg(desktop)]
+fn find_close(s: &str, name: &str) -> Option<usize> {
+    let mut i = 0usize;
+    while let Some(rel) = s[i..].find("</") {
+        let p = i + rel + 2;
+        let after = &s[p..];
+        let end = after.find(|c: char| c == '>' || c == ' ')?;
+        if local_name(&after[..end]) == name {
+            return Some(i + rel);
+        }
+        i = p;
+    }
+    None
+}
+
+/// Origin (`scheme://host[:port]`) из полного URL, чтобы разрешать относительные
+/// href из ответа сервера в абсолютные.
+#[cfg(desktop)]
+fn origin_of(url: &str) -> String {
+    if let Some(scheme_end) = url.find("://") {
+        let after = scheme_end + 3;
+        if let Some(slash) = url[after..].find('/') {
+            return url[..after + slash].to_string();
+        }
+    }
+    url.trim_end_matches('/').to_string()
+}
+
+/// PROPFIND Depth:1 по календарь-хоуму: проверяет креды и отдаёт календарные
+/// коллекции (href + имя). На не-2xx возвращает статус и тело ответа.
+#[cfg(desktop)]
+#[tauri::command]
+async fn caldav_discover(
+    url: String,
+    login: String,
+    password: String,
+) -> Result<Vec<CalCollection>, String> {
+    let client = caldav_client()?;
+    let method = reqwest::Method::from_bytes(b"PROPFIND").map_err(|e| e.to_string())?;
+    let body = r#"<?xml version="1.0" encoding="utf-8"?><d:propfind xmlns:d="DAV:"><d:prop><d:resourcetype/><d:displayname/></d:prop></d:propfind>"#;
+    let resp = client
+        .request(method, &url)
+        .basic_auth(&login, Some(&password))
+        .header("Depth", "1")
+        .header("Content-Type", "application/xml; charset=utf-8")
+        .body(body)
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+    let status = resp.status();
+    let text = resp.text().await.unwrap_or_default();
+    if !status.is_success() {
+        return Err(format!("{} {}", status.as_u16(), text.trim()));
+    }
+    let origin = origin_of(&url);
+    let mut out = Vec::new();
+    for block in elements(&text, "response") {
+        let href = match elements(block, "href").into_iter().next() {
+            Some(h) => h.trim().to_string(),
+            None => continue,
+        };
+        // только календари: у самого хоума и адресных книг нет <calendar/>
+        let rt = elements(block, "resourcetype")
+            .into_iter()
+            .next()
+            .unwrap_or("");
+        if elements(rt, "calendar").is_empty() {
+            continue;
+        }
+        let name = elements(block, "displayname")
+            .into_iter()
+            .next()
+            .map(|s| s.trim().to_string())
+            .unwrap_or_default();
+        let abs = if href.starts_with("http") {
+            href
+        } else {
+            format!("{}{}", origin, href)
+        };
+        out.push(CalCollection { href: abs, name });
+    }
+    Ok(out)
+}
+
+/// Кладёт (создаёт/обновляет) событие: PUT VCALENDAR по `{коллекция}{uid}.ics`.
+/// UID=id задачи, так что повторный пуш просто перезаписывает.
+#[cfg(desktop)]
+#[tauri::command]
+async fn caldav_put(
+    url: String,
+    login: String,
+    password: String,
+    ics: String,
+) -> Result<(), String> {
+    let client = caldav_client()?;
+    let resp = client
+        .put(&url)
+        .basic_auth(&login, Some(&password))
+        .header("Content-Type", "text/calendar; charset=utf-8")
+        .body(ics)
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+    let status = resp.status();
+    if !status.is_success() {
+        let body = resp.text().await.unwrap_or_default();
+        return Err(format!("{} {}", status.as_u16(), body.trim()));
+    }
+    Ok(())
+}
+
+/// Удаляет событие с сервера (когда задачу убрали в приложении). 404 считаем
+/// успехом: значит его и так нет.
+#[cfg(desktop)]
+#[tauri::command]
+async fn caldav_delete(url: String, login: String, password: String) -> Result<(), String> {
+    let client = caldav_client()?;
+    let resp = client
+        .delete(&url)
+        .basic_auth(&login, Some(&password))
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+    let status = resp.status();
+    if !status.is_success() && status.as_u16() != 404 {
+        let body = resp.text().await.unwrap_or_default();
+        return Err(format!("{} {}", status.as_u16(), body.trim()));
+    }
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     // TODO: на Linux пока запускаем с WEBKIT_DISABLE_DMABUF_RENDERER=1 руками.
@@ -131,7 +337,13 @@ pub fn run() {
     #[cfg(desktop)]
     let builder = builder
         .manage(CaptureShortcut::default())
-        .invoke_handler(tauri::generate_handler![set_capture_shortcut, fetch_ics]);
+        .invoke_handler(tauri::generate_handler![
+            set_capture_shortcut,
+            fetch_ics,
+            caldav_discover,
+            caldav_put,
+            caldav_delete
+        ]);
 
     builder
         .setup(|app| {

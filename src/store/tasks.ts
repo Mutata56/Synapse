@@ -17,20 +17,31 @@ import {
   compareTasks,
   isValidDay,
   newTaskId,
+  normalizeTags,
   normalizeTime,
+  type Recurrence,
   type Task,
 } from "../lib/tasks";
 
-type TaskPatch = Partial<Pick<Task, "title" | "day" | "time" | "done">>;
+type TaskPatch = Partial<
+  Pick<Task, "title" | "day" | "time" | "done" | "repeat" | "color" | "tags">
+>;
 
 type TasksState = {
   tasks: Task[];
   /** True после чтения файла, чтобы `load` не перечитывал повторно. */
   loaded: boolean;
   load: () => Promise<void>;
-  add: (day: string, title: string, time?: string | null) => Promise<void>;
+  add: (
+    day: string,
+    title: string,
+    time?: string | null,
+    repeat?: Recurrence | null,
+  ) => Promise<void>;
   update: (id: string, patch: TaskPatch) => Promise<void>;
-  toggle: (id: string) => Promise<void>;
+  /** Для повтора `date` обязателен (ставит/снимает метку в `doneDates`); у
+   *  разовой задачи `date` игнорируется, переключается её общий `done`. */
+  toggle: (id: string, date?: string) => Promise<void>;
   remove: (id: string) => Promise<void>;
 };
 
@@ -44,7 +55,7 @@ export const useTasksStore = create<TasksState>((set, get) => ({
     set({ tasks: tasks.sort(compareTasks), loaded: true });
   },
 
-  add: async (day, title, time = null) => {
+  add: async (day, title, time = null, repeat = null) => {
     const t = title.trim();
     if (!t || !isValidDay(day)) return;
     const now = Date.now();
@@ -54,6 +65,10 @@ export const useTasksStore = create<TasksState>((set, get) => ({
       day,
       time: normalizeTime(time),
       done: false,
+      repeat: repeat ?? null,
+      doneDates: [],
+      color: null,
+      tags: [],
       createdAt: now,
       updatedAt: now,
     };
@@ -74,6 +89,9 @@ export const useTasksStore = create<TasksState>((set, get) => ({
         if (patch.day !== undefined && isValidDay(patch.day)) next.day = patch.day;
         if (patch.time !== undefined) next.time = normalizeTime(patch.time);
         if (patch.done !== undefined) next.done = patch.done;
+        if (patch.repeat !== undefined) next.repeat = patch.repeat;
+        if (patch.color !== undefined) next.color = patch.color;
+        if (patch.tags !== undefined) next.tags = normalizeTags(patch.tags);
         return next;
       })
       .sort(compareTasks);
@@ -83,10 +101,21 @@ export const useTasksStore = create<TasksState>((set, get) => ({
 
   // Отдельно от `update`, чтобы пропустить пересортировку: переключение
   // `done` никогда не меняет порядок, строка остается на месте, а не прыгает.
-  toggle: async (id) => {
-    const tasks = get().tasks.map((t) =>
-      t.id === id ? { ...t, done: !t.done, updatedAt: Date.now() } : t,
-    );
+  toggle: async (id, date) => {
+    const tasks = get().tasks.map((t) => {
+      if (t.id !== id) return t;
+      const now = Date.now();
+      // Разовая: переключаем общий `done`. Повтор: ставим/снимаем метку на
+      // конкретную дату вхождения в `doneDates`.
+      if (!t.repeat || !date) {
+        return { ...t, done: !t.done, updatedAt: now };
+      }
+      const cur = t.doneDates ?? [];
+      const doneDates = cur.includes(date)
+        ? cur.filter((d) => d !== date)
+        : [...cur, date];
+      return { ...t, doneDates, updatedAt: now };
+    });
     set({ tasks });
     await writeTasks(tasks);
   },
