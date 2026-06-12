@@ -23,6 +23,13 @@ export type AppSettings = {
    *  выключено. Тянем только на чтение через Rust-команду `fetch_ics` и кладём
    *  поверх календаря. В URL зашит приватный токен, так что это секрет. */
   calendarIcsUrl: string;
+  /** Логин (почта) для Яндекс CalDAV, чтобы пушить свои задачи как события. */
+  caldavLogin: string;
+  /** Пароль приложения CalDAV. СЕКРЕТ: лежит в `.settings.json` рядом с заметками,
+   *  как и `calendarIcsUrl`. Не путать с основным паролем аккаунта. */
+  caldavPassword: string;
+  /** URL календарной коллекции для PUT событий, выбирается через "Найти календари". */
+  caldavUrl: string;
 };
 
 /** Дефолты совпадают с тем, что раньше было захардкожено в CSS и Rust, так что
@@ -34,6 +41,9 @@ export const DEFAULT_SETTINGS: AppSettings = {
   captureShortcut: "CommandOrControl+Shift+N",
   openDailyOnStartup: false,
   calendarIcsUrl: "",
+  caldavLogin: "",
+  caldavPassword: "",
+  caldavUrl: "",
 };
 
 /** Пресеты акцента, показаны плашками в настройках. Первый это исторический
@@ -85,6 +95,18 @@ export function coerceSettings(raw: unknown): AppSettings {
       typeof r.calendarIcsUrl === "string"
         ? r.calendarIcsUrl.trim()
         : DEFAULT_SETTINGS.calendarIcsUrl,
+    caldavLogin:
+      typeof r.caldavLogin === "string"
+        ? r.caldavLogin.trim()
+        : DEFAULT_SETTINGS.caldavLogin,
+    caldavPassword:
+      typeof r.caldavPassword === "string"
+        ? r.caldavPassword
+        : DEFAULT_SETTINGS.caldavPassword,
+    caldavUrl:
+      typeof r.caldavUrl === "string"
+        ? r.caldavUrl.trim()
+        : DEFAULT_SETTINGS.caldavUrl,
   };
 }
 

@@ -114,7 +114,7 @@ export function ContextMenu({
             zIndex: Z_CONTEXT_MENU,
             minWidth: MIN_WIDTH_PX,
           }}
-          className="fixed py-1 rounded-lg border border-[var(--color-border-strong)] bg-[var(--color-bg-overlay)] shadow-[var(--shadow-float)] backdrop-blur-xl backdrop-saturate-[1.7]"
+          className="fixed py-1 rounded-lg border border-[var(--color-border-strong)] bg-[var(--color-bg-elevated)] shadow-[var(--shadow-float)]"
         >
           {items.map((item, i) =>
             item.kind === "separator" ? (
