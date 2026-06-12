@@ -1,0 +1,63 @@
+# Сборка установщиков и публикация релиза.
+# Триггер — пуш тега вида v* (например `git tag v0.1.0 && git push origin v0.1.0`).
+# Под каждую ОС собирается свой бандл, всё складывается в ОДИН черновик релиза,
+# который потом остаётся опубликовать руками на странице Releases.
+name: release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+# tauri-action создаёт релиз и заливает в него файлы — нужен доступ на запись.
+permissions:
+  contents: write
+
+jobs:
+  release:
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          - ubuntu-22.04 # webkit2gtk 4.1 доступен только с 22.04
+          - windows-latest
+          - macos-latest
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # Системные библиотеки для сборки Tauri под Linux (под Win/macOS не нужны).
+      - name: Зависимости (Linux)
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libgtk-3-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      # Кэш скомпилированных crates — без него каждый прогон тянет Rust-зависимости заново.
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: ./src-tauri -> target
+
+      - run: npm ci
+
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: "Synapse ${{ github.ref_name }}"
+          releaseBody: "Установщики Synapse прикреплены ниже. Выберите файл под свою систему."
+          releaseDraft: true
+          prerelease: false
