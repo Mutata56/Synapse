@@ -1,5 +1,6 @@
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
+import { motion, useReducedMotion } from "framer-motion";
 import {
   Archive,
   CalendarDays,
@@ -10,6 +11,7 @@ import {
   Keyboard,
   Palette,
   RefreshCw,
+  Settings,
   Sparkles,
   Upload,
   type LucideIcon,
@@ -35,204 +37,365 @@ import { useNotesStore } from "../store/notes";
 import { useToastStore } from "../store/toasts";
 import { discover, yandexHome, type CalCollection } from "../lib/caldav";
 
-// Клавиши, которые являются ТОЛЬКО модификаторами: игнорируются при записи
-// комбинации, ждём реальную клавишу перед сборкой хоткея.
 const LONE_MODIFIERS = new Set(["Shift", "Control", "Alt", "Meta"]);
+const EASE = [0.22, 1, 0.36, 1] as const;
+
+const inputCls =
+  "w-full px-3.5 py-2.5 rounded-xl bg-white/[0.04] border border-[var(--color-border-strong)] text-[13px] text-zinc-200 font-mono outline-none focus:border-[var(--color-accent-border)] focus:bg-white/[0.06] transition-colors duration-200 placeholder:text-zinc-600";
+const btnCls =
+  "inline-flex items-center gap-2 px-4 py-2 rounded-xl text-[13px] font-medium border border-[var(--color-border-strong)] bg-white/[0.04] text-zinc-200 hover:bg-white/[0.08] hover:border-[var(--color-accent-border)] active:scale-[0.98] transition-all duration-200 disabled:opacity-40 disabled:cursor-default disabled:hover:bg-white/[0.04] disabled:hover:border-[var(--color-border-strong)]";
 
 export function SettingsView() {
   const settings = useNotesStore((s) => s.settings);
   const updateSettings = useNotesStore((s) => s.updateSettings);
+  const reduced = useReducedMotion() ?? false;
 
+  // `@container` на корне: вложенные сетки реагируют на ШИРИНУ самой панели, а не
+  // окна. Это важно, потому что слева сидит сайдбар, и обычные viewport-брейкпоинты
+  // (md:/lg:) переоценили бы доступное место. Так карточки честно встают в одну
+  // колонку, когда панель ужимается.
   return (
-    <div className="flex-1 flex flex-col overflow-hidden">
-      <header className="px-10 py-6 border-b border-[var(--color-border)] shrink-0">
-        <h2 className="text-2xl font-semibold tracking-tight text-zinc-100">
-          {t("Настройки")}
-        </h2>
-        <p className="text-[13px] text-zinc-500 mt-1">
-          {t("Внешний вид, быстрая заметка и хранилище")}
-        </p>
+    <div className="@container flex-1 flex flex-col overflow-hidden">
+      {/* ── Шапка ── */}
+      <header className="relative shrink-0 overflow-hidden px-6 pt-8 pb-6 @2xl:px-10">
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-[var(--color-accent-bg)] via-transparent to-transparent opacity-70" />
+        <div className="pointer-events-none absolute -top-24 right-6 h-48 w-48 rounded-full bg-[var(--color-accent)] opacity-[0.06] blur-3xl" />
+        <motion.div
+          initial={reduced ? false : { opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, ease: EASE }}
+          className="relative flex items-center gap-4"
+        >
+          {/* Шестерёнка слегка проворачивается при наведении — маленькая радость */}
+          <motion.div
+            whileHover={reduced ? undefined : { rotate: 90 }}
+            transition={{ type: "spring", stiffness: 200, damping: 15 }}
+            className="grid place-items-center p-2.5 rounded-2xl bg-[var(--color-accent-bg)] ring-1 ring-[var(--color-accent-border)]"
+          >
+            <Settings size={22} className="text-[var(--color-accent)]" />
+          </motion.div>
+          <div>
+            <h2 className="text-[26px] font-bold tracking-tight text-zinc-50">
+              {t("Настройки")}
+            </h2>
+            <p className="text-[13px] text-zinc-500 mt-0.5">
+              {t("Внешний вид, быстрая заметка и хранилище")}
+            </p>
+          </div>
+        </motion.div>
       </header>
 
-      <div className="flex-1 overflow-y-auto px-10 py-8">
-        <div className="max-w-2xl space-y-10">
-          <LanguageSection />
-          <AccentSection
-            value={settings.accentColor}
-            onChange={(hex) => void updateSettings({ accentColor: hex })}
-          />
-          <DailySection
-            value={settings.openDailyOnStartup}
-            onChange={(v) => void updateSettings({ openDailyOnStartup: v })}
-          />
-          <ShortcutSection
-            value={settings.captureShortcut}
-            onChange={(accel) => void updateSettings({ captureShortcut: accel })}
-          />
-          <CalendarSection />
-          <CaldavSection />
-          <StorageSection />
+      {/* ── Прокручиваемое тело, разбитое на смысловые секции ── */}
+      <div className="flex-1 overflow-y-auto px-6 pb-12 pt-2 @2xl:px-10">
+        <div className="mx-auto w-full max-w-[920px]">
+          <Section icon={Palette} title={t("Внешний вид")} index={0} reduced={reduced}>
+            <div className="grid grid-cols-1 gap-4 @3xl:grid-cols-[minmax(0,280px)_minmax(0,1fr)] items-start">
+              <LangCard reduced={reduced} delay={1} />
+              <AccentCard
+                value={settings.accentColor}
+                onChange={(hex) => void updateSettings({ accentColor: hex })}
+                reduced={reduced}
+                delay={2}
+              />
+            </div>
+          </Section>
+
+          <Section icon={Sparkles} title={t("Поведение")} index={1} reduced={reduced}>
+            <div className="grid grid-cols-1 gap-4 @2xl:grid-cols-2 items-start">
+              <DailyCard
+                value={settings.openDailyOnStartup}
+                onChange={(v) => void updateSettings({ openDailyOnStartup: v })}
+                reduced={reduced}
+                delay={3}
+              />
+              <ShortcutCard
+                value={settings.captureShortcut}
+                onChange={(accel) =>
+                  void updateSettings({ captureShortcut: accel })
+                }
+                reduced={reduced}
+                delay={4}
+              />
+            </div>
+          </Section>
+
+          <Section icon={CalendarDays} title={t("Календарь")} index={2} reduced={reduced}>
+            <div className="grid grid-cols-1 gap-4 @2xl:grid-cols-2 items-start">
+              <CalendarCard reduced={reduced} delay={5} />
+              <CaldavCard reduced={reduced} delay={6} />
+            </div>
+          </Section>
+
+          <Section icon={HardDrive} title={t("Данные")} index={3} reduced={reduced}>
+            <StorageCard reduced={reduced} delay={7} />
+          </Section>
         </div>
       </div>
     </div>
   );
 }
 
-// ─── Оболочка секции ───────────────────────────────────────────────────────
+// ─── Заголовок секции ──────────────────────────────────────────────────────
+// Тонкая полоска с лейблом капсом и затухающей линией — задаёт группировку, но
+// не спорит по весу с самими карточками.
 
 function Section({
   icon: Icon,
   title,
+  index,
+  reduced,
+  children,
+}: {
+  icon: LucideIcon;
+  title: string;
+  index: number;
+  reduced: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <section className="mb-9 last:mb-0">
+      <motion.div
+        initial={reduced ? false : { opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, delay: reduced ? 0 : index * 0.08, ease: EASE }}
+        className="flex items-center gap-2.5 mb-3.5 px-0.5"
+      >
+        <Icon size={14} strokeWidth={2.2} className="text-[var(--color-accent)] shrink-0" />
+        <h3 className="text-[11.5px] font-semibold uppercase tracking-[0.1em] text-zinc-400">
+          {title}
+        </h3>
+        <div className="flex-1 h-px bg-gradient-to-r from-[var(--color-border-strong)] via-[var(--color-border)] to-transparent" />
+      </motion.div>
+      {children}
+    </section>
+  );
+}
+
+// ─── Обёртка-карточка ──────────────────────────────────────────────────────
+
+function Card({
+  icon: Icon,
+  title,
   description,
   children,
+  delay,
+  reduced,
+  className,
 }: {
   icon: LucideIcon;
   title: string;
   description?: string;
   children: ReactNode;
+  delay: number;
+  reduced: boolean;
+  className?: string;
 }) {
   return (
-    <section>
-      <div className="flex items-center gap-2.5">
-        <Icon
-          size={16}
-          strokeWidth={2}
-          className="text-[var(--color-accent)] shrink-0"
-        />
-        <h3 className="text-[15px] font-semibold text-zinc-200">{title}</h3>
-      </div>
-      {description && (
-        <p className="text-[13px] text-zinc-500 mt-1 ml-[26px]">{description}</p>
+    <motion.section
+      initial={reduced ? false : { opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.45, delay: reduced ? 0 : delay * 0.05, ease: EASE }}
+      whileHover={reduced ? undefined : { y: -2, transition: { duration: 0.18, ease: EASE } }}
+      // Лёгкое возвышение: своя поверхность + рамка, на ховере рамка теплеет до
+      // акцента и подъезжает мягкая тень. transition сознательно НЕ трогает
+      // transform — иначе он дрался бы с подъёмом по y от framer-motion.
+      style={{
+        background:
+          "radial-gradient(130% 130% at 100% 0%, color-mix(in oklab, var(--color-accent) 7%, transparent) 0%, transparent 55%), var(--surface-1)",
+      }}
+      className={cn(
+        "group relative overflow-hidden rounded-2xl p-5 border border-[var(--color-border)]",
+        "transition-[border-color,box-shadow] duration-200",
+        "hover:border-[var(--color-accent-border)] hover:shadow-[0_12px_34px_-16px_rgba(0,0,0,0.7)]",
+        className,
       )}
-      <div className="mt-4 ml-[26px]">{children}</div>
-    </section>
+    >
+      {/* Акцентное свечение в углу — проявляется только при наведении */}
+      <div className="pointer-events-none absolute -top-16 -right-16 h-32 w-32 rounded-full bg-[var(--color-accent)] opacity-0 blur-3xl transition-opacity duration-500 group-hover:opacity-[0.08]" />
+
+      <div className="relative flex items-center gap-3 mb-4">
+        <span className="grid place-items-center w-9 h-9 rounded-xl bg-[var(--color-accent-bg)] text-[var(--color-accent)] shrink-0">
+          <Icon size={16} strokeWidth={2} />
+        </span>
+        <div className="min-w-0">
+          <h3 className="text-[14px] font-semibold text-zinc-200 leading-tight">{title}</h3>
+          {description && (
+            <p className="text-[12px] text-zinc-500 mt-0.5 leading-snug">{description}</p>
+          )}
+        </div>
+      </div>
+      <div className="relative">{children}</div>
+    </motion.section>
   );
 }
 
-function LanguageSection() {
+// ─── Язык ──────────────────────────────────────────────────────────────────
+
+function LangCard({ reduced, delay }: { reduced: boolean; delay: number }) {
   const { lang, setLang } = useI18n();
 
   return (
-    <Section
-      icon={Globe}
-      title="Language"
-      description="Interface language"
-    >
-      <div className="flex items-center gap-2">
+    <Card icon={Globe} title="Language" description="Interface language" reduced={reduced} delay={delay}>
+      <div className="flex gap-2">
         {(["ru", "en"] as const).map((l) => (
-          <button
+          <motion.button
             key={l}
             type="button"
+            whileTap={{ scale: 0.95 }}
             onClick={() => setLang(l)}
             className={cn(
-              "px-4 py-1.5 rounded-md text-[13px] font-medium border transition-colors",
+              "flex-1 py-2.5 rounded-xl text-[13px] font-semibold border transition-all duration-200",
               lang === l
                 ? "border-[var(--color-accent-border)] bg-[var(--color-accent-bg)] text-[var(--color-accent)]"
-                : "border-[var(--color-border-strong)] bg-white/[0.04] text-zinc-300 hover:bg-white/[0.08]",
+                : "border-[var(--color-border-strong)] bg-white/[0.03] text-zinc-400 hover:bg-white/[0.06] hover:text-zinc-200",
             )}
           >
             {l === "ru" ? "Русский" : "English"}
-          </button>
+          </motion.button>
         ))}
       </div>
-    </Section>
+    </Card>
   );
 }
 
-function AccentSection({
+// ─── Акцентный цвет ────────────────────────────────────────────────────────
+
+function AccentCard({
   value,
   onChange,
+  reduced,
+  delay,
 }: {
   value: string;
   onChange: (hex: string) => void;
+  reduced: boolean;
+  delay: number;
 }) {
-  // Локальное зеркало текстового поля hex, чтобы юзер мог свободно вводить.
-  // Коммитим только валидный 6-значный hex (на blur / Enter).
   const [custom, setCustom] = useState(value);
   useEffect(() => setCustom(value), [value]);
 
-  const commitCustom = (raw: string) => {
+  const commit = (raw: string) => {
     if (isValidHex(raw)) onChange(normalizeHex(raw));
-    else setCustom(value); // snap back to the applied colour
+    else setCustom(value);
   };
 
   return (
-    <Section
+    <Card
       icon={Palette}
       title={t("Акцентный цвет")}
       description={t("Цвет выделения, ссылок и активных элементов")}
+      reduced={reduced}
+      delay={delay}
     >
-      <div className="flex flex-wrap gap-2.5 mb-4">
-        {ACCENT_PRESETS.map((p) => {
-          const active = normalizeHex(value) === normalizeHex(p.hex);
-          return (
-            <button
-              key={p.hex}
-              type="button"
-              title={p.label}
-              aria-label={p.label}
-              aria-pressed={active}
-              onClick={() => onChange(normalizeHex(p.hex))}
-              className={cn(
-                "w-8 h-8 rounded-full flex items-center justify-center transition-transform hover:scale-110",
-                active &&
-                  "ring-2 ring-offset-2 ring-offset-[var(--color-bg)] ring-white/80",
-              )}
-              style={{ backgroundColor: p.hex }}
-            >
-              {active && (
-                <Check size={14} strokeWidth={3} className="text-white" />
-              )}
-            </button>
-          );
-        })}
+      <div className="flex flex-wrap items-end gap-x-5 gap-y-3">
+        {/* Плашки-пресеты */}
+        <div className="flex flex-wrap gap-2.5 flex-1">
+          {ACCENT_PRESETS.map((p) => {
+            const active = normalizeHex(value) === normalizeHex(p.hex);
+            return (
+              <div key={p.hex} className="relative w-9 h-9">
+                {active && (
+                  <motion.div
+                    layoutId="accent-ring"
+                    className="absolute -inset-1.5 rounded-full border-2 border-white/50 pointer-events-none"
+                    transition={{ type: "spring", stiffness: 380, damping: 26 }}
+                  />
+                )}
+                <motion.button
+                  type="button"
+                  title={p.label}
+                  aria-label={p.label}
+                  aria-pressed={active}
+                  whileHover={{ scale: 1.12 }}
+                  whileTap={{ scale: 0.92 }}
+                  onClick={() => onChange(normalizeHex(p.hex))}
+                  className="w-9 h-9 rounded-full flex items-center justify-center"
+                  style={{ backgroundColor: p.hex }}
+                >
+                  {active && (
+                    <Check size={14} strokeWidth={3} className="text-white drop-shadow" />
+                  )}
+                </motion.button>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Свой hex */}
+        <div className="flex items-center gap-2 shrink-0 pb-0.5">
+          <input
+            type="color"
+            aria-label={t("Выбрать свой цвет")}
+            value={isValidHex(custom) ? normalizeHex(custom) : value}
+            onChange={(e) => onChange(e.target.value)}
+            className="w-8 h-8 rounded-lg bg-transparent border border-[var(--color-border-strong)] cursor-pointer p-0.5"
+          />
+          <input
+            type="text"
+            value={custom}
+            spellCheck={false}
+            placeholder="#6366f1"
+            onChange={(e) => setCustom(e.target.value)}
+            onBlur={() => commit(custom)}
+            onKeyDown={(e) => e.key === "Enter" && commit(custom)}
+            className="w-24 px-2.5 py-1.5 rounded-lg bg-white/[0.04] border border-[var(--color-border-strong)] text-[12px] text-zinc-300 font-mono outline-none focus:border-[var(--color-accent-border)] transition-colors"
+          />
+        </div>
       </div>
 
-      <div className="flex items-center gap-3">
-        <input
-          type="color"
-          aria-label={t("Выбрать свой цвет")}
-          value={isValidHex(custom) ? normalizeHex(custom) : value}
-          onChange={(e) => onChange(e.target.value)}
-          className="w-9 h-9 rounded-md bg-transparent border border-[var(--color-border-strong)] cursor-pointer p-0.5"
-        />
-        <input
-          type="text"
-          value={custom}
-          spellCheck={false}
-          placeholder="#6366f1"
-          onChange={(e) => setCustom(e.target.value)}
-          onBlur={() => commitCustom(custom)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") commitCustom(custom);
-          }}
-          className="w-32 px-3 py-1.5 rounded-md bg-white/[0.04] border border-[var(--color-border-strong)] text-[13px] text-zinc-200 font-mono outline-none focus:border-[var(--color-accent-border)]"
-        />
-        <span className="text-[12px] text-zinc-500">{t("Свой цвет (HEX)")}</span>
+      {/* Живое превью: показываем цвет «в деле», а не только как кружок. Тянем
+          применённые токены (--color-link уже пересчитан под акцент). */}
+      <div className="mt-4 flex items-center gap-3 rounded-xl border border-[var(--color-border)] bg-black/20 px-3.5 py-2.5">
+        <span className="text-[10.5px] uppercase tracking-wider text-zinc-600 shrink-0">
+          {t("Превью")}
+        </span>
+        <span
+          className="px-2.5 py-1 rounded-full text-[12px] font-medium text-white shadow-sm"
+          style={{ backgroundColor: value }}
+        >
+          {t("Кнопка")}
+        </span>
+        <span
+          className="text-[12.5px] font-medium underline underline-offset-2"
+          style={{ color: "var(--color-link)" }}
+        >
+          {t("Ссылка")}
+        </span>
+        <span className="ml-auto font-mono text-[11px] text-zinc-500 shrink-0">
+          {normalizeHex(value)}
+        </span>
       </div>
-    </Section>
+    </Card>
   );
 }
 
-function DailySection({
+// ─── Тумблер «заметка дня» ─────────────────────────────────────────────────
+
+function DailyCard({
   value,
   onChange,
+  reduced,
+  delay,
 }: {
   value: boolean;
   onChange: (v: boolean) => void;
+  reduced: boolean;
+  delay: number;
 }) {
   return (
-    <Section
+    <Card
       icon={Sparkles}
       title={t("Заметка дня")}
       description={t("Поведение при запуске приложения")}
+      reduced={reduced}
+      delay={delay}
     >
       <Toggle
         checked={value}
         onChange={onChange}
         label={t("Открывать заметку дня при запуске")}
       />
-    </Section>
+    </Card>
   );
 }
 
@@ -251,34 +414,40 @@ function Toggle({
       role="switch"
       aria-checked={checked}
       onClick={() => onChange(!checked)}
-      className="flex items-center gap-3 group"
+      className="flex items-center gap-3 group py-1 w-full text-left"
     >
       <span
         className={cn(
-          "relative w-9 h-5 rounded-full transition-colors shrink-0",
+          "relative w-10 h-[22px] rounded-full transition-colors duration-300 shrink-0",
           checked ? "bg-[var(--color-accent)]" : "bg-white/[0.12]",
         )}
       >
-        <span
-          className={cn(
-            "absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform",
-            checked && "translate-x-4",
-          )}
+        <motion.span
+          layout
+          transition={{ type: "spring", stiffness: 500, damping: 30 }}
+          className="absolute top-[3px] left-[3px] w-4 h-4 rounded-full bg-white shadow-md"
+          style={{ x: checked ? 18 : 0 }}
         />
       </span>
-      <span className="text-[13px] text-zinc-300 group-hover:text-zinc-100 transition-colors">
+      <span className="text-[13px] text-zinc-300 group-hover:text-zinc-100 transition-colors duration-200">
         {label}
       </span>
     </button>
   );
 }
 
-function ShortcutSection({
+// ─── Запись хоткея ─────────────────────────────────────────────────────────
+
+function ShortcutCard({
   value,
   onChange,
+  reduced,
+  delay,
 }: {
   value: string;
   onChange: (accel: string) => void;
+  reduced: boolean;
+  delay: number;
 }) {
   const [recording, setRecording] = useState(false);
   const [hint, setHint] = useState<string | null>(null);
@@ -286,8 +455,6 @@ function ShortcutSection({
   useEffect(() => {
     if (!recording) return;
     const onKey = (e: KeyboardEvent) => {
-      // Capture-фаза + preventDefault: глотаем нажатие, чтобы оно не
-      // триггерило глобальные хоткеи (undo/redo и т.п.) пока записываем.
       e.preventDefault();
       e.stopPropagation();
       if (e.key === "Escape") {
@@ -295,17 +462,18 @@ function ShortcutSection({
         setHint(null);
         return;
       }
-      if (LONE_MODIFIERS.has(e.key)) return; // ждём реальную клавишу
+      if (LONE_MODIFIERS.has(e.key)) return;
       const accel = accelFromKeyboardEvent(e);
       if (!accel) {
-        setHint(t("Нужен модификатор (Ctrl / Alt / Shift) + буква, цифра или F-клавиша"));
+        setHint(
+          t("Нужен модификатор (Ctrl / Alt / Shift) + буква, цифра или F-клавиша"),
+        );
         return;
       }
       onChange(accel);
       setRecording(false);
       setHint(null);
     };
-    // Capture-фаза, чтобы работать раньше bubble-phase обработчика App.
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
   }, [recording, onChange]);
@@ -313,43 +481,60 @@ function ShortcutSection({
   const isDefault = value === DEFAULT_SETTINGS.captureShortcut;
 
   return (
-    <Section
+    <Card
       icon={Keyboard}
       title={t("Хоткей быстрой заметки")}
-      description={t("Глобальная комбинация для окна быстрой записи , работает даже когда приложение свёрнуто в трей")}
+      description={t("Глобальная комбинация для окна быстрой записи")}
+      reduced={reduced}
+      delay={delay}
     >
       <div className="flex items-center gap-3">
-        <button
+        <motion.button
           type="button"
+          whileTap={{ scale: 0.97 }}
           onClick={() => {
             setRecording((r) => !r);
             setHint(null);
           }}
           className={cn(
-            "min-w-[170px] px-4 py-2 rounded-md text-[13px] font-medium border transition-colors text-center",
+            "min-w-[160px] px-4 py-2.5 rounded-xl text-[13px] font-mono font-medium border transition-all duration-200 text-center",
             recording
-              ? "border-[var(--color-accent-border)] bg-[var(--color-accent-bg)] text-[var(--color-accent)] animate-pulse"
+              ? "border-[var(--color-accent-border)] bg-[var(--color-accent-bg)] text-[var(--color-accent)]"
               : "border-[var(--color-border-strong)] bg-white/[0.04] text-zinc-200 hover:bg-white/[0.08]",
           )}
         >
-          {recording ? t("Нажмите комбинацию…") : prettyAccelerator(value)}
-        </button>
+          {recording && (
+            <span className="inline-block w-2 h-2 rounded-full bg-[var(--color-accent)] mr-2 animate-pulse" />
+          )}
+          {recording ? t("Нажмите комбинацию...") : prettyAccelerator(value)}
+        </motion.button>
         {!isDefault && !recording && (
-          <button
+          <motion.button
             type="button"
+            whileTap={{ scale: 0.95 }}
             onClick={() => onChange(DEFAULT_SETTINGS.captureShortcut)}
-            className="text-[12px] text-zinc-500 hover:text-zinc-300 transition-colors"
+            className="text-[12px] text-zinc-500 hover:text-[var(--color-accent)] transition-colors duration-200"
           >
             {t("Сбросить")}
-          </button>
+          </motion.button>
         )}
       </div>
-      {hint && <p className="text-[12px] text-amber-400/80 mt-2">{hint}</p>}
-    </Section>
+      {hint && (
+        <motion.p
+          initial={{ opacity: 0, y: -4 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="text-[12px] text-amber-400/80 mt-2"
+        >
+          {hint}
+        </motion.p>
+      )}
+    </Card>
   );
 }
 
-function CalendarSection() {
+// ─── Календарь ICS ─────────────────────────────────────────────────────────
+
+function CalendarCard({ reduced, delay }: { reduced: boolean; delay: number }) {
   const url = useNotesStore((s) => s.settings.calendarIcsUrl);
   const updateSettings = useNotesStore((s) => s.updateSettings);
   const status = useCalendarStore((s) => s.status);
@@ -358,8 +543,6 @@ function CalendarSection() {
   const lastSync = useCalendarStore((s) => s.lastSync);
   const syncNow = useCalendarStore((s) => s.syncNow);
 
-  // Локальное зеркало, чтобы юзер мог свободно вводить; коммит (+ пересинхронизация)
-  // на blur/Enter.
   const [draft, setDraft] = useState(url);
   useEffect(() => setDraft(url), [url]);
 
@@ -367,7 +550,7 @@ function CalendarSection() {
     const next = draft.trim();
     if (next === url) return;
     if (next !== "" && !isValidIcsUrl(next)) {
-      setDraft(url); // не http(s) URL -- откат к сохранённому значению
+      setDraft(url);
       return;
     }
     void updateSettings({ calendarIcsUrl: next }).then(() => {
@@ -376,73 +559,76 @@ function CalendarSection() {
   };
 
   return (
-    <Section
+    <Card
       icon={CalendarDays}
-      title={t("Календарь")}
-      description={t("Подключить внешний календарь по приватной ссылке iCalendar (.ics) , только чтение")}
+      title={t("Подписка iCal")}
+      description={t("Подключить внешний календарь по ссылке iCalendar (.ics)")}
+      reduced={reduced}
+      delay={delay}
     >
-      <div className="flex items-center gap-2">
+      <div className="flex gap-2">
         <input
           type="text"
           value={draft}
           spellCheck={false}
-          placeholder="https://calendar.yandex.ru/export/ics.xml?private_token=…"
+          placeholder="https://calendar.yandex.ru/export/ics.xml?..."
           onChange={(e) => setDraft(e.target.value)}
           onBlur={commit}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") commit();
-          }}
-          className="flex-1 min-w-0 px-3 py-1.5 rounded-md bg-white/[0.04] border border-[var(--color-border-strong)] text-[13px] text-zinc-200 font-mono outline-none focus:border-[var(--color-accent-border)]"
+          onKeyDown={(e) => e.key === "Enter" && commit()}
+          className="flex-1 min-w-0 px-3 py-2 rounded-xl bg-white/[0.04] border border-[var(--color-border-strong)] text-[13px] text-zinc-200 font-mono outline-none focus:border-[var(--color-accent-border)] focus:bg-white/[0.06] transition-colors duration-200 placeholder:text-zinc-600"
         />
-        <button
+        <motion.button
           type="button"
+          whileTap={{ scale: 0.96 }}
           disabled={!url || status === "loading"}
           onClick={() => void syncNow()}
           title={t("Синхронизировать")}
-          className="shrink-0 inline-flex items-center gap-2 px-3.5 py-1.5 rounded-md text-[13px] font-medium bg-white/[0.04] border border-[var(--color-border-strong)] text-zinc-200 hover:bg-white/[0.08] transition-colors disabled:opacity-50 disabled:cursor-default"
+          className={btnCls}
         >
           <RefreshCw
             size={14}
-            strokeWidth={2}
             className={cn(status === "loading" && "animate-spin")}
           />
           {t("Обновить")}
-        </button>
+        </motion.button>
       </div>
 
-      <div className="mt-2 min-h-[18px] text-[12px]">
-        {status === "loading" && <span className="text-zinc-500">{t("Синхронизация…")}</span>}
+      <div className="mt-2 min-h-[16px] text-[12px]">
+        {status === "loading" && (
+          <span className="text-zinc-500">{t("Синхронизация...")}</span>
+        )}
         {status === "error" && (
-          <span className="text-red-400/90 break-words">{t("Ошибка")}: {error}</span>
+          <span className="text-red-400/90 break-words">
+            {t("Ошибка")}: {error}
+          </span>
         )}
         {status === "ok" && (
           <span className="text-zinc-500">
-            Событий: {eventCount}
+            {eventCount} {t("событий")}
             {lastSync != null
-              ? ` · обновлено ${new Date(lastSync).toLocaleTimeString("ru-RU", {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })}`
+              ? ` · ${new Date(lastSync).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })}`
               : ""}
           </span>
         )}
       </div>
 
-      <p className="text-[12px] text-zinc-600 mt-2 leading-relaxed">
-        В Яндекс.Календаре: «Настройки» , нужный календарь , скопируйте приватную
-        ссылку (iCal). Ссылка содержит секретный токен , не делитесь ей.
+      <p className="text-[11px] text-zinc-600 mt-2 leading-relaxed">
+        В Яндекс.Календаре: «Настройки» → нужный календарь →
+        скопируйте приватную ссылку (iCal). Ссылка содержит токен, не делитесь
+        ей.
       </p>
-    </Section>
+    </Card>
   );
 }
 
-function CaldavSection() {
+// ─── Пуш CalDAV ────────────────────────────────────────────────────────────
+
+function CaldavCard({ reduced, delay }: { reduced: boolean; delay: number }) {
   const login = useNotesStore((s) => s.settings.caldavLogin);
   const password = useNotesStore((s) => s.settings.caldavPassword);
   const url = useNotesStore((s) => s.settings.caldavUrl);
   const updateSettings = useNotesStore((s) => s.updateSettings);
 
-  // Локальные зеркала: даём свободно печатать, в настройки коммитим на blur.
   const [loginDraft, setLoginDraft] = useState(login);
   const [pwDraft, setPwDraft] = useState(password);
   const [finding, setFinding] = useState(false);
@@ -452,9 +638,8 @@ function CaldavSection() {
   useEffect(() => setPwDraft(password), [password]);
 
   const saveCreds = () => {
-    if (loginDraft.trim() !== login) {
+    if (loginDraft.trim() !== login)
       void updateSettings({ caldavLogin: loginDraft.trim() });
-    }
     if (pwDraft !== password) void updateSettings({ caldavPassword: pwDraft });
   };
 
@@ -471,9 +656,8 @@ function CaldavSection() {
     try {
       const list = await discover(yandexHome(l), l, p);
       setCollections(list);
-      if (list.length === 0) {
+      if (list.length === 0)
         useToastStore.getState().push("Календари не найдены", "info");
-      }
     } catch (e) {
       useToastStore.getState().push(`CalDAV: ${String(e)}`, "error");
     } finally {
@@ -482,12 +666,12 @@ function CaldavSection() {
   };
 
   return (
-    <Section
+    <Card
       icon={Upload}
       title={t("Пуш в Яндекс.Календарь (CalDAV)")}
-      description={t(
-        "Отправлять свои задачи как события. Нужен пароль приложения, не пароль аккаунта.",
-      )}
+      description={t("Отправлять задачи как события. Нужен пароль приложения.")}
+      reduced={reduced}
+      delay={delay}
     >
       <div className="space-y-2">
         <input
@@ -497,7 +681,7 @@ function CaldavSection() {
           placeholder="логин@yandex.ru"
           onChange={(e) => setLoginDraft(e.target.value)}
           onBlur={saveCreds}
-          className="w-full px-3 py-1.5 rounded-md bg-white/[0.04] border border-[var(--color-border-strong)] text-[13px] text-zinc-200 font-mono outline-none focus:border-[var(--color-accent-border)]"
+          className={inputCls}
         />
         <input
           type="password"
@@ -506,69 +690,62 @@ function CaldavSection() {
           placeholder={t("пароль приложения")}
           onChange={(e) => setPwDraft(e.target.value)}
           onBlur={saveCreds}
-          className="w-full px-3 py-1.5 rounded-md bg-white/[0.04] border border-[var(--color-border-strong)] text-[13px] text-zinc-200 font-mono outline-none focus:border-[var(--color-accent-border)]"
+          className={inputCls}
         />
-        <button
+        <motion.button
           type="button"
+          whileTap={{ scale: 0.97 }}
           disabled={finding}
           onClick={() => void find()}
-          className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-md text-[13px] font-medium bg-white/[0.04] border border-[var(--color-border-strong)] text-zinc-200 hover:bg-white/[0.08] transition-colors disabled:opacity-50 disabled:cursor-default"
+          className={btnCls}
         >
-          <RefreshCw
-            size={14}
-            strokeWidth={2}
-            className={cn(finding && "animate-spin")}
-          />
+          <RefreshCw size={14} className={cn(finding && "animate-spin")} />
           {t("Найти календари")}
-        </button>
+        </motion.button>
       </div>
 
       {collections && collections.length > 0 && (
-        <div className="mt-3 space-y-1">
-          <div className="text-[12px] text-zinc-500">{t("Куда отправлять")}:</div>
+        <div className="mt-2.5 space-y-1.5">
+          <div className="text-[11px] text-zinc-500 uppercase tracking-wider font-medium">
+            {t("Куда отправлять")}
+          </div>
           {collections.map((c) => (
-            <button
+            <motion.button
               key={c.href}
               type="button"
+              whileTap={{ scale: 0.98 }}
               onClick={() => void updateSettings({ caldavUrl: c.href })}
               className={cn(
-                "w-full text-left px-3 py-1.5 rounded-md border text-[12.5px] transition-colors",
+                "w-full text-left px-3 py-2 rounded-xl border text-[12.5px] transition-all duration-200",
                 c.href === url
                   ? "border-[var(--color-accent-border)] bg-[var(--color-accent-bg)] text-zinc-100"
-                  : "border-[var(--color-border)] text-zinc-300 hover:bg-white/[0.05]",
+                  : "border-[var(--color-border)] text-zinc-400 hover:bg-white/[0.04] hover:text-zinc-200",
               )}
             >
               <span className="font-medium">{c.name || t("(без имени)")}</span>
               {c.href === url && (
-                <Check
-                  size={13}
-                  className="inline ml-2 text-[var(--color-accent)]"
-                />
+                <Check size={12} className="inline ml-1.5 text-[var(--color-accent)]" />
               )}
-              <div className="text-[11px] text-zinc-600 font-mono truncate">
+              <div className="text-[10px] text-zinc-600 font-mono truncate mt-0.5">
                 {c.href}
               </div>
-            </button>
+            </motion.button>
           ))}
         </div>
       )}
 
       {url && !collections && (
-        <p className="mt-2 text-[12px] text-zinc-500 break-all">
+        <p className="mt-2 text-[11px] text-zinc-500 break-all">
           {t("Выбран")}: <span className="font-mono text-zinc-400">{url}</span>
         </p>
       )}
-
-      <p className="text-[12px] text-zinc-600 mt-2 leading-relaxed">
-        Пароль приложения: id.yandex.ru , Безопасность , Пароли приложений ,
-        «Календарь CalDAV». Хранится локально в файле настроек рядом с заметками,
-        не делитесь им.
-      </p>
-    </Section>
+    </Card>
   );
 }
 
-function StorageSection() {
+// ─── Хранилище и бэкап ─────────────────────────────────────────────────────
+
+function StorageCard({ reduced, delay }: { reduced: boolean; delay: number }) {
   const [path, setPath] = useState<string | null>(null);
   const [backing, setBacking] = useState(false);
   const [restoring, setRestoring] = useState(false);
@@ -580,10 +757,7 @@ function StorageSection() {
     setBacking(true);
     try {
       const saved = await backupWorkspace();
-      if (saved) {
-        useToastStore.getState().push(t("Бэкап сохранён"), "success");
-      }
-      // saved === null意味着 юзер отменил диалог сохранения, тост не показываем.
+      if (saved) useToastStore.getState().push(t("Бэкап сохранён"), "success");
     } catch (e) {
       console.error("backup failed:", e);
       useToastStore.getState().push(t("Не удалось создать бэкап"), "error");
@@ -593,8 +767,6 @@ function StorageSection() {
   };
 
   const runRestore = async () => {
-    // 1) Выбираем исходный zip. open() возвращает null если юзер отменил,
-    //    молчаливый выход, без тоста (отмена была осознанной).
     let picked: string | string[] | null = null;
     try {
       picked = await openDialog({
@@ -607,42 +779,30 @@ function StorageSection() {
       useToastStore.getState().push(t("Не удалось открыть выбор файла"), "error");
       return;
     }
-    if (!picked || Array.isArray(picked)) return; // cancelled / impossible
+    if (!picked || Array.isArray(picked)) return;
 
-    // 2) Жёсткое подтверждение: восстановление деструктивно (текущая папка
-    //    архивируется в notes.bak-<ts>, но это всё равно сюрприз если юзер
-    //    случайно нажал). confirmDialog возвращает false при отмене/Escape.
     const ok = await confirmDialog(
-      t("Это перезапишет всю текущую папку заметок. Текущее состояние сохранится в notes.bak-<дата> рядом. Продолжить?"),
+      t("Это перезапишет текущую папку заметок. Текущее состояние сохранится в notes.bak-<дата>. Продолжить?"),
       { confirmLabel: t("Восстановить"), danger: true },
     );
     if (!ok) return;
 
-    // 3) Запускаем. resetStorageCaches внутри restoreWorkspace сбрасывает
-    //    кэши meta + refs, так что refresh ниже увидит новый диск. Активная
-    //    заметка вероятно устарела (её id может не существовать в восстановленном
-    //    наборе), поэтому чистим её тоже: юзер попадёт в дерево.
     setRestoring(true);
     try {
       const { backupDir, filesRestored } = await restoreWorkspace(picked);
-      // Чистим активную заметку перед рефрешем: она почти наверняка указывает
-      // на id которого нет в восстановленном дереве.
       useNotesStore.setState({ activeId: null, activeNote: null });
       await Promise.all([refreshTree(), refreshTrash(), refreshAssets()]);
       useToastStore
         .getState()
         .push(
-          t(`Восстановлено · ${filesRestored} файлов · старая папка , ${backupDir}`),
+          t(`Восстановлено · ${filesRestored} файлов · старая папка: ${backupDir}`),
           "success",
         );
     } catch (e) {
       console.error("restore failed:", e);
       useToastStore
         .getState()
-        .push(
-          t(`Не удалось восстановить: ${(e as Error)?.message ?? String(e)}`),
-          "error",
-        );
+        .push(t(`Ошибка: ${(e as Error)?.message ?? String(e)}`), "error");
     } finally {
       setRestoring(false);
     }
@@ -651,29 +811,28 @@ function StorageSection() {
   useEffect(() => {
     let alive = true;
     void getWorkspaceDir()
-      .then((p) => {
-        if (alive) setPath(p);
-      })
+      .then((p) => { if (alive) setPath(p); })
       .catch((e) => console.error("getWorkspaceDir failed:", e));
-    return () => {
-      alive = false;
-    };
+    return () => { alive = false; };
   }, []);
 
   return (
-    <Section
+    <Card
       icon={HardDrive}
       title={t("Хранилище")}
       description={t("Где лежат все заметки, изображения и корзина")}
+      reduced={reduced}
+      delay={delay}
     >
-      <div className="mb-3 px-3 py-2 rounded-md bg-white/[0.03] border border-[var(--color-border)]">
+      <div className="mb-3 px-3.5 py-2.5 rounded-xl bg-black/20 border border-[var(--color-border)]">
         <code className="text-[12px] text-zinc-400 font-mono break-all">
           {path ?? "…"}
         </code>
       </div>
       <div className="flex flex-wrap gap-2">
-        <button
+        <motion.button
           type="button"
+          whileTap={{ scale: 0.97 }}
           disabled={!path}
           onClick={() => {
             if (path)
@@ -681,37 +840,36 @@ function StorageSection() {
                 console.error("revealItemInDir failed:", e),
               );
           }}
-          className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-md text-[13px] font-medium bg-white/[0.04] border border-[var(--color-border-strong)] text-zinc-200 hover:bg-white/[0.08] transition-colors disabled:opacity-50 disabled:cursor-default"
+          className={btnCls}
         >
-          <FolderOpen size={14} strokeWidth={2} />
+          <FolderOpen size={14} />
           {t("Открыть папку")}
-        </button>
-        <button
+        </motion.button>
+        <motion.button
           type="button"
+          whileTap={{ scale: 0.97 }}
           disabled={backing || restoring}
           onClick={() => void runBackup()}
-          className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-md text-[13px] font-medium bg-white/[0.04] border border-[var(--color-border-strong)] text-zinc-200 hover:bg-white/[0.08] transition-colors disabled:opacity-50 disabled:cursor-default"
+          className={btnCls}
         >
-          <Archive size={14} strokeWidth={2} />
-          {backing ? t("Создаю бэкап…") : t("Создать бэкап (.zip)")}
-        </button>
-        <button
+          <Archive size={14} />
+          {backing ? t("Создаю бэкап...") : t("Создать бэкап (.zip)")}
+        </motion.button>
+        <motion.button
           type="button"
+          whileTap={{ scale: 0.97 }}
           disabled={backing || restoring}
           onClick={() => void runRestore()}
-          className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-md text-[13px] font-medium bg-white/[0.04] border border-[var(--color-border-strong)] text-zinc-200 hover:bg-white/[0.08] transition-colors disabled:opacity-50 disabled:cursor-default"
+          className={btnCls}
         >
-          <Upload size={14} strokeWidth={2} />
-          {restoring ? t("Восстанавливаю…") : t("Восстановить из бэкапа…")}
-        </button>
+          <Upload size={14} />
+          {restoring ? t("Восстанавливаю...") : t("Восстановить из бэкапа")}
+        </motion.button>
       </div>
-      <p className="text-[12px] text-zinc-600 mt-3">
-        Бэкап собирает все заметки в один .zip , выберите, куда сохранить
-        (облако, флешка, любая папка). Восстановление полностью заменит
-        текущую папку; предыдущее состояние сохранится в{" "}
-        <code className="font-mono text-zinc-500">notes.bak-&lt;дата&gt;</code>{" "}
-        рядом, на случай если потребуется откатиться.
+      <p className="text-[11px] text-zinc-600 mt-2.5 leading-relaxed">
+        Бэкап собирает заметки в .zip. Восстановление заменит папку; старая
+        сохранится в <code className="font-mono text-zinc-500">notes.bak-&lt;дата&gt;</code>.
       </p>
-    </Section>
+    </Card>
   );
 }

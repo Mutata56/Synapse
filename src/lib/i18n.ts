@@ -59,6 +59,13 @@ const en: Record<string, string> = {
 
   // ─── Настройки ───
   "Внешний вид, быстрая заметка и хранилище": "Appearance, quick note and storage",
+  "Внешний вид": "Appearance",
+  "Поведение": "Behavior",
+  "Данные": "Data",
+  "Подписка iCal": "iCal subscription",
+  "Превью": "Preview",
+  "Кнопка": "Button",
+  "Ссылка": "Link",
 
   // ─── Календарь: подсказка и CalDAV ───
   "Подсказка": "Help",
