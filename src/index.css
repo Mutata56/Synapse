@@ -1,0 +1,2128 @@
+@import "tailwindcss";
+
+/* ─── Дизайн-токены (3-слойная архитектура темизации) ───────────────────────
+   1. ПРИМИТИВЫ : сырые палитры цветов  никогда не используются в разметке напрямую.
+   2. СЕМАНТИЧЕСКИЕ ТОКЕНЫ: объявлены на `:root` (по дефолту темная тема).
+      Будущая светлая тема реализуется одним блоком `[data-theme="light"] { … }`,
+      который просто переопределит эти токены - остальной код останется нетронутым.
+   3. ДИРЕКТИВА @theme: связывает утилиты Tailwind (`--color-*`) с семантическими токенами
+      ПО ССЫЛКЕ через `var()`. Смена токена в рантайме мгновенно перерисовывает
+      все утилиты без пересборки и ререндера React.
+
+   Граф интерактивной доски считывает те же переменные в тинты Pixi.js (см. lib/themeColors.ts),
+   поэтому Canvas и DOM используют одну общую палитру. */
+
+:root {
+  /* ── 1. Примитивы ──────────────────────────────────────────────────── */
+  --indigo-300: #a5b4fc;
+  --indigo-400: #818cf8;
+  --indigo-500: #6366f1;
+  --indigo-600: #4f46e5;
+
+
+  --bg: #0a0a0b;
+  --surface-1: #0e0e10;
+  --surface-2: color-mix(in oklab, #16161b 78%, transparent);
+  --surface-2-solid: #16161b;
+
+  --border: rgba(255, 255, 255, 0.06);
+  --border-strong: rgba(255, 255, 255, 0.1);
+
+  --text: #e4e4e7;
+  --text-strong: #f4f4f5;
+  --text-secondary: #d4d4d8;
+  --text-muted: #71717a;
+
+  --text-dim: #71717a;
+  --text-quote: #a1a1aa;
+
+  --accent: var(--indigo-500);
+  --accent-bg: color-mix(in oklab, var(--accent) 12%, transparent);
+  --accent-bg-hover: color-mix(in oklab, var(--accent) 18%, transparent);
+  --accent-border: color-mix(in oklab, var(--accent) 35%, transparent);
+
+
+  --tag-accent: #5fb89a;
+
+  --link: var(--indigo-400);
+  --link-hover: var(--indigo-300);
+  --code-bg: rgba(255, 255, 255, 0.06);
+  --code-text: #c7d2fe;
+  --pre-bg: #09090b;
+  --table-head-bg: rgba(255, 255, 255, 0.04);
+
+  --scrollbar-thumb: rgba(255, 255, 255, 0.06);
+  --scrollbar-thumb-hover: rgba(255, 255, 255, 0.12);
+
+  --search-hit: rgba(250, 204, 21, 0.32);
+  --search-hit-current: rgba(250, 204, 21, 0.85);
+
+
+  --cluster-0: oklch(0.76 0.15 25);
+  --cluster-1: oklch(0.76 0.15 55);
+  --cluster-2: oklch(0.76 0.15 90);
+  --cluster-3: oklch(0.76 0.15 130);
+  --cluster-4: oklch(0.76 0.15 160);
+  --cluster-5: oklch(0.76 0.15 195);
+  --cluster-6: oklch(0.76 0.15 230);
+  --cluster-7: oklch(0.76 0.15 265);
+  --cluster-8: oklch(0.76 0.15 290);
+  --cluster-9: oklch(0.76 0.15 320);
+  --cluster-10: oklch(0.76 0.15 345);
+  --cluster-11: oklch(0.76 0.15 10);
+
+
+  --shadow-float:
+    0 0 0 1px rgba(0, 0, 0, 0.45), 0 1px 2px rgba(0, 0, 0, 0.3),
+    0 8px 24px -6px rgba(0, 0, 0, 0.5), 0 24px 48px -12px rgba(0, 0, 0, 0.55),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-bg-elevated: var(--surface-1);
+  --color-bg-overlay: var(--surface-2);
+
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+
+  --color-text: var(--text);
+  --color-text-strong: var(--text-strong);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-muted: var(--text-muted);
+  --color-text-dim: var(--text-dim);
+  --color-text-quote: var(--text-quote);
+
+  --color-accent: var(--accent);
+  --color-accent-bg: var(--accent-bg);
+  --color-accent-bg-hover: var(--accent-bg-hover);
+  --color-accent-border: var(--accent-border);
+
+  --color-tag-accent: var(--tag-accent);
+
+  --color-link: var(--link);
+  --color-link-hover: var(--link-hover);
+  --color-code-bg: var(--code-bg);
+  --color-code-text: var(--code-text);
+  --color-pre-bg: var(--pre-bg);
+  --color-table-head-bg: var(--table-head-bg);
+
+  --color-scrollbar-thumb: var(--scrollbar-thumb);
+  --color-scrollbar-thumb-hover: var(--scrollbar-thumb-hover);
+
+  --color-search-hit: var(--search-hit);
+  --color-search-hit-current: var(--search-hit-current);
+}
+
+@theme {
+
+  --font-sans:
+    "Inter", "InterVariable", ui-sans-serif, system-ui, -apple-system,
+    "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif;
+  --font-emoji:
+    "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji",
+    "Twemoji Mozilla", sans-serif;
+  --font-mono:
+    "JetBrains Mono", ui-monospace, SFMono-Regular, "SF Mono", Consolas,
+    monospace;
+}
+
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--color-bg);
+  color: var(--color-text);
+  overflow: hidden;
+  color-scheme: dark;
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11", "ss01", "ss03";
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+
+* {
+  border-color: var(--color-border);
+}
+
+.app-shell {
+  background:
+    radial-gradient(
+      ellipse 80% 50% at 50% -20%,
+      rgba(99, 102, 241, 0.06),
+      transparent 70%
+    ),
+    var(--color-bg);
+  animation: app-fade 0.25s ease-out;
+}
+
+@keyframes app-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes pulse-once {
+  0% {
+    background-color: var(--color-accent-bg);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+.pulse-once {
+  animation: pulse-once 0.8s ease-out;
+}
+
+
+.glass {
+  position: relative;
+  background: var(--color-bg-overlay);
+  -webkit-backdrop-filter: blur(20px) saturate(1.7);
+  backdrop-filter: blur(20px) saturate(1.7);
+  border: 1px solid transparent;
+  box-shadow: var(--shadow-float);
+}
+.glass::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(
+    to bottom,
+    rgba(255, 255, 255, 0.14),
+    rgba(255, 255, 255, 0.04) 35%,
+    rgba(255, 255, 255, 0.02)
+  );
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  pointer-events: none;
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .glass {
+    background: var(--surface-2-solid);
+  }
+}
+
+/* ─── Интеграция BLOCKNOTE ────────────────────────────────────────────── */
+
+.bn-container[data-color-scheme="dark"] {
+  --bn-colors-editor-background: transparent !important;
+  --bn-colors-editor-text: var(--color-text) !important;
+}
+
+.bn-editor {
+  padding: 4rem 5rem 8rem !important;
+  max-width: 56rem;
+  margin: 0 auto;
+}
+
+
+.bn-editor a {
+  color: var(--color-link) !important;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+  transition: color 0.12s ease;
+}
+.bn-editor a:hover {
+  color: var(--color-link-hover) !important;
+}
+
+/* ─── Скролл бар  ── */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-scrollbar-thumb);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-scrollbar-thumb-hover);
+  background-clip: padding-box;
+  border: 2px solid transparent;
+}
+
+::selection {
+  background: var(--color-accent-bg-hover);
+  color: var(--color-text);
+}
+
+/* ─── Управление фокусом ─────────────────────────────────────────────────── */
+
+button:focus-visible,
+[role="button"]:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+input:focus,
+input:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+.hero-title {
+  font-size: 3.5rem !important; /* ~56px */
+  font-weight: 800 !important;
+  line-height: 1.15 !important;
+  letter-spacing: -0.02em;
+  background: transparent !important;
+  resize: none !important;
+}
+.hero-title,
+.hero-title:focus,
+.hero-title:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+  border: none !important;
+}
+
+::highlight(note-search) {
+  background-color: var(--color-search-hit);
+  color: var(--color-text-strong);
+}
+::highlight(note-search-current) {
+  background-color: var(--color-search-hit-current);
+  color: var(--color-bg);
+}
+
+.bn-wikilink {
+  color: var(--color-accent);
+  background-color: var(--color-accent-bg);
+  border-radius: 3px;
+  padding: 0 2px;
+  cursor: pointer;
+  transition: background-color 0.12s ease;
+}
+.bn-wikilink:hover {
+  background-color: var(--color-accent-bg-hover);
+}
+.bn-wikilink--broken {
+  color: #f87171;
+  background-color: transparent;
+  text-decoration: underline dotted;
+  text-underline-offset: 2px;
+  cursor: default;
+}
+
+
+.bn-tag {
+  color: #5fb89a;
+  background-color: rgba(95, 184, 154, 0.13);
+  border-radius: 3px;
+  padding: 0 3px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.12s ease;
+}
+.bn-tag:hover {
+  background-color: rgba(95, 184, 154, 0.22);
+}
+
+/* ─── Едитор 2026 ──────────────────────────────────────────────────────────
+ */
+
+.e26-zoom-scope .bn-default-styles {
+  font-size: calc(16px * var(--e26-zoom, 1));
+}
+
+.e26-zoom-scope .bn-editor {
+  cursor: default;
+}
+.e26-zoom-scope .bn-block-content {
+  cursor: text;
+}
+
+/* Блок коллаута / выноски. */
+/* В BlockNote элемент `.bn-block-content` имеет `display: flex`. Этот блок является
+   флекс-элементом с дефолтным `min-width: auto`, из-за чего длинный текст растягивал бы блок,
+   а не переносился. Принудительно заставляем всю цепочку контейнеров сжиматься . */
+.bn-block-content[data-content-type="callout"],
+.bn-block-content[data-content-type="callout"] > * {
+  min-width: 0;
+}
+.e26-callout {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  margin: 4px 0;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--e26-callout-border, rgba(255, 255, 255, 0.15));
+  background: var(--e26-callout-bg, rgba(255, 255, 255, 0.04));
+}
+.e26-callout__head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding-bottom: 6px;
+  margin-bottom: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.09);
+  user-select: none;
+}
+.e26-callout__icon {
+  background: transparent;
+  border: none;
+  padding: 0;
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+}
+.e26-callout__title {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--e26-callout-accent, var(--color-text-secondary));
+}
+.e26-callout__body {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.e26-callout--info {
+  --e26-callout-bg: rgba(59, 130, 246, 0.1);
+  --e26-callout-border: rgba(59, 130, 246, 0.32);
+  --e26-callout-accent: #6ea8fe;
+}
+.e26-callout--warn {
+  --e26-callout-bg: rgba(234, 179, 8, 0.1);
+  --e26-callout-border: rgba(234, 179, 8, 0.38);
+  --e26-callout-accent: #f0c64e;
+}
+.e26-callout--tip {
+  --e26-callout-bg: rgba(34, 197, 94, 0.1);
+  --e26-callout-border: rgba(34, 197, 94, 0.32);
+  --e26-callout-accent: #5fd08a;
+}
+.e26-callout--note {
+  --e26-callout-bg: rgba(255, 255, 255, 0.05);
+  --e26-callout-border: rgba(255, 255, 255, 0.15);
+  --e26-callout-accent: #b9b9c0;
+}
+.e26-callout--success {
+  --e26-callout-bg: rgba(16, 185, 129, 0.1);
+  --e26-callout-border: rgba(16, 185, 129, 0.32);
+  --e26-callout-accent: #4fd1b1;
+}
+/* Меню выбора типа по правому клику (выносится через портал в <body>) */
+.e26-callout__menu {
+  z-index: 100;
+  min-width: 170px;
+  padding: 4px;
+  border-radius: 10px;
+  border: 1px solid var(--color-border-strong, rgba(255, 255, 255, 0.18));
+  background: #232326;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+}
+.e26-callout__menu button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 8px;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  color: var(--color-text, #e5e5e5);
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+.e26-callout__menu button:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+.e26-callout__menu button.is-active {
+  color: var(--color-accent, #6366f1);
+  background: rgba(255, 255, 255, 0.06);
+}
+.e26-callout__menuicon {
+  font-size: 14px;
+}
+.e26-callout__menulabel {
+  flex: 1;
+}
+.e26-callout__menu button.is-active svg {
+  color: var(--color-accent, #6366f1);
+}
+.e26-callout__menutitle {
+  padding: 3px 8px 6px;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+}
+
+/* Gallery block. */
+.e26-gallery {
+  margin: 6px 0;
+}
+.e26-gallery__bar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.e26-gallery__bar button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--color-border, rgba(255, 255, 255, 0.12));
+  border-radius: 6px;
+  cursor: pointer;
+}
+.e26-gallery__bar button:hover {
+  background: rgba(255, 255, 255, 0.09);
+}
+.e26-gallery__empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 28px;
+  color: var(--color-text-secondary);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px dashed var(--color-border-strong, rgba(255, 255, 255, 0.2));
+  border-radius: 10px;
+  cursor: pointer;
+}
+.e26-gallery__empty:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+.e26-gallery__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 8px;
+}
+/* Полноценная карусель: один слайд, кнопки «назад/вперед», точки, счетчик, плавное перелистывание. */
+.e26-carousel {
+  position: relative;
+}
+.e26-carousel__viewport {
+  position: relative;
+  overflow: hidden;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.35);
+}
+.e26-carousel__track {
+  display: flex;
+  transition: transform 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.e26-carousel__slide {
+  flex: 0 0 100%;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 420px;
+}
+.e26-carousel__slide img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+.e26-carousel__nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.5);
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+.e26-carousel__nav:hover {
+  background: rgba(0, 0, 0, 0.82);
+}
+.e26-carousel__nav--prev {
+  left: 10px;
+}
+.e26-carousel__nav--next {
+  right: 10px;
+}
+.e26-carousel__del {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.5);
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.e26-carousel__del:hover {
+  background: rgba(220, 38, 38, 0.85);
+}
+.e26-carousel__counter {
+  position: absolute;
+  bottom: 10px;
+  right: 12px;
+  padding: 2px 8px;
+  font-size: 12px;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.5);
+  border-radius: 999px;
+}
+.e26-carousel__dots {
+  display: flex;
+  justify-content: center;
+  gap: 7px;
+  margin-top: 10px;
+}
+.e26-carousel__dots button {
+  width: 8px;
+  height: 8px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: var(--color-border-strong, rgba(255, 255, 255, 0.25));
+  cursor: pointer;
+  transition: background 0.12s ease, transform 0.12s ease;
+}
+.e26-carousel__dots button:hover {
+  background: rgba(255, 255, 255, 0.5);
+}
+.e26-carousel__dots button.is-active {
+  background: var(--color-accent, #6366f1);
+  transform: scale(1.25);
+}
+.e26-gallery__item {
+  position: relative;
+  margin: 0;
+  border-radius: 8px;
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.25);
+}
+.e26-gallery__item img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  max-height: 320px;
+  object-fit: cover;
+}
+.e26-gallery__ctl {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: flex;
+  gap: 4px;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+.e26-gallery__item:hover .e26-gallery__ctl {
+  opacity: 1;
+}
+.e26-gallery__ctl button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.55);
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.e26-gallery__ctl button:hover {
+  background: rgba(0, 0, 0, 0.8);
+}
+.e26-gallery__ctl button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+/* Карточка прикрепленного файла. */
+.e26-filecard {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 4px 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--color-border, rgba(255, 255, 255, 0.12));
+  background: rgba(255, 255, 255, 0.04);
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+.e26-filecard:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+.e26-filecard--empty {
+  cursor: default;
+  background: rgba(255, 255, 255, 0.03);
+  border-style: dashed;
+}
+.e26-filecard--empty button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--color-text-secondary);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 13px;
+}
+.e26-filecard__badge {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 42px;
+  height: 42px;
+  padding: 0 6px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  color: #fff;
+  background: var(--color-accent, #6366f1);
+  border-radius: 8px;
+}
+.e26-filecard__meta {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+.e26-filecard__name {
+  color: var(--color-text, #e5e5e5);
+  font-size: 13px;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.e26-filecard__size {
+  color: var(--color-text-secondary);
+  font-size: 11px;
+}
+.e26-filecard__reveal {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  color: var(--color-text-secondary);
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.e26-filecard__reveal:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--color-text, #e5e5e5);
+}
+
+/* Блок встроенной базы данных (dataTable) - построен на div-сетке (без тега <table>: см. DataTableView). */
+/* Ограничиваем таблицу шириной заметки (по аналогии с фиксом для коллаутов): сам блок
+   является флекс-элементом внутри `.bn-block-content` с `min-width: auto`. Без этого ограничения
+   широкая сетка растянет весь редактор целиком вместо того, чтобы скроллиться внутри `.e26-db__scroll`. */
+.bn-block-content[data-content-type="dataTable"],
+.bn-block-content[data-content-type="dataTable"] > * {
+  min-width: 0;
+}
+.e26-db {
+  margin: 8px 0;
+  min-width: 0;
+  max-width: 100%;
+  font-size: 13px;
+}
+.e26-db__scroll {
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+.e26-db__grid {
+  display: grid;
+  gap: 1px;
+  width: max-content;
+  min-width: 100%;
+  background: var(--color-border, rgba(255, 255, 255, 0.1));
+  border: 1px solid var(--color-border, rgba(255, 255, 255, 0.1));
+  border-radius: 10px;
+  overflow: hidden;
+}
+.e26-db__h {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 36px;
+  padding: 0 4px 0 8px;
+  background: rgba(255, 255, 255, 0.045);
+}
+.e26-db__htype {
+  display: inline-flex;
+  flex-shrink: 0;
+  color: var(--color-text-secondary);
+  opacity: 0.8;
+}
+.e26-db__hname {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--color-text, #e5e5e5);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+.e26-db__hbtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  background: transparent;
+  border: none;
+  border-radius: 5px;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.1s ease, background 0.1s ease;
+}
+.e26-db__h:hover .e26-db__hbtn {
+  opacity: 0.7;
+}
+.e26-db__hbtn:hover {
+  opacity: 1 !important;
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--color-text, #e5e5e5);
+}
+.e26-db__resize {
+  position: absolute;
+  top: 0;
+  right: -2px;
+  z-index: 2;
+  width: 6px;
+  height: 100%;
+  cursor: col-resize;
+}
+.e26-db__resize:hover {
+  background: var(--color-accent, #6366f1);
+  opacity: 0.6;
+}
+.e26-db__hadd {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.045);
+}
+.e26-db__hadd button,
+.e26-db__rowact button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+}
+.e26-db__hadd button:hover,
+.e26-db__rowact button:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--color-text, #e5e5e5);
+}
+.e26-db__cell {
+  display: flex;
+  align-items: stretch;
+  min-width: 0;
+  min-height: 34px;
+  background: var(--color-bg, #1a1a1a);
+}
+.e26-db__rowact {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-bg, #1a1a1a);
+}
+.e26-db__rowact button {
+  opacity: 0.35;
+}
+.e26-db__rowact button:hover {
+  opacity: 1;
+}
+.e26-db__cellinput,
+.e26-db__date {
+  width: 100%;
+  padding: 6px 8px;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--color-text, #e5e5e5);
+  font-size: 13px;
+}
+.e26-db__cellinput:focus,
+.e26-db__date:focus {
+  background: rgba(99, 102, 241, 0.12);
+}
+.e26-db__date {
+  color-scheme: dark;
+}
+.e26-db__checkwrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  cursor: pointer;
+}
+.e26-db__check {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  accent-color: var(--color-accent, #6366f1);
+}
+.e26-db__tags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  padding: 4px 6px;
+}
+.e26-db__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 4px 1px 7px;
+  font-size: 11.5px;
+  color: #c7b8ff;
+  background: rgba(99, 102, 241, 0.18);
+  border-radius: 999px;
+}
+.e26-db__chip button {
+  display: inline-flex;
+  padding: 0;
+  background: transparent;
+  border: none;
+  color: inherit;
+  font-size: 13px;
+  line-height: 1;
+  opacity: 0.7;
+  cursor: pointer;
+}
+.e26-db__chip button:hover {
+  opacity: 1;
+}
+.e26-db__taginput {
+  flex: 1;
+  min-width: 48px;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--color-text, #e5e5e5);
+  font-size: 13px;
+}
+.e26-db__addrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  padding: 5px 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--color-border, rgba(255, 255, 255, 0.12));
+  border-radius: 8px;
+  color: var(--color-text-secondary);
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.e26-db__addrow:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--color-text, #e5e5e5);
+}
+/* Меню настроек колонок (выносится через портал в <body>) */
+.e26-db__menu {
+  z-index: 100;
+  width: 200px;
+  padding: 5px;
+  border-radius: 10px;
+  border: 1px solid var(--color-border-strong, rgba(255, 255, 255, 0.18));
+  background: #232326;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+}
+.e26-db__menu button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 8px;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  color: var(--color-text, #e5e5e5);
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+.e26-db__menu button:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+.e26-db__menu button.is-active {
+  color: var(--color-accent, #6366f1);
+}
+.e26-db__menu button.e26-db__menudanger {
+  color: #f87171;
+}
+.e26-db__menu button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.e26-db__menusep {
+  height: 1px;
+  margin: 5px 4px;
+  background: var(--color-border, rgba(255, 255, 255, 0.1));
+}
+.e26-db__menulabel {
+  padding: 4px 8px 2px;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+}
+
+/* Многоколоночный режим поддерживается пакетом @blocknote/xl-multi-column
+   и стилизуется встроенными правилами ядра (.bn-block-column-list / .bn-block-column)
+   - кастомный CSS не требуется. */
+
+/* Стили интерактивной доски (кастомный движок e26) добавлены в самый конец этого файла. */
+
+/* ─── Рендеринг Markdown в режиме «только чтение» (превью в корзине и т. д.) ───────────────── */
+.md-content {
+  color: var(--color-text-secondary);
+  font-size: 14px;
+  line-height: 1.7;
+}
+.md-content h1,
+.md-content h2 {
+  font-weight: 700;
+  color: var(--color-text-strong);
+}
+.md-content h1 {
+  font-size: 1.7em;
+  margin: 1.2em 0 0.5em;
+}
+.md-content h2 {
+  font-size: 1.4em;
+  margin: 1.1em 0 0.4em;
+}
+.md-content h3,
+.md-content h4,
+.md-content h5,
+.md-content h6 {
+  font-weight: 600;
+  color: var(--color-text);
+}
+.md-content h3 {
+  font-size: 1.2em;
+  margin: 1em 0 0.3em;
+}
+.md-content h4,
+.md-content h5,
+.md-content h6 {
+  margin: 0.9em 0 0.3em;
+}
+.md-content p {
+  margin: 0.6em 0;
+}
+.md-content strong {
+  color: var(--color-text-strong);
+  font-weight: 600;
+}
+.md-content em {
+  color: var(--color-text);
+}
+.md-content a {
+  color: var(--color-link);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.md-content a:hover {
+  color: var(--color-link-hover);
+}
+.md-content ul,
+.md-content ol {
+  padding-left: 1.4em;
+  margin: 0.6em 0;
+}
+.md-content ul {
+  list-style: disc;
+}
+.md-content ol {
+  list-style: decimal;
+}
+.md-content li {
+  margin: 0.2em 0;
+}
+.md-content code {
+  background: var(--color-code-bg);
+  color: var(--color-code-text);
+  padding: 0.15em 0.4em;
+  border-radius: 4px;
+  font-size: 0.9em;
+  font-family: var(--font-mono);
+}
+.md-content pre {
+  background: var(--color-pre-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 1em;
+  overflow-x: auto;
+  margin: 0.8em 0;
+}
+.md-content pre code {
+  background: transparent;
+  color: var(--color-text-secondary);
+  padding: 0;
+}
+.md-content blockquote {
+  border-left: 3px solid var(--color-accent);
+  padding-left: 1em;
+  color: var(--color-text-quote);
+  margin: 0.8em 0;
+  font-style: italic;
+}
+.md-content hr {
+  border: none;
+  border-top: 1px solid var(--color-border-strong);
+  margin: 1.5em 0;
+}
+.md-content table {
+  border-collapse: collapse;
+  margin: 0.8em 0;
+  width: 100%;
+}
+.md-content th,
+.md-content td {
+  border: 1px solid var(--color-border);
+  padding: 0.5em 0.8em;
+  text-align: left;
+}
+.md-content th {
+  background: var(--color-table-head-bg);
+  font-weight: 600;
+  color: var(--color-text-strong);
+}
+.md-content img {
+  max-width: 100%;
+  border-radius: 8px;
+  margin: 0.8em 0;
+}
+.md-content input[type="checkbox"] {
+  margin-right: 0.4em;
+}
+
+/* ─── Доступность: уменьшение движения ─────────────────────────────────────
+  У пользователей с системным режимом «Уменьшение движения» (reduce motion)
+   все CSS-анимации и переходы (transitions) сбрасываются до почти нулевой длительности.
+
+   ВАЖНО: Это влияет ТОЛЬКО на CSS-анимации (плавное появление .app-shell,
+   пульсация .pulse-once, scroll-behavior, ховеры). Анимации от framer-motion (карточки, поповеры)
+   управляются через JS. Чтобы они тоже отключались, нужно внедрять хук `useReducedMotion()`
+   в каждый компонент.
+*/
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   ИНТЕРАКТИВНАЯ ДОСКА (e26) - Кастомный UI-движок (2026).
+   Стили: Темная тема, эффект матового стекла (glassmorphic), индиго-акцент.
+
+   Имена классов соответствуют DOM-структуре из компонентов:
+   whiteboardBlock.tsx, WhiteboardCanvas.tsx и Toolbox.tsx.
+   ════════════════════════════════════════════════════════════════════════════ */
+
+/* Корневой контейнер встроенного блока + КАРТОЧКА (компактное превью внутри заметки) */
+.e26-wb {
+  margin: 10px 0;
+}
+.e26-wb__card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  max-width: 344px;
+  padding: 12px;
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.08));
+  border-radius: 16px;
+  background:
+    radial-gradient(120% 140% at 100% 0%, color-mix(in oklab, var(--accent, #6366f1) 9%, transparent) 0%, transparent 55%),
+    var(--surface-1, #0e0e10);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.03) inset,
+    0 6px 22px rgba(0, 0, 0, 0.35);
+  transition: border-color 0.16s ease, transform 0.16s ease, box-shadow 0.16s ease;
+}
+.e26-wb__card:hover {
+  border-color: var(--accent-border, color-mix(in oklab, var(--accent, #6366f1) 35%, transparent));
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.05) inset,
+    0 10px 30px rgba(0, 0, 0, 0.45);
+}
+
+/* ── имя ряда ── */
+.e26-wb__namerow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 2px 0;
+}
+.e26-wb__nameicon {
+  flex: 0 0 auto;
+  color: var(--accent, #6366f1);
+}
+.e26-wb__name {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  padding: 3px 6px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 650;
+  color: var(--text-strong, #f4f4f5);
+  outline: none;
+  transition: background 0.14s ease, border-color 0.14s ease;
+}
+.e26-wb__name::placeholder {
+  color: var(--text-muted, #71717a);
+  font-weight: 600;
+}
+.e26-wb__name:hover {
+  background: color-mix(in oklab, var(--text-strong, #f4f4f5) 5%, transparent);
+}
+.e26-wb__name:focus {
+  background: color-mix(in oklab, var(--text-strong, #f4f4f5) 7%, transparent);
+  border-color: var(--accent-border, color-mix(in oklab, var(--accent, #6366f1) 35%, transparent));
+}
+
+/* ── Превью (по центру) - на всю ширину карточки, сохраняет пропорции ── */
+.e26-wb__thumb {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 320 / 140;
+  border-radius: 12px;
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.08));
+  background:
+    radial-gradient(circle at 1px 1px, rgba(255, 255, 255, 0.12) 1px, transparent 1px)
+      0 0 / 14px 14px,
+    #0b0b0d;
+  overflow: hidden;
+  display: block;
+}
+
+/*  Кнопка открытия (снизу) - на всю ширину  */
+.e26-wb__open {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  padding: 9px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  color: var(--text-strong, #f4f4f5);
+  background: color-mix(in oklab, var(--accent, #6366f1) 16%, transparent);
+  border: 1px solid var(--accent-border, color-mix(in oklab, var(--accent, #6366f1) 35%, transparent));
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.14s ease, transform 0.1s ease;
+}
+.e26-wb__open:hover {
+  background: color-mix(in oklab, var(--accent, #6366f1) 26%, transparent);
+}
+.e26-wb__open:active {
+  transform: translateY(1px);
+}
+
+/* Название доски в полноэкранной модалке (вверху слева, рядом с кнопкой закрытия) */
+.e26-wb__modaltitle {
+  position: absolute;
+  top: 18px;
+  left: 20px;
+  z-index: 6;
+  max-width: 50vw;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
+  font-weight: 650;
+  color: var(--text-strong, #f4f4f5);
+  opacity: 0.85;
+  pointer-events: none;
+}
+
+/* ── ПОЛНОЭКРАННАЯ МОДАЛКА (выносится через портал в <body>) ──────────────────────────────────── */
+.e26-wb__overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  background: color-mix(in oklab, #050506 86%, transparent);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  animation: e26-wb-fade 0.16s ease;
+}
+.e26-wb__modal {
+  position: relative;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+@keyframes e26-wb-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.e26-wb__close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 6;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  color: var(--text-secondary, #d4d4d8);
+  background: var(--surface-2, color-mix(in oklab, #16161b 78%, transparent));
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.08));
+  border-radius: 11px;
+  cursor: pointer;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  transition: color 0.14s ease, background 0.14s ease;
+}
+.e26-wb__close:hover {
+  color: var(--text-strong, #f4f4f5);
+  background: var(--surface-2-solid, #16161b);
+}
+.e26-wb__loading {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary, #d4d4d8);
+  font-size: 14px;
+}
+
+/*  СЦЕНА: контейнер для холста, оверлеев и плавающих панелей */
+.e26-wb__stage {
+  position: relative;
+  flex: 1;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  background:
+    radial-gradient(120% 120% at 50% 0%, #0d0d12 0%, #08080a 70%, #060608 100%);
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.e26-wb__cv {
+  position: absolute;
+  display: block;
+}
+/* Слой мира: увеличен на WORLD_PAD с каждой стороны (размер и позиция задаются через JS в engine.resize).
+   Установлено `pointer-events: none`, чтобы клики проходили насквозь в слой оверлея.
+   Свойство `will-change: transform` - это подсказка для браузера, что элемент будет двигаться,
+   благодаря чему CSS-трансформации (translate/scale) обрабатываются напрямую через GPU. */
+.e26-wb__cv--world {
+  pointer-events: none;
+  will-change: transform;
+}
+/* Слой оверлея: размером во весь вьюпорт, координаты (0,0). Перехватывает события мыши (pointer events);
+   движок слушает их здесь, чтобы функция `localPoint()` возвращала координаты относительно вьюпорта. */
+.e26-wb__cv--overlay {
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* ── СЛОЙ РЕДАКТИРОВАНИЯ ТЕКСТА  */
+.e26-wb__textedit {
+  position: fixed;
+  z-index: 10000;
+  margin: 0;
+  padding: 2px 4px;
+  min-width: 8px;
+  max-width: 70vw;
+  transform-origin: top left;
+  background: color-mix(in oklab, #0b0b0e 70%, transparent);
+  border: 1px solid var(--accent, #6366f1);
+  border-radius: 6px;
+  outline: none;
+  resize: none;
+  overflow: hidden;
+  white-space: pre;
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--accent, #6366f1) 22%, transparent);
+  caret-color: var(--accent, #6366f1);
+}
+
+/*  Редактор текста для связей (edge-label): по центру.
+    Центрируется по точке разметки через инлайновый `transform` из WhiteboardCanvas; */
+.e26-wb__textedit--chip {
+  padding: 4px 10px;
+  min-width: 32px;
+  text-align: center;
+  white-space: pre;
+  background: color-mix(in oklab, #0e0e10 92%, transparent);
+  border: 1px solid color-mix(in oklab, var(--accent, #818cf8) 60%, transparent);
+  border-radius: 8px;
+  box-shadow:
+    0 6px 18px rgba(0, 0, 0, 0.5),
+    0 0 0 3px color-mix(in oklab, var(--accent, #818cf8) 20%, transparent);
+}
+
+/* ── Панель на ПКМ ───────────────────────────────────────────────── */
+.e26-wb-sp {
+  position: fixed;
+  z-index: 10002;
+  width: 232px;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  color: var(--text-strong, #f4f4f5);
+  background: color-mix(in oklab, var(--surface-1, #0e0e10) 80%, transparent);
+  backdrop-filter: blur(14px) saturate(1.3);
+  -webkit-backdrop-filter: blur(14px) saturate(1.3);
+  border: 1px solid var(--border-strong, rgba(255, 255, 255, 0.1));
+  border-radius: 12px;
+  box-shadow:
+    0 18px 50px rgba(0, 0, 0, 0.55),
+    0 4px 14px rgba(0, 0, 0, 0.45);
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  animation: e26-wb-nodeov-in 0.12s ease;
+}
+.e26-wb-sp__row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 7px 10px;
+  font: inherit;
+  text-align: left;
+  color: var(--text-strong, #f4f4f5);
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.1s ease;
+}
+button.e26-wb-sp__row:hover {
+  background: color-mix(in oklab, var(--accent, #818cf8) 14%, transparent);
+}
+.e26-wb-sp__row--static {
+  cursor: default;
+}
+.e26-wb-sp__label {
+  flex: 0 0 62px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary, #d4d4d8);
+}
+.e26-wb-sp__swatch {
+  margin-left: auto;
+  width: 28px;
+  height: 18px;
+  border-radius: 5px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4) inset;
+}
+.e26-wb-sp__swatch[data-empty] {
+  background: repeating-conic-gradient(#3a3a40 0% 25%, #24242a 0% 50%) 0 0 / 8px
+    8px;
+}
+.e26-wb-sp__widths {
+  margin-left: auto;
+  display: flex;
+  gap: 4px;
+}
+.e26-wb-sp__wbtn {
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  background: color-mix(in oklab, var(--surface-2, #16161b) 70%, transparent);
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.1));
+  border-radius: 6px;
+  cursor: pointer;
+  transition: border-color 0.1s ease, background 0.1s ease;
+}
+.e26-wb-sp__wbtn span {
+  display: block;
+  border-radius: 999px;
+  background: var(--text-secondary, #d4d4d8);
+}
+.e26-wb-sp__wbtn--on {
+  border-color: var(--accent, #818cf8);
+  background: color-mix(in oklab, var(--accent, #818cf8) 20%, transparent);
+}
+.e26-wb-sp__wbtn--on span {
+  background: var(--accent, #a5b4fc);
+}
+.e26-wb-sp__range {
+  flex: 1;
+  margin: 0 2px;
+  accent-color: var(--accent, #818cf8);
+}
+.e26-wb-sp__pct {
+  flex: 0 0 32px;
+  text-align: right;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary, #d4d4d8);
+}
+.e26-wb-sp__sep {
+  height: 1px;
+  margin: 4px 6px;
+  background: var(--border, rgba(255, 255, 255, 0.08));
+}
+.e26-wb-sp__zrow {
+  display: flex;
+  gap: 4px;
+}
+.e26-wb-sp__item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 8px 10px;
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  color: var(--text-strong, #f4f4f5);
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.1s ease;
+}
+.e26-wb-sp__item--half {
+  width: auto;
+  flex: 1;
+  justify-content: center;
+  gap: 6px;
+}
+.e26-wb-sp__item svg {
+  color: var(--text-secondary, #d4d4d8);
+}
+.e26-wb-sp__item:hover {
+  background: color-mix(in oklab, var(--accent, #818cf8) 16%, transparent);
+}
+.e26-wb-sp__item--danger {
+  color: #fb7185;
+}
+.e26-wb-sp__item--danger svg {
+  color: #fb7185;
+}
+.e26-wb-sp__item--danger:hover {
+  background: color-mix(in oklab, #fb7185 18%, transparent);
+}
+
+/* ── ПАНЕЛЬ ВЫБОРА ЦВЕТА (палитра OKLCH + кастомный цвет) ────────────────── */
+.e26-wb-cpick {
+  position: fixed;
+  z-index: 10003;
+  width: 236px;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: color-mix(in oklab, var(--surface-1, #0e0e10) 82%, transparent);
+  backdrop-filter: blur(14px) saturate(1.3);
+  -webkit-backdrop-filter: blur(14px) saturate(1.3);
+  border: 1px solid var(--border-strong, rgba(255, 255, 255, 0.12));
+  border-radius: 12px;
+  box-shadow:
+    0 18px 50px rgba(0, 0, 0, 0.6),
+    0 4px 14px rgba(0, 0, 0, 0.45);
+  animation: e26-wb-nodeov-in 0.1s ease;
+}
+.e26-wb-cpick__row {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 4px;
+}
+.e26-wb-cpick__sw {
+  aspect-ratio: 1;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 5px;
+  cursor: pointer;
+  transition: transform 0.08s ease, box-shadow 0.08s ease;
+}
+.e26-wb-cpick__sw:hover {
+  transform: scale(1.18);
+}
+.e26-wb-cpick__sw--on {
+  box-shadow:
+    0 0 0 2px var(--surface-1, #0e0e10),
+    0 0 0 4px var(--accent, #818cf8);
+}
+.e26-wb-cpick__custom {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 2px;
+  padding: 5px 2px 0;
+  font-size: 12px;
+  color: var(--text-secondary, #d4d4d8);
+  border-top: 1px solid var(--border, rgba(255, 255, 255, 0.08));
+}
+.e26-wb-cpick__custom input[type="color"] {
+  width: 30px;
+  height: 24px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.14));
+  border-radius: 6px;
+  cursor: pointer;
+}
+@media (prefers-reduced-motion: reduce) {
+  .e26-wb-sp,
+  .e26-wb-cpick {
+    animation: none;
+  }
+  .e26-wb-sp__row,
+  .e26-wb-sp__item,
+  .e26-wb-sp__wbtn,
+  .e26-wb-cpick__sw {
+    transition: none;
+  }
+}
+
+/* ── Тулбар сверху  ──────────────────────────── */
+/* Подсказка для пустой доски по центру экрана.
+Исчезает, как только на доске появляется первый элемент (shapeCount > 0). */
+.e26-wb__empty-hint {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 3;
+  pointer-events: none;
+  text-align: center;
+  color: var(--text-muted, #71717a);
+  user-select: none;
+  max-width: 480px;
+  padding: 0 24px;
+}
+.e26-wb__empty-hint__title {
+  font-size: 16px;
+  font-weight: 650;
+  color: var(--text-secondary, #d4d4d8);
+  margin-bottom: 10px;
+  opacity: 0.6;
+}
+.e26-wb__empty-hint__body {
+  font-size: 13px;
+  line-height: 1.7;
+  opacity: 0.75;
+}
+.e26-wb__empty-hint kbd {
+  display: inline-block;
+  min-width: 18px;
+  padding: 1px 5px;
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.12));
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.05);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  color: var(--text-strong, #f4f4f5);
+  vertical-align: 1px;
+}
+
+.e26-wb-toolbar {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: calc(100% - 32px);
+  padding: 7px 9px;
+  flex-wrap: wrap;
+  justify-content: center;
+  background: var(--surface-2, color-mix(in oklab, #16161b 78%, transparent));
+  backdrop-filter: blur(12px) saturate(1.3);
+  -webkit-backdrop-filter: blur(12px) saturate(1.3);
+  border: 1px solid var(--border-strong, rgba(255, 255, 255, 0.1));
+  border-radius: 16px;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.05) inset,
+    0 14px 40px rgba(0, 0, 0, 0.5),
+    0 2px 8px rgba(0, 0, 0, 0.4);
+}
+.e26-wb-toolbar__group {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+.e26-wb-toolbar__sep {
+  width: 1px;
+  align-self: stretch;
+  margin: 3px 4px;
+  background: var(--border, rgba(255, 255, 255, 0.08));
+}
+
+.e26-wb-tbtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  color: var(--text-secondary, #d4d4d8);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.13s ease, color 0.13s ease, border-color 0.13s ease;
+}
+.e26-wb-tbtn:hover {
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--text-strong, #f4f4f5);
+}
+.e26-wb-tbtn:active {
+  background: rgba(255, 255, 255, 0.12);
+}
+/* Обводка фокуса при навигации с клавиатуры (Tab). */
+.e26-wb-tbtn:focus-visible,
+.e26-wb-swatch:focus-visible,
+.e26-wb-stroke:focus-visible {
+  outline: none;
+  border-color: var(--accent-border, color-mix(in oklab, var(--accent, #6366f1) 55%, transparent));
+  box-shadow:
+    0 0 0 1px var(--surface-2, #16161b),
+    0 0 0 3px color-mix(in oklab, var(--accent, #6366f1) 50%, transparent);
+}
+.e26-wb-tbtn:disabled {
+  opacity: 0.34;
+  cursor: default;
+  background: transparent;
+  color: var(--text-secondary, #d4d4d8);
+}
+.e26-wb-tbtn--active {
+  color: #fff;
+  background: color-mix(in oklab, var(--accent, #6366f1) 26%, transparent);
+  border-color: var(--accent-border, color-mix(in oklab, var(--accent, #6366f1) 40%, transparent));
+  box-shadow: 0 0 0 1px color-mix(in oklab, var(--accent, #6366f1) 30%, transparent) inset;
+}
+.e26-wb-tbtn--active:hover {
+  background: color-mix(in oklab, var(--accent, #6366f1) 34%, transparent);
+}
+.e26-wb-tbtn--danger:hover {
+  background: color-mix(in oklab, #f43f5e 20%, transparent);
+  color: #fda4af;
+}
+
+
+.e26-wb-swatches {
+  gap: 5px;
+}
+.e26-wb-swatch {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  cursor: pointer;
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+.e26-wb-swatch:hover {
+  transform: scale(1.14);
+}
+.e26-wb-swatch--active {
+  box-shadow:
+    0 0 0 2px var(--surface-2-solid, #16161b),
+    0 0 0 3.5px var(--accent, #6366f1);
+}
+
+.e26-wb-strokes {
+  gap: 2px;
+}
+.e26-wb-stroke {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  cursor: pointer;
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+.e26-wb-stroke:hover {
+  background: rgba(255, 255, 255, 0.07);
+}
+.e26-wb-stroke--active {
+  border-color: var(--accent-border, color-mix(in oklab, var(--accent, #6366f1) 40%, transparent));
+  background: color-mix(in oklab, var(--accent, #6366f1) 14%, transparent);
+}
+.e26-wb-stroke__dot {
+  display: block;
+  border-radius: 50%;
+  background: var(--text, #e4e4e7);
+}
+.e26-wb-stroke--active .e26-wb-stroke__dot {
+  background: var(--indigo-300, #a5b4fc);
+}
+
+/* Зум */
+.e26-wb-zoom {
+  gap: 1px;
+}
+.e26-wb-zoom__label {
+  min-width: 52px;
+  height: 34px;
+  padding: 0 8px;
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary, #d4d4d8);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.e26-wb-zoom__label:hover {
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--text-strong, #f4f4f5);
+}
+
+/* ── Миникарта спрва снизу ───────────────────────────────────────────────── */
+.e26-wb-minimap {
+  position: absolute;
+  right: 16px;
+  bottom: 16px;
+  z-index: 4;
+  padding: 6px;
+  background: var(--surface-2, color-mix(in oklab, #16161b 78%, transparent));
+  backdrop-filter: blur(12px) saturate(1.3);
+  -webkit-backdrop-filter: blur(12px) saturate(1.3);
+  border: 1px solid var(--border-strong, rgba(255, 255, 255, 0.1));
+  border-radius: 14px;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.05) inset,
+    0 12px 32px rgba(0, 0, 0, 0.5);
+}
+.e26-wb-minimap__canvas {
+  display: block;
+  border-radius: 9px;
+  background:
+    radial-gradient(circle at 1px 1px, rgba(255, 255, 255, 0.06) 1px, transparent 1px)
+      0 0 / 12px 12px,
+    #0a0a0d;
+  cursor: pointer;
+}
+
+/* ── Системные настройки анимации ────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .e26-wb__overlay { animation: none; }
+  .e26-wb__card,
+  .e26-wb__open,
+  .e26-wb-tbtn,
+  .e26-wb-swatch,
+  .e26-wb-stroke { transition: none; }
+}
+
+/* ── КОНТЕКСТНАЯ ПАНЕЛЬ НОДЫ (SQL / действия / редактор) ─────────────────────
+   Всплывающая панель, которая рендерится поверх интерактивной доски.
+   Позиционируется через position:fixed + inline left/top (в пикселях вьюпорта).
+   Находится ВЫШЕ, чем модалка доски (z: 9999) и оверлей редактирования текста (z: 10000).
+*/
+.e26-wb-nodeov {
+  position: fixed;
+  z-index: 10001;
+  width: 360px;
+  max-width: calc(100vw - 24px);
+  display: flex;
+  flex-direction: column;
+  color: var(--text-strong, #f4f4f5);
+  /* * ВАЖНО: Фон панели ОБЯЗАТЕЛЬНО должен быть полупрозрачным, иначе эффект размытия
+   * (backdrop-filter: blur) просто не сработает (--surface-1 по дизайну полностью НЕПРОЗРАЧНЫЙ #0e0e10).
+   * Реализовываю матовый оттенок на основе базового цвета + добавляю прозрачность
+   * чтобы эффект стекла действительно размывал элементы за панелью.
+   */
+  background: color-mix(in oklab, var(--surface-1, #0e0e10) 78%, transparent);
+  backdrop-filter: blur(14px) saturate(1.3);
+  -webkit-backdrop-filter: blur(14px) saturate(1.3);
+  border: 1px solid var(--border-strong, rgba(255, 255, 255, 0.1));
+  border-radius: 14px;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.05) inset,
+    0 18px 50px rgba(0, 0, 0, 0.55),
+    0 4px 14px rgba(0, 0, 0, 0.45),
+    0 0 0 1px color-mix(in oklab, var(--accent, #818cf8) 14%, transparent);
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  animation: e26-wb-nodeov-in 0.14s ease;
+  overflow: hidden;
+}
+@keyframes e26-wb-nodeov-in {
+  from { opacity: 0; transform: translateY(-4px) scale(0.985); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* заголовок */
+.e26-wb-nodeov__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 12px 10px 14px;
+  border-bottom: 1px solid var(--border, rgba(255, 255, 255, 0.08));
+  background: linear-gradient(
+    to bottom,
+    color-mix(in oklab, var(--accent, #818cf8) 9%, transparent),
+    transparent
+  );
+}
+.e26-wb-nodeov__title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13.5px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--text-strong, #f4f4f5);
+}
+.e26-wb-nodeov__title svg {
+  color: var(--accent, #818cf8);
+}
+.e26-wb-nodeov__x {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  color: var(--text-secondary, #d4d4d8);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  cursor: pointer;
+  transition: color 0.13s ease, background 0.13s ease;
+}
+.e26-wb-nodeov__x:hover {
+  color: var(--text-strong, #f4f4f5);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* body */
+.e26-wb-nodeov__body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+}
+.e26-wb-nodeov__field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.e26-wb-nodeov__label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-secondary, #d4d4d8);
+}
+
+.e26-wb-nodeov__input {
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 8px 10px;
+  font: inherit;
+  font-size: 13.5px;
+  color: var(--text-strong, #f4f4f5);
+  background: var(--surface-2, color-mix(in oklab, #16161b 86%, transparent));
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.1));
+  border-radius: 9px;
+  outline: none;
+  transition: border-color 0.13s ease, box-shadow 0.13s ease;
+}
+.e26-wb-nodeov__input::placeholder,
+.e26-wb-nodeov__code::placeholder,
+.e26-wb-nodeov__textarea::placeholder {
+  color: color-mix(in oklab, var(--text-secondary, #d4d4d8) 52%, transparent);
+}
+
+.e26-wb-nodeov__input:focus,
+.e26-wb-nodeov__textarea:focus,
+.e26-wb-nodeov__code:focus {
+  border-color: var(--accent, #818cf8);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--accent, #818cf8) 22%, transparent);
+}
+
+
+.e26-wb-nodeov__textarea {
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 8px 10px;
+  min-height: 84px;
+  font: inherit;
+  font-size: 13.5px;
+  line-height: 1.45;
+  color: var(--text-strong, #f4f4f5);
+  background: var(--surface-2, color-mix(in oklab, #16161b 86%, transparent));
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.1));
+  border-radius: 9px;
+  outline: none;
+  resize: vertical;
+  transition: border-color 0.13s ease, box-shadow 0.13s ease;
+}
+
+/* Мини-поле для SQL-кода без подсветки */
+.e26-wb-nodeov__code {
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 11px 12px;
+  min-height: 128px;
+  font-family: "JetBrains Mono", "SFMono-Regular", ui-monospace, "Cascadia Code",
+    "Fira Code", Menlo, Consolas, monospace;
+  font-size: 13px;
+  line-height: 1.55;
+  tab-size: 2;
+  -moz-tab-size: 2;
+  white-space: pre;
+  overflow: auto;
+  color: var(--text-strong, #f4f4f5);
+  caret-color: var(--accent, #818cf8);
+  background:
+    linear-gradient(
+      to right,
+      color-mix(in oklab, var(--accent, #818cf8) 6%, transparent) 0,
+      transparent 30px
+    ),
+    var(--surface-2, color-mix(in oklab, #0b0b0e 88%, transparent));
+  /* a hairline "gutter" rule via a left accent border + inner shadow */
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.1));
+  border-left: 2px solid color-mix(in oklab, var(--accent, #818cf8) 55%, transparent);
+  border-radius: 9px;
+  outline: none;
+  resize: vertical;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25) inset;
+  transition: border-color 0.13s ease, box-shadow 0.13s ease;
+}
+.e26-wb-nodeov__code:focus {
+  border-left-color: var(--accent, #818cf8);
+}
+
+/* footer */
+.e26-wb-nodeov__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 11px 14px 13px;
+  border-top: 1px solid var(--border, rgba(255, 255, 255, 0.08));
+}
+.e26-wb-nodeov__hint {
+  font-size: 11px;
+  color: color-mix(in oklab, var(--text-secondary, #d4d4d8) 70%, transparent);
+  font-variant-numeric: tabular-nums;
+}
+.e26-wb-nodeov__save {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 14px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: #fff;
+  background: color-mix(in oklab, var(--accent, #818cf8) 88%, #000 6%);
+  border: 1px solid color-mix(in oklab, var(--accent, #a5b4fc) 60%, transparent);
+  border-radius: 10px;
+  cursor: pointer;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.18) inset,
+    0 6px 18px color-mix(in oklab, var(--accent, #818cf8) 30%, transparent);
+  transition: background 0.13s ease, transform 0.08s ease, box-shadow 0.13s ease;
+}
+.e26-wb-nodeov__save:hover {
+  background: var(--accent, #818cf8);
+}
+.e26-wb-nodeov__save:active {
+  transform: translateY(1px);
+}
+.e26-wb-nodeov__save svg {
+  margin-left: -2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .e26-wb-nodeov { animation: none; }
+  .e26-wb-nodeov__x,
+  .e26-wb-nodeov__save,
+  .e26-wb-nodeov__input,
+  .e26-wb-nodeov__textarea,
+  .e26-wb-nodeov__code { transition: none; }
+}

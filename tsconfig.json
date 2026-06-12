@@ -1,0 +1,27 @@
+{
+  "compilerOptions": {
+    // В какой стандарт JavaScript компилировать код (ES2020 поддерживается всеми современными браузерами)
+    "target": "ES2020",
+    // Включает соответствие стандарту ECMAScript при обработке полей классов (важно для корректной работы некоторых библиотек)
+    "useDefineForClassFields": true,
+    // Список встроенных библиотек типов, которые будут доступны в проекте
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "skipLibCheck": true,
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    // Запрещает TypeScript генерировать JS-файлы на диск
+    "noEmit": true,
+    // Поддержка JSX для React 17+.
+    "jsx": "react-jsx",
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+
+    "noFallthroughCasesInSwitch": true
+  },
+  "include": ["src"],
+  "references": [{ "path": "./tsconfig.node.json" }]
+}
