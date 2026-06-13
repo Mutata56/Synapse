@@ -16,7 +16,7 @@ build() {
   cd "Synapse-$pkgver"
   npm ci
   # --no-bundle: нужен только нативный бинарь (без deb/rpm/appimage). Линкуется с
-  # системным webkit, поэтому интерфейс рисуется — в отличие от AppImage с чужим
+  # системным webkit, поэтому интерфейс рисуется, в отличие от AppImage с чужим
   # бандлом webkit, который на свежих системах даёт серый экран.
   npm run tauri build -- --no-bundle
 }

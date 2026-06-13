@@ -66,7 +66,7 @@ export function SettingsView() {
           transition={{ duration: 0.5, ease: EASE }}
           className="relative flex items-center gap-4"
         >
-          {/* Шестерёнка слегка проворачивается при наведении — маленькая радость */}
+          {/* Шестерёнка слегка проворачивается при наведении, маленькая радость */}
           <motion.div
             whileHover={reduced ? undefined : { rotate: 90 }}
             transition={{ type: "spring", stiffness: 200, damping: 15 }}
@@ -136,7 +136,7 @@ export function SettingsView() {
 }
 
 // ─── Заголовок секции ──────────────────────────────────────────────────────
-// Тонкая полоска с лейблом капсом и затухающей линией — задаёт группировку, но
+// Тонкая полоска с лейблом капсом и затухающей линией: задаёт группировку, но
 // не спорит по весу с самими карточками.
 
 function Section({
@@ -198,7 +198,7 @@ function Card({
       whileHover={reduced ? undefined : { y: -2, transition: { duration: 0.18, ease: EASE } }}
       // Лёгкое возвышение: своя поверхность + рамка, на ховере рамка теплеет до
       // акцента и подъезжает мягкая тень. transition сознательно НЕ трогает
-      // transform — иначе он дрался бы с подъёмом по y от framer-motion.
+      // transform, иначе он дрался бы с подъёмом по y от framer-motion.
       style={{
         background:
           "radial-gradient(130% 130% at 100% 0%, color-mix(in oklab, var(--color-accent) 7%, transparent) 0%, transparent 55%), var(--surface-1)",
@@ -210,7 +210,7 @@ function Card({
         className,
       )}
     >
-      {/* Акцентное свечение в углу — проявляется только при наведении */}
+      {/* Акцентное свечение в углу, проявляется только при наведении */}
       <div className="pointer-events-none absolute -top-16 -right-16 h-32 w-32 rounded-full bg-[var(--color-accent)] opacity-0 blur-3xl transition-opacity duration-500 group-hover:opacity-[0.08]" />
 
       <div className="relative flex items-center gap-3 mb-4">

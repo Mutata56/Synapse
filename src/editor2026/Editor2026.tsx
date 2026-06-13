@@ -144,7 +144,7 @@ export function Editor2026() {
     // Разворачиваем портабельную ссылку `.assets/<имя>` (и старую абсолютную из
     // ранее сохранённых заметок) в рабочий URL под текущую машину прямо при
     // показе встроенных блоков картинки/файла. На диске проп остаётся
-    // портабельным — это и делает бэкап переносимым между ОС.
+    // портабельным, и именно это делает бэкап переносимым между ОС.
     resolveFileUrl: (url) => Promise.resolve(resolveAssetUrl(url)),
     // Multi-column: drag-cursor для создания колонок + локализация для
     // slash-пункта и хендлеров.
@@ -237,7 +237,7 @@ export function Editor2026() {
       if (loadedIdRef.current !== activeId) return;
       try {
         // Сворачиваем ссылки на ассеты к портабельной форме ПЕРЕД сохранением,
-        // из тех же блоков делаем и markdown — иначе в заметку утечёт абсолютный
+        // из тех же блоков делаем и markdown, иначе в заметку утечёт абсолютный
         // путь и бэкап не переедет на другую ОС.
         const blocks = portablizeBlocks(editor.document);
         const md = await editor.blocksToMarkdownLossy(blocks as never);
