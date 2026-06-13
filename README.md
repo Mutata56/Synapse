@@ -15,8 +15,6 @@
 - Windows - `.msi` или `.exe`;
 - macOS - `.dmg`.
 
-Релизы собираются автоматически: на каждый тег вида `v*` GitHub Actions поднимает Ubuntu, Windows и macOS, собирает на каждой свой установщик и складывает всё в один релиз (workflow - [.github/workflows/release.yml](.github/workflows/release.yml)). Так что под любую из трёх систем лежит готовый файл, собирать руками ничего не нужно.
-
 ## Архитектура
 
 Как устроены граф связей (собственный физический движок + Pixi.js), интерактивная доска (свой Canvas-движок), файловая система и Rust-бэкенд - в [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
