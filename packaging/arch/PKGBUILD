@@ -1,0 +1,61 @@
+# Maintainer: Kirill
+#
+# Локальная сборка пакета для Arch. Репозиторий приватный, поэтому тянуть исходник
+# из публичного места (как требует AUR) нельзя — собираем из своего дерева.
+# Бандл webkit под Arch сереет, а нативная сборка линкуется с системным webkit и
+# рисуется нормально, поэтому пакет собирается из исходников, а не из AppImage.
+#
+# Использование (из корня репозитория):
+#   ./packaging/arch/build.sh
+# либо вручную:
+#   git archive --format=tar.gz --prefix="Synapse-0.1.2/" -o \
+#       packaging/arch/synapse-notes-0.1.2.tar.gz v0.1.2
+#   cd packaging/arch && makepkg -si
+#
+# При бампе версии правь pkgver и тег в git archive.
+
+pkgname=synapse-notes
+pkgver=0.1.2
+pkgrel=1
+pkgdesc="Личные заметки: редактор в духе Notion и граф связей как в Obsidian"
+arch=('x86_64')
+url="https://github.com/Mutata56/Synapse"
+license=('GPL-3.0-only')
+depends=('webkit2gtk-4.1' 'gtk3' 'libayatana-appindicator' 'librsvg' 'hicolor-icon-theme')
+makedepends=('rust' 'cargo' 'nodejs' 'npm')
+# Локальный тарбол из git archive (см. шапку). SKIP — потому что он наш, не из сети.
+source=("synapse-notes-$pkgver.tar.gz")
+sha256sums=('SKIP')
+
+build() {
+  cd "Synapse-$pkgver"
+  npm ci
+  # --no-bundle: нужен только нативный бинарь, без deb/rpm/appimage.
+  npm run tauri build -- --no-bundle
+}
+
+package() {
+  cd "Synapse-$pkgver"
+
+  install -Dm755 "src-tauri/target/release/synapse" "$pkgdir/usr/bin/synapse"
+
+  install -Dm644 "src-tauri/icons/128x128.png" \
+    "$pkgdir/usr/share/icons/hicolor/128x128/apps/synapse.png"
+  install -Dm644 "src-tauri/icons/32x32.png" \
+    "$pkgdir/usr/share/icons/hicolor/32x32/apps/synapse.png"
+
+  install -d "$pkgdir/usr/share/applications"
+  cat > "$pkgdir/usr/share/applications/synapse.desktop" <<'DESKTOP'
+[Desktop Entry]
+Type=Application
+Name=Synapse
+GenericName=Заметки
+Comment=Личные заметки: Notion-редактор и граф связей
+Exec=synapse
+Icon=synapse
+Terminal=false
+Categories=Office;TextEditor;Utility;
+StartupWMClass=synapse
+Keywords=notes;notion;obsidian;заметки;
+DESKTOP
+}

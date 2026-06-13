@@ -1,0 +1,5 @@
+# Генерируемые makepkg артефакты
+*.tar.gz
+*.pkg.tar.*
+/src/
+/pkg/
