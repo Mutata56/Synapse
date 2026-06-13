@@ -55,6 +55,11 @@ jobs:
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # linuxdeploy (сам AppImage) на раннере не всегда монтируется через
+          # FUSE и валит сборку .AppImage с "failed to run linuxdeploy". Флаг
+          # велит ему распаковываться во временную папку вместо монтирования.
+          # На Windows/macOS переменная просто игнорируется.
+          APPIMAGE_EXTRACT_AND_RUN: 1
         with:
           tagName: ${{ github.ref_name }}
           releaseName: "Synapse ${{ github.ref_name }}"

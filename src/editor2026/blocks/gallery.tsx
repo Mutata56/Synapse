@@ -15,7 +15,7 @@ import {
   X,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { importFile } from "../lib/assets";
+import { importFile, resolveAssetUrl, toPortableAssetRef } from "../lib/assets";
 import { t } from "../../lib/i18n";
 
 type GalleryItem = { url: string; name: string; caption?: string };
@@ -92,7 +92,7 @@ function Carousel({
         >
           {slides.map((it, i) => (
             <div className="e26-carousel__slide" key={i}>
-              <img src={it.url} alt={it.caption || it.name || ""} />
+              <img src={resolveAssetUrl(it.url)} alt={it.caption || it.name || ""} />
             </div>
           ))}
         </div>
@@ -162,17 +162,20 @@ function GalleryView({ block, editor }: { block: any; editor: any }) {
   const onPick = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
     const added: GalleryItem[] = [];
-    const have = new Set(items.map((it) => it.url)); // дедуп по существующим
+    // Дедуп по портабельной форме: храним `.assets/<имя>`, чтобы галерея
+    // переезжала между ОС вместе с бэкапом (а не тянула абсолютный путь).
+    const have = new Set(items.map((it) => toPortableAssetRef(it.url)));
     for (const f of Array.from(files)) {
       try {
         const a = await importFile(f);
+        const url = toPortableAssetRef(a.url);
         // URL после SHA-дедупа совпадают детерминированно, если та же
         // картинка импортируется дважды (например, дубликат файла при
         // перетаскивании). Оставляем одну, также гарантирует уникальность
         // React-ключа `it.url` между ре-рендерами.
-        if (have.has(a.url)) continue;
-        have.add(a.url);
-        added.push({ url: a.url, name: a.name });
+        if (have.has(url)) continue;
+        have.add(url);
+        added.push({ url, name: a.name });
       } catch (e) {
         console.error("gallery: import failed:", e);
       }
@@ -223,7 +226,7 @@ function GalleryView({ block, editor }: { block: any; editor: any }) {
         <div className="e26-gallery__grid">
           {items.map((it, i) => (
             <figure key={it.url} className="e26-gallery__item">
-              <img src={it.url} alt={it.caption || it.name || ""} />
+              <img src={resolveAssetUrl(it.url)} alt={it.caption || it.name || ""} />
               <div className="e26-gallery__ctl">
                 <button
                   type="button"
@@ -284,7 +287,7 @@ export const galleryBlock = createReactBlockSpec(
       return (
         <div data-gallery="1">
           {items.map((it, i) => (
-            <img key={i} src={it.url} alt={it.caption || it.name || ""} />
+            <img key={i} src={resolveAssetUrl(it.url)} alt={it.caption || it.name || ""} />
           ))}
         </div>
       );

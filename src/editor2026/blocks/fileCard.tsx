@@ -14,7 +14,9 @@ import {
   humanSize,
   importFile,
   openAssetInOS,
+  resolveAssetUrl,
   revealAssetInOS,
+  toPortableAssetRef,
 } from "../lib/assets";
 
 export const fileCardBlock = createReactBlockSpec(
@@ -45,7 +47,9 @@ export const fileCardBlock = createReactBlockSpec(
           props.editor.updateBlock(props.block, {
             type: "fileCard",
             props: {
-              assetUrl: a.url,
+              // Портабельная ссылка, чтобы карточка переехала между ОС с бэкапом.
+              // Открытие/показ файла и так идут по assetName (см. ниже).
+              assetUrl: toPortableAssetRef(a.url),
               assetName: a.assetName,
               name: a.name,
               ext: a.ext,
@@ -106,12 +110,13 @@ export const fileCardBlock = createReactBlockSpec(
       );
     },
 
-    // Экспорт деградирует до портативной ссылки.
+    // Экспорт деградирует до ссылки. На диске assetUrl портабельный, поэтому
+    // для рабочей ссылки разворачиваем его под текущую машину.
     toExternalHTML: (props) => {
       const { assetUrl, name } = props.block.props;
       return (
         <p>
-          <a href={assetUrl || "#"}>{name || "Файл"}</a>
+          <a href={resolveAssetUrl(assetUrl) || "#"}>{name || "Файл"}</a>
         </p>
       );
     },

@@ -22,6 +22,7 @@ import { TrashView } from "./components/TrashView";
 import { VersionHistory } from "./components/VersionHistory";
 import { WikiLinkPicker } from "./components/WikiLinkPicker";
 import { WritingDashboard } from "./components/WritingDashboard";
+import { warmAssetResolver } from "./editor2026/lib/assets";
 import { warmIndex, wordCountsFor } from "./lib/fullTextSearch";
 import { seedTemplatesIfEmpty } from "./lib/templates";
 import { flattenNotes } from "./lib/treeUtils";
@@ -79,6 +80,9 @@ export default function App() {
       // localStorage может кидать в приватных режимах / при переполнении
       // квоты, best-effort.
     }
+    // Прогреваем путь к .assets, чтобы разворот портабельных ссылок на картинки
+    // (resolveAssetUrl) был синхронным к моменту отрисовки первой заметки.
+    void warmAssetResolver();
     void (async () => {
       // Загружаем настройки первыми, чтобы CSS-переменные accent и
       // пользовательский глобальный шорткат применились как можно раньше

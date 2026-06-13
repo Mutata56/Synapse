@@ -65,6 +65,11 @@ import { getNotesSchema } from "./schema";
 import { TemplateChipRow } from "./TemplateChipRow";
 import { buildWikiLinkItems } from "./wikiLink2026";
 import { tryHandleImagePaste } from "./lib/pasteImages";
+import {
+  portablizeBlocks,
+  resolveAssetUrl,
+  toPortableAssetRef,
+} from "./lib/assets";
 
 /** Задержка перед сохранением содержимого BlockNote на диск. */
 const CONTENT_SAVE_DEBOUNCE_MS = 400;
@@ -83,8 +88,13 @@ const schema = getNotesSchema();
 /**
  * Upload-хендлер BlockNote, направляет каждое перетащенное/вставленное
  * изображение через пайплайн дедупликации ассетов по SHA и возвращает
- * Tauri asset-protocol URL. На уровне модуля, чтобы замыкание было
+ * ПОРТАБЕЛЬНУЮ ссылку `.assets/<имя>`. На уровне модуля, чтобы замыкание было
  * стабильным между ре-рендерами.
+ *
+ * Возвращаем портабельную, а не абсолютную ссылку нарочно: она и ложится в проп
+ * блока, и уезжает на диск, так что в заметке нет привязки к пути конкретной ОС
+ * (важно для бэкапа между системами). В рабочий URL для показа её разворачивает
+ * resolveFileUrl ниже.
  */
 async function uploadDroppedFile(file: File): Promise<string> {
   try {
@@ -94,7 +104,7 @@ async function uploadDroppedFile(file: File): Promise<string> {
       file.type.split("/")[1] ??
       FALLBACK_EXT;
     const { url } = await importAssetBytes(buf, ext);
-    return url;
+    return toPortableAssetRef(url);
   } catch (e) {
     console.error("Editor2026: dropped file import failed:", e);
     throw e;
@@ -131,6 +141,11 @@ export function Editor2026() {
   const editor = useCreateBlockNote({
     schema,
     uploadFile: uploadDroppedFile,
+    // Разворачиваем портабельную ссылку `.assets/<имя>` (и старую абсолютную из
+    // ранее сохранённых заметок) в рабочий URL под текущую машину прямо при
+    // показе встроенных блоков картинки/файла. На диске проп остаётся
+    // портабельным — это и делает бэкап переносимым между ОС.
+    resolveFileUrl: (url) => Promise.resolve(resolveAssetUrl(url)),
     // Multi-column: drag-cursor для создания колонок + локализация для
     // slash-пункта и хендлеров.
     dropCursor: multiColumnDropCursor,
@@ -221,8 +236,11 @@ export function Editor2026() {
       saveTimerRef.current = null;
       if (loadedIdRef.current !== activeId) return;
       try {
-        const blocks = editor.document;
-        const md = await editor.blocksToMarkdownLossy(blocks);
+        // Сворачиваем ссылки на ассеты к портабельной форме ПЕРЕД сохранением,
+        // из тех же блоков делаем и markdown — иначе в заметку утечёт абсолютный
+        // путь и бэкап не переедет на другую ОС.
+        const blocks = portablizeBlocks(editor.document);
+        const md = await editor.blocksToMarkdownLossy(blocks as never);
         if (loadedIdRef.current !== activeId) return;
         await saveNote({
           content: md,
@@ -267,8 +285,9 @@ export function Editor2026() {
         saveTimerRef.current = null;
         if (loadedIdRef.current !== editingId) return;
         try {
-          const blocks = editor.document;
-          const md = await editor.blocksToMarkdownLossy(blocks);
+          // См. flush выше: портабилизируем ссылки на ассеты до сохранения.
+          const blocks = portablizeBlocks(editor.document);
+          const md = await editor.blocksToMarkdownLossy(blocks as never);
           if (loadedIdRef.current !== editingId) return;
           await saveNote({
             content: md,

@@ -10,6 +10,7 @@ import {
   writeNote,
   type Note,
 } from "../lib/storage";
+import { toPortableAssetRef } from "../editor2026/lib/assets";
 
 /**
  * Окно быстрого захвата: без рамки, всегда поверх остальных (метка окна Tauri
@@ -119,7 +120,9 @@ export function CaptureWindow() {
         const buf = new Uint8Array(await f.arrayBuffer());
         const ext = (f.type.split("/")[1] || "png").toLowerCase();
         const { url } = await importAssetBytes(buf, ext);
-        refs.push(`![](${url})`);
+        // Портабельная ссылка `.assets/<имя>`, а не абсолютный путь: главный
+        // редактор развернёт её в картинку, а бэкап переедет на другую ОС.
+        refs.push(`![](${toPortableAssetRef(url)})`);
       } catch (err) {
         console.error("CaptureWindow: image paste failed:", err);
       }
