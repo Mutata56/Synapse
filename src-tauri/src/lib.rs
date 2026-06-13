@@ -3,6 +3,9 @@ use std::sync::Mutex;
 #[cfg(desktop)]
 use std::time::Duration;
 
+use std::io::Write;
+use std::path::PathBuf;
+
 use tauri::{
     menu::{Menu, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
@@ -18,6 +21,98 @@ use tauri_plugin_global_shortcut::Shortcut;
 #[cfg(desktop)]
 #[derive(Default)]
 struct CaptureShortcut(Mutex<Option<Shortcut>>);
+
+// ─── Лог запуска ─────────────────────────────────────────────────────────────
+//
+// Релизный билд под Windows собран как GUI (`windows_subsystem = "windows"` в
+// main.rs) и в консоль не пишет ничего, поэтому при мгновенном краше причину
+// поймать негде. Пишем простой текстовый лог рядом с данными приложения (там же,
+// где лежат заметки) плюс panic-hook, который складывает туда же текст паники.
+// Без сторонних крейтов: платформенную папку берём из переменных окружения.
+
+#[cfg(target_os = "windows")]
+fn base_data_dir() -> PathBuf {
+    std::env::var_os("APPDATA")
+        .map(PathBuf::from)
+        .unwrap_or_else(std::env::temp_dir)
+}
+
+#[cfg(target_os = "macos")]
+fn base_data_dir() -> PathBuf {
+    std::env::var_os("HOME")
+        .map(|h| {
+            let mut p = PathBuf::from(h);
+            p.push("Library/Application Support");
+            p
+        })
+        .unwrap_or_else(std::env::temp_dir)
+}
+
+#[cfg(all(unix, not(target_os = "macos")))]
+fn base_data_dir() -> PathBuf {
+    if let Some(xdg) = std::env::var_os("XDG_DATA_HOME") {
+        return PathBuf::from(xdg);
+    }
+    std::env::var_os("HOME")
+        .map(|h| {
+            let mut p = PathBuf::from(h);
+            p.push(".local/share");
+            p
+        })
+        .unwrap_or_else(std::env::temp_dir)
+}
+
+/// Путь к файлу лога: `<данные приложения>/com.kirill.synapse/synapse.log`.
+fn log_path() -> PathBuf {
+    let mut dir = base_data_dir();
+    dir.push("com.kirill.synapse");
+    let _ = std::fs::create_dir_all(&dir);
+    dir.push("synapse.log");
+    dir
+}
+
+/// Дописывает строку в лог-файл. Ошибки записи глотаем — лог не должен сам себя
+/// ронять.
+fn log_line(msg: &str) {
+    let ts = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    if let Ok(mut f) = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(log_path())
+    {
+        let _ = writeln!(f, "[{ts}] {msg}");
+    }
+}
+
+/// Ставит panic-hook, который пишет текст и место паники в лог-файл (и всё равно
+/// зовёт стандартный, чтобы под Linux/в dev паника по-прежнему печаталась в
+/// консоль). Зовём первым делом в `run`, чтобы поймать в том числе панику внутри
+/// setup и обработчиков.
+fn init_crash_log() {
+    log_line(&format!(
+        "──── запуск synapse {} на {} ────",
+        env!("CARGO_PKG_VERSION"),
+        std::env::consts::OS,
+    ));
+    let prev = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        let where_ = info
+            .location()
+            .map(|l| format!("{}:{}", l.file(), l.line()))
+            .unwrap_or_else(|| "?".into());
+        let what = info
+            .payload()
+            .downcast_ref::<&str>()
+            .map(|s| s.to_string())
+            .or_else(|| info.payload().downcast_ref::<String>().cloned())
+            .unwrap_or_else(|| "(без сообщения)".into());
+        log_line(&format!("PANIC в {where_}: {what}"));
+        prev(info);
+    }));
+}
 
 /// Поднимает главное окно на передний план (из трея или свёрнутого).
 fn show_main(app: &AppHandle) {
@@ -326,6 +421,9 @@ async fn caldav_delete(url: String, login: String, password: String) -> Result<(
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // Пишем лог запуска и ловим паники в файл (под Windows консоли нет).
+    init_crash_log();
+
     // TODO: на Linux пока запускаем с WEBKIT_DISABLE_DMABUF_RENDERER=1 руками.
     // Вшить здесь через std::env::set_var до инициализации вебвью (под cfg linux).
     let builder = tauri::Builder::default()
@@ -345,7 +443,7 @@ pub fn run() {
             caldav_delete
         ]);
 
-    builder
+    let run_result = builder
         .setup(|app| {
             #[cfg(desktop)]
             {
@@ -353,13 +451,21 @@ pub fn run() {
                     Code, GlobalShortcutExt, Modifiers, ShortcutState,
                 };
 
+                log_line("setup: старт");
+
                 // По умолчанию Ctrl+Shift+N открывает окно быстрого захвата.
                 // Активная комбинация лежит в managed state чтобы
                 // `set_capture_shortcut` мог менять её на лету. Обработчик
                 // сверяется с состоянием, а не с захваченной константой.
                 let capture_sc =
                     Shortcut::new(Some(Modifiers::CONTROL | Modifiers::SHIFT), Code::KeyN);
-                app.handle().plugin(
+
+                // Плагин глобального шортката и регистрация дефолтной комбинации.
+                // Любая осечка тут НЕ фатальна: приложение стартует и без
+                // глобального хоткея (раньше `?` ронял весь запуск — это и был
+                // мгновенный краш под Windows, когда Ctrl+Shift+N уже занят
+                // другим приложением).
+                match app.handle().plugin(
                     tauri_plugin_global_shortcut::Builder::new()
                         .with_handler(move |app, shortcut, event| {
                             if event.state() != ShortcutState::Pressed {
@@ -376,42 +482,64 @@ pub fn run() {
                             }
                         })
                         .build(),
-                )?;
-                // TODO: на Wayland (Hyprland) X11-grab не ловит нативные окна, а
-                // register может и упасть на старте. Переделать под Linux или выпилить.
-                app.global_shortcut().register(capture_sc)?;
-                app.state::<CaptureShortcut>()
-                    .0
-                    .lock()
-                    .unwrap()
-                    .replace(capture_sc);
+                ) {
+                    Ok(()) => match app.global_shortcut().register(capture_sc) {
+                        Ok(()) => {
+                            if let Ok(mut g) = app.state::<CaptureShortcut>().0.lock() {
+                                g.replace(capture_sc);
+                            }
+                            log_line("setup: глобальный хоткей Ctrl+Shift+N зарегистрирован");
+                        }
+                        Err(e) => log_line(&format!(
+                            "setup: хоткей не зарегистрирован, продолжаем без него: {e}"
+                        )),
+                    },
+                    Err(e) => log_line(&format!(
+                        "setup: плагин global-shortcut не поднялся, продолжаем без него: {e}"
+                    )),
+                }
 
                 // Иконка в трее: держит приложение в фоне чтобы глобальный
-                // шорткат работал даже после закрытия окна в трей.
-                let open_i = MenuItem::with_id(app, "open", "Открыть", true, None::<&str>)?;
-                let quit_i = MenuItem::with_id(app, "quit", "Выход", true, None::<&str>)?;
-                let menu = Menu::with_items(app, &[&open_i, &quit_i])?;
-                TrayIconBuilder::new()
-                    .icon(app.default_window_icon().unwrap().clone())
-                    .menu(&menu)
-                    .show_menu_on_left_click(false)
-                    .on_menu_event(|app, event| match event.id.as_ref() {
-                        "open" => show_main(app),
-                        "quit" => app.exit(0),
-                        _ => {}
-                    })
-                    .on_tray_icon_event(|tray, event| {
-                        if let TrayIconEvent::Click {
-                            button: MouseButton::Left,
-                            button_state: MouseButtonState::Up,
-                            ..
-                        } = event
-                        {
-                            show_main(tray.app_handle());
-                        }
-                    })
-                    .build(app)?;
+                // шорткат работал даже после закрытия окна в трей. Тоже не валим
+                // запуск, если трея/иконки нет — раньше `unwrap()` на иконке и
+                // `?` на сборке трея могли убить старт.
+                let tray_result: tauri::Result<()> = (|| {
+                    let open_i = MenuItem::with_id(app, "open", "Открыть", true, None::<&str>)?;
+                    let quit_i = MenuItem::with_id(app, "quit", "Выход", true, None::<&str>)?;
+                    let menu = Menu::with_items(app, &[&open_i, &quit_i])?;
+                    let mut tray = TrayIconBuilder::new()
+                        .menu(&menu)
+                        .show_menu_on_left_click(false)
+                        .on_menu_event(|app, event| match event.id.as_ref() {
+                            "open" => show_main(app),
+                            "quit" => app.exit(0),
+                            _ => {}
+                        })
+                        .on_tray_icon_event(|tray, event| {
+                            if let TrayIconEvent::Click {
+                                button: MouseButton::Left,
+                                button_state: MouseButtonState::Up,
+                                ..
+                            } = event
+                            {
+                                show_main(tray.app_handle());
+                            }
+                        });
+                    // Иконку ставим, только если она есть (без unwrap).
+                    if let Some(icon) = app.default_window_icon() {
+                        tray = tray.icon(icon.clone());
+                    }
+                    tray.build(app)?;
+                    Ok(())
+                })();
+                match tray_result {
+                    Ok(()) => log_line("setup: трей создан"),
+                    Err(e) => log_line(&format!(
+                        "setup: трей не создан, продолжаем без него: {e}"
+                    )),
+                }
             }
+            log_line("setup: готово");
             Ok(())
         })
         .on_window_event(|window, event| {
@@ -423,6 +551,13 @@ pub fn run() {
                 let _ = window.hide();
             }
         })
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .run(tauri::generate_context!());
+
+    // Сюда доходим, только если приложение вообще не смогло стартовать (например,
+    // под Windows нет рантайма WebView2). Пишем причину в лог и выходим с кодом 1;
+    // если это была паника — её отдельно зафиксирует panic-hook выше.
+    if let Err(e) = run_result {
+        log_line(&format!("FATAL: приложение не запустилось: {e}"));
+        std::process::exit(1);
+    }
 }

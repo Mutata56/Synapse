@@ -1,6 +1,6 @@
 [package]
 name = "synapse"
-version = "0.1.0"
+version = "0.1.1"
 description = "Personal Notion-like notes with Obsidian-style graph"
 authors = ["Kirill"]
 edition = "2021"
