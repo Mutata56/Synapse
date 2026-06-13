@@ -1,18 +1,4 @@
-# Maintainer: Kirill
-#
-# Локальная сборка пакета для Arch. Репозиторий приватный, поэтому тянуть исходник
-# из публичного места (как требует AUR) нельзя — собираем из своего дерева.
-# Бандл webkit под Arch сереет, а нативная сборка линкуется с системным webkit и
-# рисуется нормально, поэтому пакет собирается из исходников, а не из AppImage.
-#
-# Использование (из корня репозитория):
-#   ./packaging/arch/build.sh
-# либо вручную:
-#   git archive --format=tar.gz --prefix="Synapse-0.1.2/" -o \
-#       packaging/arch/synapse-notes-0.1.2.tar.gz v0.1.2
-#   cd packaging/arch && makepkg -si
-#
-# При бампе версии правь pkgver и тег в git archive.
+# Maintainer: Kirill <helmutbecker146@gmail.com>
 
 pkgname=synapse-notes
 pkgver=0.1.2
@@ -23,14 +9,15 @@ url="https://github.com/Mutata56/Synapse"
 license=('GPL-3.0-only')
 depends=('webkit2gtk-4.1' 'gtk3' 'libayatana-appindicator' 'librsvg' 'hicolor-icon-theme')
 makedepends=('rust' 'cargo' 'nodejs' 'npm')
-# Локальный тарбол из git archive (см. шапку). SKIP — потому что он наш, не из сети.
-source=("synapse-notes-$pkgver.tar.gz")
-sha256sums=('SKIP')
+source=("$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/v$pkgver.tar.gz")
+sha256sums=('4839377ba2a22f43c3feb25b77fb37177f0f9b78a8ddba2f20327e2fb7ed2f93')
 
 build() {
   cd "Synapse-$pkgver"
   npm ci
-  # --no-bundle: нужен только нативный бинарь, без deb/rpm/appimage.
+  # --no-bundle: нужен только нативный бинарь (без deb/rpm/appimage). Линкуется с
+  # системным webkit, поэтому интерфейс рисуется — в отличие от AppImage с чужим
+  # бандлом webkit, который на свежих системах даёт серый экран.
   npm run tauri build -- --no-bundle
 }
 

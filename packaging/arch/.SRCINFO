@@ -1,0 +1,20 @@
+pkgbase = synapse-notes
+	pkgdesc = Личные заметки: редактор в духе Notion и граф связей как в Obsidian
+	pkgver = 0.1.2
+	pkgrel = 1
+	url = https://github.com/Mutata56/Synapse
+	arch = x86_64
+	license = GPL-3.0-only
+	makedepends = rust
+	makedepends = cargo
+	makedepends = nodejs
+	makedepends = npm
+	depends = webkit2gtk-4.1
+	depends = gtk3
+	depends = libayatana-appindicator
+	depends = librsvg
+	depends = hicolor-icon-theme
+	source = synapse-notes-0.1.2.tar.gz::https://github.com/Mutata56/Synapse/archive/refs/tags/v0.1.2.tar.gz
+	sha256sums = 4839377ba2a22f43c3feb25b77fb37177f0f9b78a8ddba2f20327e2fb7ed2f93
+
+pkgname = synapse-notes

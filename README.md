@@ -15,6 +15,8 @@
 - Windows - `.msi` или `.exe`;
 - macOS - `.dmg`.
 
+**Arch Linux** - из AUR: `yay -S synapse-notes`. Пакет собирается из исходников и линкуется с системным WebKitGTK, поэтому интерфейс рисуется корректно - у AppImage на свежих rolling-системах вроде Arch бывает пустой серый экран из-за вшитого в него старого WebKitGTK. PKGBUILD лежит в [packaging/arch/](packaging/arch/).
+
 ## Архитектура
 
 Как устроены граф связей (собственный физический движок + Pixi.js), интерактивная доска (свой Canvas-движок), файловая система и Rust-бэкенд - в [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
