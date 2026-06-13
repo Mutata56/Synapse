@@ -424,8 +424,16 @@ pub fn run() {
     // Пишем лог запуска и ловим паники в файл (под Windows консоли нет).
     init_crash_log();
 
-    // TODO: на Linux пока запускаем с WEBKIT_DISABLE_DMABUF_RENDERER=1 руками.
-    // Вшить здесь через std::env::set_var до инициализации вебвью (под cfg linux).
+    // WebKitGTK с DMABUF-рендерером на части GPU/драйверов (и обычно под Wayland)
+    // показывает пустой серый экран вместо интерфейса. Отключаем рендерер ДО
+    // инициализации вебвью. Только Linux; Windows (WebView2) и macOS (WKWebView)
+    // это не касается. Если переменную выставили снаружи — уважаем её.
+    #[cfg(target_os = "linux")]
+    if std::env::var_os("WEBKIT_DISABLE_DMABUF_RENDERER").is_none() {
+        std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1");
+        log_line("linux: WEBKIT_DISABLE_DMABUF_RENDERER=1 (защита от серого экрана)");
+    }
+
     let builder = tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_fs::init())

@@ -1,7 +1,7 @@
 {
   "name": "synapse",
   "private": true,
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Личные заметки: редактор в духе Notion + граф связей как в Obsidian.",
   "author": "Kirill",
   "license": "GPL-3.0-only",
