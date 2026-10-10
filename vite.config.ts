@@ -1,6 +1,7 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
+import { fileURLToPath } from "node:url";
 
 // Динамическое определение хоста для разработки внутри окружения Tauri
 // @ts-expect-error process is a nodejs global
@@ -14,6 +15,13 @@ export default defineConfig(async () => ({
   // TODO: продакшен-бандл >500КБ (подсветка кода + pixi тянут много). Разбить
   // ручными build.rollupOptions.output.manualChunks, когда дойдут руки.
   plugins: [react(), tailwindcss()],
+  resolve: {
+    // Markdown parsing also runs in Workers, where the package's DOM decoder
+    // cannot use document.createElement. Its table-based decoder is equivalent.
+    alias: {
+      "decode-named-character-reference": fileURLToPath(new URL("./node_modules/decode-named-character-reference/index.js", import.meta.url)),
+    },
+  },
 
   clearScreen: false,
   server: {

@@ -189,7 +189,7 @@ export class ForceLayout {
   }
 
   /** Двигает симуляцию на один шаг времени. Возвращает суммарную кинетическую энергию. */
-  step(): number {
+  step(alpha = 1): number {
     const fx = this.fx;
     const fy = this.fy;
     fx.fill(0);
@@ -364,8 +364,8 @@ export class ForceLayout {
         node.py = node.y;
         continue;
       }
-      const ax = (fx[i] - gravity * (node.x - bx)) / node.mass;
-      const ay = (fy[i] - gravity * (node.y - by)) / node.mass;
+      const ax = (fx[i] - gravity * (node.x - bx)) / node.mass * alpha;
+      const ay = (fy[i] - gravity * (node.y - by)) / node.mass * alpha;
       let dx = (node.x - node.px) * damping + ax * dt2;
       let dy = (node.y - node.py) * damping + ay * dt2;
       const step2 = dx * dx + dy * dy;

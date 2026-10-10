@@ -3,3 +3,4 @@ dist/
 target/
 .idea/
 *.log
+/tests/fixtures/graph-vault.json

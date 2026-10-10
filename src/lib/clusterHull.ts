@@ -142,6 +142,9 @@ export interface ClusterHullOptions {
   rimWidth?: number;
   /** Сила аддитивного отбеливания блика. Дефолт 0.55. */
   rimStrength?: number;
+  /** Bound the expensive density/filter passes independently of display DPI. */
+  resolution?: number;
+  maxPixels?: number;
 }
 
 export class ClusterHullManager {
@@ -156,7 +159,11 @@ export class ClusterHullManager {
   private readonly clustered: readonly boolean[];
   private readonly filter: Filter;
   private readonly uniforms: UniformGroup;
-  private readonly resolution: number; // нативное разрешение буфера (чётко, без блюра от апскейла)
+  private resolution: number;
+  private readonly maxResolution: number;
+  private readonly maxPixels: number;
+  private width: number;
+  private height: number;
   private rt: RenderTexture;
   private spread = 1; // живой множитель радиуса ядра (растёт с отталкиванием)
 
@@ -167,14 +174,16 @@ export class ClusterHullManager {
     opts: ClusterHullOptions,
   ) {
     this.renderer = renderer;
+    this.width = width;
+    this.height = height;
+    this.maxResolution = opts.resolution ?? 0.85;
+    this.maxPixels = opts.maxPixels ?? 768000;
     this.clustered = opts.clustered;
     this.blob = this.createGradientTexture(GRADIENT_HALF);
 
     // ── Офскрин-буфер плотности и выходной спрайт после порога ───────────────
-    // Рендерим в НАТИВНОМ разрешении канваса. Уменьшенный буфер (0.5 из спеки)
-    // апскейлится мутно, и мягкий край читается как уродливая размытая "рамка",
-    // так что меняем экономию на производительности на чёткую изоповерхность.
-    this.resolution = Math.min(renderer.resolution, 2); // 2x чётко для retina; высокие DPI режем
+    // The soft density field needs fewer pixels than crisp text and node disks.
+    this.resolution = this.chooseResolution(width, height);
     this.rt = RenderTexture.create({ width, height, resolution: this.resolution });
     this.uniforms = new UniformGroup({
       uThreshold: { value: opts.threshold ?? 0.42, type: "f32" },
@@ -184,6 +193,7 @@ export class ClusterHullManager {
       uRimStrength: { value: opts.rimStrength ?? 0.55, type: "f32" },
     });
     this.filter = new Filter({
+      resolution: this.resolution,
       glProgram: GlProgram.from({
         vertex: VERTEX,
         fragment: FRAGMENT,
@@ -250,6 +260,10 @@ export class ClusterHullManager {
 
   /** Пересоздаёт офскрин-буфер после ресайза канваса. */
   resize(width: number, height: number): void {
+    this.width = width;
+    this.height = height;
+    this.resolution = this.chooseResolution(width, height);
+    this.filter.resolution = this.resolution;
     const old = this.rt;
     this.rt = RenderTexture.create({ width, height, resolution: this.resolution });
     this.output.texture = this.rt;
@@ -283,7 +297,10 @@ export class ClusterHullManager {
     }
     for (let i = 0; i < this.kernels.length; i++) {
       const n = nodes[i];
-      const on = this.clustered[i] && n.active;
+      const reach = this.baseScale[i] * this.blob.width / 2 * spread * scale;
+      const x = n.x * scale + offsetX;
+      const y = n.y * scale + offsetY;
+      const on = this.clustered[i] && n.active && x + reach >= 0 && y + reach >= 0 && x - reach <= this.width && y - reach <= this.height;
       const k = this.kernels[i];
       k.visible = on;
       if (on) k.position.set(n.x, n.y);
@@ -309,6 +326,10 @@ export class ClusterHullManager {
     // Этот глобальный синглтон уничтожать НЕЛЬЗЯ.
     if (this.blob !== Texture.WHITE) this.blob.destroy(true);
     this.filter.destroy();
+  }
+
+  private chooseResolution(width: number, height: number): number {
+    return Math.max(0.25, Math.min(this.renderer.resolution, this.maxResolution, Math.sqrt(this.maxPixels / Math.max(1, width * height))));
   }
 
   // Процедурное ядро (радиальный градиент, спека §4): белое, чтобы цвет давал
