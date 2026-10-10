@@ -14,6 +14,7 @@ import { ImageLightbox } from "./components/ImageLightbox";
 import { ImagesView } from "./components/ImagesView";
 import { InboxView } from "./components/InboxView";
 import { NotesGallery } from "./components/NotesGallery";
+import { MarkdownSourceEditor } from "./components/MarkdownSourceEditor";
 import { SettingsView } from "./components/SettingsView";
 import { Sidebar } from "./components/Sidebar";
 import { TagsView } from "./components/TagsView";
@@ -255,7 +256,7 @@ function screenKeyFor(view: View, activeId: string | null): string {
 function renderView(view: View, activeId: string | null): ReactNode {
   switch (view) {
     case "notes":
-      return activeId ? <Editor2026 /> : <NotesGallery />;
+      return activeId ? <NoteEditor /> : <NotesGallery />;
     case "files":
       return <FilesView />;
     case "trash":
@@ -277,6 +278,16 @@ function renderView(view: View, activeId: string | null): ReactNode {
     default:
       return assertNever(view);
   }
+}
+
+/** Choose the lossless source route before a BlockNote instance is mounted. */
+function NoteEditor() {
+  const note = useNotesStore((s) => s.activeNote);
+  const reloadNonce = useNotesStore((s) => s.editorReloadNonce);
+  if (!note) return <div className="flex-1 grid place-items-center text-zinc-500">Заметка не загружена</div>;
+  return note.markdownSource
+    ? <MarkdownSourceEditor key={`${note.id}:${reloadNonce}`} />
+    : <Editor2026 />;
 }
 
 /**

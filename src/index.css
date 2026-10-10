@@ -1,5 +1,34 @@
 @import "tailwindcss";
 
+/* Copied vault Markdown: preview is separate from the original source. */
+.markdown-source-editor { display: flex; flex: 1; flex-direction: column; min-width: 0; min-height: 0; }
+.markdown-source-toolbar { display: flex; align-items: center; gap: 8px; padding: 10px 16px; border-bottom: 1px solid var(--border); overflow-x: auto; flex-shrink: 0; }
+.markdown-source-toolbar button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; white-space: nowrap; padding: 7px 10px; border-radius: 7px; color: var(--text-secondary); font-size: 12px; }
+.markdown-source-toolbar button:hover { background: var(--surface-2-solid); color: var(--text-strong); }
+.markdown-source-toolbar button[aria-pressed="true"] { background: var(--accent-bg); color: var(--link); }
+.markdown-source-toolbar button:disabled { opacity: .4; cursor: default; }
+.markdown-source-toolbar button:focus-visible, .markdown-source-input:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.markdown-source-modes { display: flex; gap: 2px; }
+.markdown-source-status { margin-left: auto; white-space: nowrap; font-size: 11px; color: var(--text-muted); }
+.markdown-source-location { padding: 7px 24px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-muted); font-size: 11px; flex-shrink: 0; }
+.markdown-source-error { padding: 10px 24px; background: rgba(239, 68, 68, .10); color: #fca5a5; font-size: 13px; }
+.markdown-source-panes { display: flex; flex: 1; min-width: 0; min-height: 0; }
+.markdown-source-input { display: block; flex: 1; width: 100%; min-width: 0; resize: none; padding: 24px; background: transparent; color: var(--text); font: 13px/1.8 ui-monospace, SFMono-Regular, Menlo, monospace; border: 0; outline: none; tab-size: 4; }
+.markdown-source-preview { flex: 1; min-width: 0; overflow: auto; }
+.markdown-source-split > * { width: 50%; }
+.markdown-source-split .markdown-source-input { border-right: 1px solid var(--border); }
+.markdown-source-body { max-width: 840px; margin: 0 auto; padding: 0 40px 80px; overflow-wrap: anywhere; }
+.markdown-source-body img { max-width: 100%; object-fit: contain; }
+.markdown-source-body table { display: block; max-width: 100%; overflow-x: auto; }
+.markdown-source-missing { display: inline-block; padding: 8px 12px; border: 1px dashed var(--border-strong); color: var(--text-muted); font-size: 12px; }
+.markdown-source-attachment { display: inline-block; padding: 8px 12px; color: var(--link); border: 1px solid var(--border-strong); border-radius: 6px; }
+@media (max-width: 900px) {
+  .markdown-source-split { flex-direction: column; }
+  .markdown-source-split > * { width: 100%; min-height: 200px; }
+  .markdown-source-split .markdown-source-input { border-right: 0; border-bottom: 1px solid var(--border); }
+  .markdown-source-body { padding: 0 24px 48px; }
+}
+
 /* ─── Дизайн-токены (3-слойная архитектура темизации) ───────────────────────
    1. ПРИМИТИВЫ : сырые палитры цветов  никогда не используются в разметке напрямую.
    2. СЕМАНТИЧЕСКИЕ ТОКЕНЫ: объявлены на `:root` (по дефолту темная тема).

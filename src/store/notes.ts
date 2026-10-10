@@ -91,6 +91,9 @@ export type View =
 export type SaveNotePatch = {
   title?: string;
   content?: string;
+  /** Imported notes accept full Markdown, checked against the loaded disk revision. */
+  sourceText?: string;
+  sourceRevision?: string;
   icon?: string | null;
   cover?: string | null;
   favorite?: boolean;
@@ -1213,6 +1216,7 @@ export const useNotesStore = create<Store>((set, get) => {
         savingState: "error",
         lastSaveError: (e as Error)?.message ?? String(e),
       });
+      if (current.markdownSource) throw e;
       return;
     }
     set({ savingState: "saved", lastSavedAt: Date.now(), lastSaveError: null });
@@ -1222,18 +1226,20 @@ export const useNotesStore = create<Store>((set, get) => {
 
     // Если активная заметка не изменилась с момента начала, патчим локально.
     if (get().activeId !== updated.id) return;
-    set({ activeNote: updated });
+    const savedNote = updated.markdownSource ? (await readNote(updated.id)) ?? updated : updated;
+    if (get().activeId !== updated.id) return;
+    set({ activeNote: savedNote });
 
     // Для контента/заголовка обновляем превью/теги, перечитывая один файл
     // (очень дёшево), а не обходя весь воркспейс.
     const contentLikeChanged =
-      patch.content !== undefined || patch.title !== undefined;
+      patch.content !== undefined || patch.title !== undefined || patch.sourceText !== undefined;
 
     if (contentLikeChanged) {
-      const fresh = await readNote(updated.id).catch((e) => {
+      const fresh = (updated.markdownSource ? savedNote : await readNote(updated.id).catch((e) => {
         console.error("saveNote: re-read failed:", e);
         return null;
-      });
+      }));
       if (fresh && get().activeId === updated.id) {
         set({
           tree: patchNoteInTree(get().tree, updated.id, {
@@ -1513,6 +1519,7 @@ export const useNotesStore = create<Store>((set, get) => {
       const updated: Note = {
         ...current,
         content: ver.body,
+        ...(current.markdownSource ? { sourceText: ver.sourceText } : {}),
         blocknote: ver.blocknote,
         bnHash: ver.bnHash,
         updatedAt: Date.now(),
@@ -1547,7 +1554,7 @@ export const useNotesStore = create<Store>((set, get) => {
               favorite: fresh.favorite,
             })
           : s.tree,
-        ...(s.activeId === id ? { activeNote: updated } : {}),
+        ...(s.activeId === id ? { activeNote: fresh ?? updated } : {}),
         editorReloadNonce: s.editorReloadNonce + 1,
         versionHistoryFor: null,
       }));
@@ -1607,7 +1614,7 @@ export const useNotesStore = create<Store>((set, get) => {
             })
           : s.tree,
         ...(s.activeId === noteId
-          ? { activeNote: updated, editorReloadNonce: s.editorReloadNonce + 1 }
+          ? { activeNote: fresh ?? updated, editorReloadNonce: s.editorReloadNonce + 1 }
           : {}),
       }));
     },

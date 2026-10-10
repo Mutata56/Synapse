@@ -21,6 +21,14 @@ import {
   type AppSettings,
 } from "./settings";
 import { coerceTasks, type Task } from "./tasks";
+import {
+  assertMarkdownSourceUnchanged,
+  boundedVaultPath,
+  mapMarkdownText,
+  markdownSourceToWrite,
+  splitMarkdownSource,
+  wikiTarget,
+} from "./obsidianImport";
 
 const ROOT = "notes";
 const TRASH = "notes/.trash";
@@ -82,10 +90,16 @@ export type NoteMeta = {
    *  храним либо инлайн-массивом `aliases: ["x", "y"]`, либо многострочным YAML-
    *  списком, читаем обе формы. Пусто, если юзер ничего не задал. */
   aliases?: string[];
+  /** Copied Obsidian Markdown is edited as source, never through BlockNote. */
+  markdownSource?: boolean;
 };
 
 export type Note = NoteMeta & {
   content: string;
+  /** Full copied Markdown including BOM, YAML, comments and original newlines. */
+  sourceText?: string;
+  /** Source read from disk; checked before every source edit to detect conflicts. */
+  sourceRevision?: string;
   /** JSON документа BlockNote без потерь, главный источник правды для редактора
    *  при перезагрузке: тогда тогглы, вложенность и блоки кода переживают
    *  (markdown-зеркало `content` лоссёвое). Нет у заметок, созданных или
@@ -194,6 +208,8 @@ export function resetStorageCaches(): void {
   refsCacheLoaded = false;
   refsCacheLoadPromise = null;
   refsCacheDirty = false;
+  obsidianState = null;
+  obsidianLoadPromise = null;
 }
 
 async function cleanupOrphanedTmpAssets(): Promise<void> {
@@ -271,10 +287,6 @@ export function sanitizeFolderName(name: string): string {
 // ─── Фронтматтер ───────────────────────────────────────────────────────────
 
 const FRONTMATTER_START = "---";
-/** Ловит `\n---`, за которым перенос строки или конец строки. Достаточно
- *  строго, чтобы случайная строка `---abc` в теле не закрыла блок фронтматтера
- *  по ошибке. */
-const FRONTMATTER_END_RE = /\n---(?:\n|$)/;
 
 function serializeFrontmatter(extra: Record<string, FrontmatterValue>): string {
   const lines: string[] = [FRONTMATTER_START];
@@ -305,15 +317,10 @@ function parseFrontmatter(raw: string): {
   meta: FrontmatterRecord;
   body: string;
 } {
-  if (!raw.startsWith(FRONTMATTER_START)) return { meta: {}, body: raw };
-
-  const tail = raw.slice(FRONTMATTER_START.length);
-  const m = FRONTMATTER_END_RE.exec(tail);
-  if (!m) return { meta: {}, body: raw };
-
-  const block = tail.slice(0, m.index).trim();
-  // Тело начинается сразу после закрывающего `---\n` (или конца строки).
-  const body = tail.slice(m.index + m[0].length);
+  const { frontmatter, body } = splitMarkdownSource(raw);
+  if (!frontmatter) return { meta: {}, body };
+  const block = frontmatter.replace(/^(?:\uFEFF)?---[^\n]*\n/, "")
+    .replace(/(?:---|\.\.\.)[ \t]*(?:\r?\n)?$/, "").trim();
 
   const meta: FrontmatterRecord = {};
   const blockLines = block.split("\n");
@@ -321,6 +328,8 @@ function parseFrontmatter(raw: string): {
     const line = blockLines[i];
     const idx = line.indexOf(":");
     if (idx === -1) continue;
+    // Nested/custom YAML remains intact in the source, but is not app metadata.
+    if (/^\s/.test(line)) continue;
     const key = line.slice(0, idx).trim();
     if (!key) continue;
     const rest = line.slice(idx + 1).trim();
@@ -428,15 +437,16 @@ function extractTags(body: string): string[] {
  * и в тегах.
  */
 function extractLinks(body: string): string[] {
-  const noCode = body
-    .replace(/```[\s\S]*?```/g, " ")
-    .replace(/`[^`]*`/g, " ");
-  const re = /\[\[([^[\]]+)\]\]/g;
   const out = new Set<string>();
-  let match: RegExpExecArray | null;
-  while ((match = re.exec(noCode)) !== null) {
-    out.add(match[1].trim().toLowerCase());
-  }
+  mapMarkdownText(body, (text) => {
+    const re = /\[\[([^[\]]+)\]\]/g;
+    let match: RegExpExecArray | null;
+    while ((match = re.exec(text)) !== null) {
+      const path = wikiTarget(match[1]).path;
+      if (path) out.add(basenameOf(path).replace(/\.md$/i, "").toLowerCase());
+    }
+    return text;
+  });
   return [...out];
 }
 
@@ -482,23 +492,25 @@ function metaFromRaw(
   pathId: string,
   folder: string,
   body: string,
+  times?: { createdAt: number; updatedAt: number },
+  sidecarId = pathId,
 ): NoteMeta {
   const now = Date.now();
-  return {
+  const meta: NoteMeta = {
     // Путь на диске это единственный источник правды для id заметки. `id` во
     // фронтматтере только информационный: он протухает, когда родительскую
     // папку переименовали или подвинули (мы не переписываем каждую вложенную
     // заметку), и доверять ему значит вести чтения и клики на несуществующий путь.
     id: pathId,
-    title: typeof raw.title === "string" ? raw.title : DEFAULT_TITLE,
+    title: typeof raw.title === "string" ? raw.title : basenameOf(pathId) || DEFAULT_TITLE,
     folder,
-    createdAt: asNumber(raw.createdAt, now),
-    updatedAt: asNumber(raw.updatedAt, now),
+    createdAt: asNumber(raw.createdAt, times?.createdAt || now),
+    updatedAt: asNumber(raw.updatedAt, times?.updatedAt || now),
     icon: typeof raw.icon === "string" ? raw.icon : null,
     cover: typeof raw.cover === "string" ? raw.cover : null,
     preview: extractPreview(body),
     favorite: asBool(raw.favorite),
-    tags: extractTags(body),
+    tags: [...new Set([...extractTags(body), ...(Array.isArray(raw.tags) ? raw.tags : [])])],
     links: extractLinks(body),
     mood: typeof raw.mood === "number" ? raw.mood : null,
     // Aliases приходят в любой из форм (JSON-массив `["x","y"]` или YAML-список).
@@ -509,6 +521,7 @@ function metaFromRaw(
       ? (raw.aliases as string[]).map((s) => s.trim()).filter((s) => s.length > 0)
       : undefined,
   };
+  return applyObsidianMetadata(meta, sidecarId);
 }
 
 // ─── Хелперы файловой системы ────────────────────────────────────────────────────
@@ -521,6 +534,11 @@ async function ensureDir(path: string): Promise<void> {
 
 async function pathExists(relPath: string): Promise<boolean> {
   return exists(relPath, APP_DATA);
+}
+
+/** The SDK's readTextFile decoder strips UTF-8 BOM; copied source must retain it. */
+async function readMarkdownSource(path: string): Promise<string> {
+  return new TextDecoder("utf-8", { ignoreBOM: true, fatal: true }).decode(await readFile(path, APP_DATA));
 }
 
 /**
@@ -640,6 +658,209 @@ async function atomicWriteTextFile(
   }
 }
 
+// Imported Markdown stays byte-for-byte intact for metadata-only operations.
+// The manifest records provenance; movable markers and UI overrides live separately.
+const OBSIDIAN_MANIFEST = `${ROOT}/.synapse/obsidian-import.json`;
+const OBSIDIAN_METADATA = `${ROOT}/.synapse/obsidian-metadata.json`;
+type ObsidianOverrides = Partial<Pick<NoteMeta,
+  "title" | "createdAt" | "updatedAt" | "icon" | "cover" | "favorite" | "mood" | "aliases"
+>> & { markdownSource: boolean };
+type ObsidianState = { version: 1; notes: Record<string, ObsidianOverrides> };
+let obsidianState: ObsidianState | null = null;
+let obsidianLoadPromise: Promise<void> | null = null;
+let obsidianWriteChain: Promise<void> = Promise.resolve();
+const sourceWriteChains = new Map<string, Promise<void>>();
+
+async function loadObsidianState(): Promise<void> {
+  if (obsidianState) return;
+  if (obsidianLoadPromise) return obsidianLoadPromise;
+  obsidianLoadPromise = (async () => {
+    const notes: Record<string, ObsidianOverrides> = Object.create(null);
+    if (await pathExists(OBSIDIAN_MANIFEST)) {
+      const manifest = JSON.parse(await readTextFile(OBSIDIAN_MANIFEST, APP_DATA));
+      if (manifest?.version !== 1 || manifest?.kind !== "obsidian" || !Array.isArray(manifest.notePaths)) {
+        throw new Error("Невозможно прочитать список импортированных заметок Obsidian");
+      }
+      for (const path of manifest.notePaths) {
+        if (typeof path !== "string" || !path.endsWith(NOTE_EXT) || boundedVaultPath(path) !== path) {
+          throw new Error("Некорректный путь в списке импортированных заметок Obsidian");
+        }
+        notes[path.slice(0, -NOTE_EXT.length)] = { markdownSource: true };
+      }
+    }
+    if (await pathExists(OBSIDIAN_METADATA)) {
+      const sidecar = JSON.parse(await readTextFile(OBSIDIAN_METADATA, APP_DATA));
+      if (sidecar?.version !== 1 || !sidecar.notes || typeof sidecar.notes !== "object" || Array.isArray(sidecar.notes)) {
+        throw new Error("Невозможно прочитать метаданные импортированных заметок Obsidian");
+      }
+      for (const [id, value] of Object.entries(sidecar.notes)) {
+        if (boundedVaultPath(id) !== id || !value || typeof value !== "object" || Array.isArray(value)) continue;
+        const data = value as Record<string, unknown>;
+        if (typeof data.markdownSource !== "boolean") continue;
+        const entry: ObsidianOverrides = { markdownSource: data.markdownSource };
+        if (typeof data.title === "string") entry.title = data.title;
+        for (const key of ["createdAt", "updatedAt"] as const) {
+          if (typeof data[key] === "number" && Number.isFinite(data[key])) entry[key] = data[key];
+        }
+        for (const key of ["icon", "cover"] as const) {
+          if (data[key] === null || typeof data[key] === "string") entry[key] = data[key];
+        }
+        if (typeof data.favorite === "boolean") entry.favorite = data.favorite;
+        if (data.mood === null || (typeof data.mood === "number" && data.mood >= 1 && data.mood <= 5)) entry.mood = data.mood;
+        if (Array.isArray(data.aliases) && data.aliases.every((s) => typeof s === "string")) entry.aliases = data.aliases;
+        notes[id] = entry;
+      }
+    }
+    obsidianState = { version: 1, notes };
+  })();
+  try { await obsidianLoadPromise; } finally { obsidianLoadPromise = null; }
+}
+
+function applyObsidianMetadata(meta: NoteMeta, id = meta.id): NoteMeta {
+  const entry = obsidianState?.notes[id];
+  return entry?.markdownSource ? { ...meta, ...entry } : meta;
+}
+
+/** Serialize sidecar transactions; commit in memory only after a successful disk write. */
+function updateObsidianState(update: (notes: ObsidianState["notes"]) => boolean): Promise<void> {
+  const next = obsidianWriteChain.then(async () => {
+    await loadObsidianState();
+    const notes = Object.assign(Object.create(null), obsidianState!.notes);
+    if (!update(notes)) return;
+    await ensureDir(`${ROOT}/.synapse`);
+    await atomicWriteTextFile(OBSIDIAN_METADATA, JSON.stringify({ version: 1, notes }, null, 2));
+    obsidianState = { version: 1, notes };
+    metaCache.clear();
+    metaCacheDirty = true;
+  });
+  obsidianWriteChain = next.catch(() => undefined);
+  return next;
+}
+
+/** Called after an on-disk move, including folder moves and collisions in trash. */
+async function rebaseObsidianMetadata(from: string, to: string, folder = false): Promise<void> {
+  await updateObsidianState((notes) => {
+    const moved = Object.entries(notes).filter(([id, data]) =>
+      data.markdownSource && (id === from || (folder && id.startsWith(`${from}/`))),
+    );
+    for (const [id, data] of moved) {
+      notes[id] = { markdownSource: false }; // shadows the immutable import manifest
+      notes[to + id.slice(from.length)] = data;
+    }
+    return moved.length > 0;
+  });
+}
+
+async function relocateWithObsidianMetadata(
+  from: string,
+  to: string,
+  folder: boolean,
+  move: () => Promise<void>,
+): Promise<void> {
+  // Stage both markers before the filesystem move. If the app stops between
+  // these steps, either possible on-disk location still opens as source.
+  const destinations = new Map<string, ObsidianOverrides | undefined>();
+  await updateObsidianState((notes) => {
+    const moved = Object.entries(notes).filter(([id, data]) =>
+      data.markdownSource && (id === from || (folder && id.startsWith(`${from}/`))),
+    );
+    for (const [id, data] of moved) {
+      const destination = to + id.slice(from.length);
+      destinations.set(destination, notes[destination]);
+      notes[destination] = data;
+    }
+    return moved.length > 0;
+  });
+  try { await move(); } catch (e) {
+    await updateObsidianState((notes) => {
+      for (const [id, previous] of destinations) {
+        if (previous) notes[id] = previous;
+        else delete notes[id];
+      }
+      return destinations.size > 0;
+    });
+    throw e;
+  }
+  await rebaseObsidianMetadata(from, to, folder);
+}
+
+async function forgetObsidianMetadata(path: string, folder = false): Promise<void> {
+  await updateObsidianState((notes) => {
+    let changed = false;
+    for (const id of Object.keys(notes)) {
+      if (id === path || (folder && id.startsWith(`${path}/`))) {
+        notes[id] = { markdownSource: false };
+        changed = true;
+      }
+    }
+    return changed;
+  });
+}
+
+async function writeObsidianNote(note: Note): Promise<void> {
+  if (note.sourceRevision === undefined) throw new Error("Перечитайте исходный Markdown перед сохранением");
+  const revision = note.sourceRevision;
+  const nextSource = markdownSourceToWrite(revision, note.sourceText, note.content);
+  const path = idToFilePath(note.id);
+  const fileInfo = await stat(path, APP_DATA);
+  if (nextSource !== revision) {
+    const latest = await readMarkdownSource(path);
+    if (latest !== nextSource) {
+      assertMarkdownSourceUnchanged(revision, latest);
+      // Keep a full source snapshot, even when only frontmatter changed.
+      await snapshotNoteNow(note.id);
+      const temp = `${path}.synapse-${randomSuffix(8)}${TMP_SUFFIX}`;
+      try {
+        await writeTextFile(temp, nextSource, APP_DATA);
+        assertMarkdownSourceUnchanged(revision, await readMarkdownSource(path));
+        await renameInAppData(temp, path);
+      } catch (e) {
+        await safeRemove(temp);
+        throw e;
+      }
+    }
+  }
+  const previousParts = parseFrontmatter(revision);
+  const before = metaFromRaw(previousParts.meta, note.id, note.folder, previousParts.body, {
+    createdAt: fileInfo.birthtime?.getTime() ?? fileInfo.mtime?.getTime() ?? note.createdAt,
+    updatedAt: fileInfo.mtime?.getTime() ?? note.updatedAt,
+  });
+  await updateObsidianState((notes) => {
+    const entry = { ...(notes[note.id] ?? { markdownSource: true }) };
+    let changed = false;
+    if (nextSource !== revision && !previousParts.meta.createdAt && entry.createdAt === undefined) {
+      entry.createdAt = note.createdAt;
+      changed = true;
+    }
+    for (const key of ["title", "createdAt", "updatedAt", "icon", "cover", "favorite", "mood", "aliases"] as const) {
+      if (JSON.stringify(note[key]) === JSON.stringify(before[key])) continue;
+      Object.assign(entry, { [key]: note[key] ?? (key === "aliases" ? [] : null) });
+      changed = true;
+    }
+    if (changed) notes[note.id] = entry;
+    return changed;
+  });
+  metaCache.delete(path);
+  metaCacheDirty = true;
+}
+
+/** Inventory excludes symlinks and internal metadata; assets may keep original names. */
+export async function listVaultFiles(): Promise<string[]> {
+  await ensureWorkspace();
+  const files: string[] = [];
+  const walk = async (folder: string): Promise<void> => {
+    const entries = await readDir(folder ? `${ROOT}/${folder}` : ROOT, APP_DATA);
+    for (const entry of entries) {
+      if (!entry.name || entry.isSymlink || (entry.name.startsWith(".") && entry.name !== ".assets")) continue;
+      const path = folder ? `${folder}/${entry.name}` : entry.name;
+      if (entry.isDirectory) await walk(path);
+      else if (entry.isFile) files.push(path);
+    }
+  };
+  await walk("");
+  return files;
+}
+
 /**
  * Подбирает ещё не занятый путь назначения. Если первый вариант свободен,
  * возвращает его как есть. Иначе дописывает `-<random>` (или `-<random>.md`) и
@@ -704,7 +925,7 @@ export function newNoteId(folder = ""): string {
 // Это дотфайл, так что обход дерева (skipDotted) его никогда не показывает.
 
 const META_CACHE = `${ROOT}/.meta-cache.json`;
-const META_CACHE_VERSION = 1;
+const META_CACHE_VERSION = 2;
 
 type MetaCacheEntry = { mtime: number; size: number; meta: NoteMeta };
 
@@ -822,7 +1043,7 @@ async function buildTree(
 
   const tasks: Promise<TreeNode | null>[] = entries.map(
     async (entry): Promise<TreeNode | null> => {
-      if (!entry.name) return null;
+      if (!entry.name || entry.isSymlink) return null;
       if (opts.skipDotted && entry.name.startsWith(".")) return null;
 
       if (entry.isDirectory) {
@@ -874,6 +1095,7 @@ async function readNoteMeta(
   folder: string,
   useCache = false,
 ): Promise<NoteMeta | null> {
+  const sidecarId = isTrashPath(filePath) ? `.trash/${fallbackId}` : fallbackId;
   // Быстрый путь: если файл не менялся с момента кэширования (тот же mtime и
   // size), отдаём кэшированную мету и вообще пропускаем чтение и парсинг.
   if (useCache) {
@@ -892,12 +1114,15 @@ async function readNoteMeta(
       const size = Number(st.size ?? 0);
       const cached = metaCache.get(filePath);
       if (cached && mtime !== 0 && cached.mtime === mtime && cached.size === size) {
-        return cached.meta; // попадание, без чтения и парсинга
+        return applyObsidianMetadata(cached.meta, sidecarId);
       }
       try {
-        const raw = await readTextFile(filePath, APP_DATA);
+        const raw = await readMarkdownSource(filePath);
         const { meta, body } = parseFrontmatter(raw);
-        const result = metaFromRaw(meta, fallbackId, folder, body);
+        const result = metaFromRaw(meta, fallbackId, folder, body, {
+          createdAt: st.birthtime ? new Date(st.birthtime).getTime() : mtime,
+          updatedAt: mtime,
+        }, sidecarId);
         metaCache.set(filePath, { mtime, size, meta: result });
         metaCacheDirty = true;
         return result;
@@ -920,9 +1145,9 @@ async function readNoteMeta(
   }
   // Путь без кэша (stat выше был недоступен).
   try {
-    const raw = await readTextFile(filePath, APP_DATA);
+    const raw = await readMarkdownSource(filePath);
     const { meta, body } = parseFrontmatter(raw);
-    return metaFromRaw(meta, fallbackId, folder, body);
+    return metaFromRaw(meta, fallbackId, folder, body, undefined, sidecarId);
   } catch (e) {
     // Нет файла = исчез посреди обхода (безобидная гонка), логируем только настоящие сбои.
     if (!isMissingPathError(e)) {
@@ -953,7 +1178,7 @@ function flattenNotes(tree: TreeNode[]): NoteMeta[] {
 
 export async function listTree(): Promise<TreeNode[]> {
   await ensureWorkspace();
-  await loadMetaCache();
+  await Promise.all([loadMetaCache(), loadObsidianState()]);
   const seen = new Set<string>();
   const tree = await buildTree(ROOT, "", {
     skipDotted: true,
@@ -984,7 +1209,7 @@ export async function listTree(): Promise<TreeNode[]> {
  */
 export async function listTrashTree(): Promise<TreeNode[]> {
   await ensureWorkspace();
-  await loadMetaCache();
+  await Promise.all([loadMetaCache(), loadObsidianState()]);
   const seen = new Set<string>();
   const tree = await buildTree(TRASH, "", {
     skipDotted: false,
@@ -1007,14 +1232,19 @@ export async function listTrashTree(): Promise<TreeNode[]> {
 
 export async function readNote(id: string): Promise<Note | null> {
   await ensureWorkspace();
+  await loadObsidianState();
   const path = idToFilePath(id);
   if (!(await pathExists(path))) return null;
   try {
-    const raw = await readTextFile(path, APP_DATA);
+    const [raw, fileInfo] = await Promise.all([readMarkdownSource(path), stat(path, APP_DATA)]);
     const { meta, body } = parseFrontmatter(raw);
     return {
-      ...metaFromRaw(meta, id, parentOf(id), body),
+      ...metaFromRaw(meta, id, parentOf(id), body, {
+        createdAt: fileInfo.birthtime?.getTime() ?? fileInfo.mtime?.getTime() ?? Date.now(),
+        updatedAt: fileInfo.mtime?.getTime() ?? Date.now(),
+      }),
       content: body,
+      ...(obsidianState?.notes[id]?.markdownSource ? { sourceText: raw, sourceRevision: raw } : {}),
       // Не держим это в NoteMeta (в дереве), чтобы кэш дерева оставался лёгким:
       // (потенциально большой) JSON редактора тащит только полное чтение заметки здесь.
       blocknote: typeof meta.blocknote === "string" ? meta.blocknote : null,
@@ -1031,7 +1261,7 @@ export async function readTrashedNoteBody(trashId: string): Promise<string> {
   const path = trashFilePath(trashId);
   if (!(await pathExists(path))) return "";
   try {
-    const raw = await readTextFile(path, APP_DATA);
+    const raw = await readMarkdownSource(path);
     return parseFrontmatter(raw).body;
   } catch (e) {
     console.error("readTrashedNoteBody failed:", trashId, e);
@@ -1126,7 +1356,7 @@ async function snapshotPreviousVersion(
 ): Promise<void> {
   const path = idToFilePath(id);
   if (!(await pathExists(path))) return; // совсем новая заметка, прошлого нет
-  const prev = await readTextFile(path, APP_DATA);
+  const prev = await readMarkdownSource(path);
   const prevBody = parseFrontmatter(prev).body;
   if (prevBody === newBody) return; // контент не менялся
   if (!prevBody.trim()) return; // пустую заметку не версионируем
@@ -1146,8 +1376,8 @@ async function snapshotPreviousVersion(
 export async function snapshotNoteNow(id: string): Promise<void> {
   const path = idToFilePath(id);
   if (!(await pathExists(path))) return;
-  const prev = await readTextFile(path, APP_DATA);
-  if (!parseFrontmatter(prev).body.trim()) return; // хранить нечего
+  const prev = await readMarkdownSource(path);
+  if (!prev.trim()) return;
   const dir = versionsDirOf(id);
   await ensureDir(dir);
   await writeTextFile(`${dir}/${Date.now()}${NOTE_EXT}`, prev, APP_DATA);
@@ -1181,14 +1411,16 @@ export async function readNoteVersion(
   body: string;
   blocknote: string | null;
   bnHash: number | null;
+  sourceText: string;
 } | null> {
   const file = `${versionsDirOf(id)}/${timestamp}${NOTE_EXT}`;
   if (!(await pathExists(file))) return null;
   try {
-    const raw = await readTextFile(file, APP_DATA);
+    const raw = await readMarkdownSource(file);
     const { meta, body } = parseFrontmatter(raw);
     return {
       body,
+      sourceText: raw,
       blocknote: typeof meta.blocknote === "string" ? meta.blocknote : null,
       bnHash: typeof meta.bnHash === "number" ? meta.bnHash : null,
     };
@@ -1204,6 +1436,16 @@ export async function readNoteVersion(
  */
 export async function writeNote(note: Note): Promise<void> {
   await ensureWorkspace();
+  await loadObsidianState();
+  if (note.markdownSource || obsidianState?.notes[note.id]?.markdownSource) {
+    const previous = sourceWriteChains.get(note.id) ?? Promise.resolve();
+    const next = previous.catch(() => undefined).then(() => writeObsidianNote(note));
+    sourceWriteChains.set(note.id, next);
+    try { await next; } finally {
+      if (sourceWriteChains.get(note.id) === next) sourceWriteChains.delete(note.id);
+    }
+    return;
+  }
   const path = idToFilePath(note.id);
   await ensureDir(parentOf(path));
   // Снимаем предыдущую версию с диска перед перезаписью (с троттлингом, по
@@ -1254,15 +1496,17 @@ export async function moveNote(
   const finalPath = await uniqueDestination(idToFilePath(proposedId));
   const finalId = noteRelFromAbs(finalPath, ROOT);
 
-  try {
-    await renameInAppData(oldPath, finalPath);
-  } catch {
-    // Настоящий сбой rename, источник остался на месте: откатываемся к
-    // однопутёвой схеме read, write, delete (без двупутёвой команды ФС).
-    const raw = await readTextFile(oldPath, APP_DATA);
-    await writeTextFile(finalPath, raw, APP_DATA);
-    await remove(oldPath, APP_DATA);
-  }
+  await relocateWithObsidianMetadata(id, finalId, false, async () => {
+    try {
+      await renameInAppData(oldPath, finalPath);
+    } catch {
+      await copyFile(oldPath, finalPath, {
+        fromPathBaseDir: BaseDirectory.AppData,
+        toPathBaseDir: BaseDirectory.AppData,
+      });
+      await remove(oldPath, APP_DATA);
+    }
+  });
 
   // Обновляем поле `id` во фронтматтере, чтобы будущие чтения совпадали с новым
   // местом. По возможности: если перезапись упадёт, файл всё равно перемещён и
@@ -1275,7 +1519,9 @@ export async function moveNote(
 
 /** Читает, правит ключи `id`/`updatedAt` и пишет файл обратно. */
 async function rewriteNoteId(filePath: string, newId: string): Promise<void> {
-  const raw = await readTextFile(filePath, APP_DATA);
+  await loadObsidianState();
+  if (obsidianState?.notes[newId]?.markdownSource) return;
+  const raw = await readMarkdownSource(filePath);
   const { meta, body } = parseFrontmatter(raw);
   const patched: FrontmatterRecord = {
     ...meta,
@@ -1308,8 +1554,9 @@ export async function moveFolder(
   const proposedAbs = `${ROOT}/${proposed}`;
   const finalAbs = await uniqueDestination(proposedAbs);
 
-  await renameInAppData(src, finalAbs);
-  return folderRelFromAbs(finalAbs, ROOT);
+  const finalFolder = folderRelFromAbs(finalAbs, ROOT);
+  await relocateWithObsidianMetadata(folderPath, finalFolder, true, () => renameInAppData(src, finalAbs));
+  return finalFolder;
 }
 
 /**
@@ -1338,8 +1585,9 @@ export async function renameFolder(
   const caseOnly = proposedAbs.toLowerCase() === src.toLowerCase();
   const finalAbs = caseOnly ? proposedAbs : await uniqueDestination(proposedAbs);
 
-  await renameInAppData(src, finalAbs);
-  return folderRelFromAbs(finalAbs, ROOT);
+  const finalFolder = folderRelFromAbs(finalAbs, ROOT);
+  await relocateWithObsidianMetadata(folderPath, finalFolder, true, () => renameInAppData(src, finalAbs));
+  return finalFolder;
 }
 
 // ─── Публичное: корзина ─────────────────────────────────────────────────────────
@@ -1365,9 +1613,10 @@ export async function trashNote(id: string): Promise<string> {
   const proposedDst = trashFilePath(id);
   await ensureDir(parentOf(proposedDst));
   const finalDst = await uniqueDestination(proposedDst);
-  await renameInAppData(src, finalDst);
+  const trashedId = noteRelFromAbs(finalDst, TRASH);
+  await relocateWithObsidianMetadata(id, `.trash/${trashedId}`, false, () => renameInAppData(src, finalDst));
   // ".trash/folder/foo.md" даёт "folder/foo"
-  return noteRelFromAbs(finalDst, TRASH);
+  return trashedId;
 }
 
 /**
@@ -1388,8 +1637,9 @@ export async function trashFolder(folderPath: string): Promise<string> {
   if (dstParent && dstParent !== TRASH) await ensureDir(dstParent);
 
   const finalDst = await uniqueDestination(dst);
-  await renameInAppData(src, finalDst);
-  return folderRelFromAbs(finalDst, TRASH);
+  const trashedFolder = folderRelFromAbs(finalDst, TRASH);
+  await relocateWithObsidianMetadata(folderPath, `.trash/${trashedFolder}`, true, () => renameInAppData(src, finalDst));
+  return trashedFolder;
 }
 
 /**
@@ -1410,16 +1660,18 @@ export async function restoreFromTrash(
     const proposed = `${ROOT}/${trashPath}${NOTE_EXT}`;
     await ensureDir(parentOf(proposed));
     const finalDst = await uniqueRestoreDestination(proposed, NOTE_EXT);
-    await renameInAppData(fileSrc, finalDst);
-    return { kind: "file", path: noteRelFromAbs(finalDst, ROOT) };
+    const restoredId = noteRelFromAbs(finalDst, ROOT);
+    await relocateWithObsidianMetadata(`.trash/${trashPath}`, restoredId, false, () => renameInAppData(fileSrc, finalDst));
+    return { kind: "file", path: restoredId };
   }
 
   if (await pathExists(dirSrc)) {
     const proposed = `${ROOT}/${trashPath}`;
     await ensureDir(parentOf(proposed) || ROOT);
     const finalDst = await uniqueRestoreDestination(proposed, "");
-    await renameInAppData(dirSrc, finalDst);
-    return { kind: "folder", path: folderRelFromAbs(finalDst, ROOT) };
+    const restoredFolder = folderRelFromAbs(finalDst, ROOT);
+    await relocateWithObsidianMetadata(`.trash/${trashPath}`, restoredFolder, true, () => renameInAppData(dirSrc, finalDst));
+    return { kind: "folder", path: restoredFolder };
   }
 
   return { kind: "missing", path: trashPath };
@@ -1429,11 +1681,13 @@ export async function deleteForever(trashPath: string): Promise<void> {
   const filePath = `${TRASH}/${trashPath}${NOTE_EXT}`;
   if (await pathExists(filePath)) {
     await remove(filePath, APP_DATA);
+    await forgetObsidianMetadata(`.trash/${trashPath}`);
     return;
   }
   const dirPath = `${TRASH}/${trashPath}`;
   if (await pathExists(dirPath)) {
     await remove(dirPath, { ...APP_DATA, recursive: true });
+    await forgetObsidianMetadata(`.trash/${trashPath}`, true);
   }
 }
 
@@ -1441,6 +1695,7 @@ export async function emptyTrash(): Promise<void> {
   if (!(await pathExists(TRASH))) return;
   await remove(TRASH, { ...APP_DATA, recursive: true });
   await ensureDir(TRASH);
+  await forgetObsidianMetadata(".trash", true);
 }
 
 // ─── Папки ───────────────────────────────────────────────────────────────
