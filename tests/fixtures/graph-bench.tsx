@@ -25,7 +25,11 @@ if (query.has("vault")) {
   }
 }
 // This local fixture has no filesystem. Opening a point records selection only.
-useNotesStore.setState({ tree, view: "graph", selectNote: async (activeId) => { useNotesStore.setState({ activeId }); } });
+useNotesStore.setState({ tree, view: "graph", selectNote: async (activeId) => {
+  useNotesStore.setState({ activeId });
+  const metrics = document.getElementById("bench-metrics");
+  if (metrics) { metrics.dataset.openedNote = activeId; metrics.dataset.openCount = String(Number(metrics.dataset.openCount ?? 0) + 1); }
+} });
 createRoot(document.getElementById("root")!).render(<main style={{ display: "flex", height: "100vh", width: "100vw" }}><GraphView documents={documents} obsidianSettings={obsidianSettings} /><output id="bench-metrics" hidden /></main>);
 let lastTime = performance.now(), lastCount = 0, lastMs = 0;
 setInterval(() => {

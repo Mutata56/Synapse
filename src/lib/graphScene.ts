@@ -356,7 +356,6 @@ export class GraphScene {
       if (!canceled && this.down && !this.dragging && this.dragged >= 0) {
         const key = this.data.nodes[this.dragged].key;
         if (event.shiftKey) this.focus(key);
-        else if (this.mode === "obsidian") this.callbacks.open(key);
         else { this.selected = this.dragged; this.callbacks.select(key); this.loop.request(); }
       }
       this.down = null; this.dragged = -1; this.dragging = false;
