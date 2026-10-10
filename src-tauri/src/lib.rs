@@ -1,5 +1,7 @@
 #[cfg(desktop)]
 use std::sync::Mutex;
+#[cfg(target_os = "macos")]
+mod single_instance_macos;
 #[cfg(desktop)]
 use std::time::Duration;
 
@@ -434,7 +436,60 @@ pub fn run() {
         log_line("linux: WEBKIT_DISABLE_DMABUF_RENDERER=1 (защита от серого экрана)");
     }
 
-    let builder = tauri::Builder::default()
+    let context = tauri::generate_context!();
+
+    // На macOS Unix-сокет плагина создаётся асинхронно: одновременный холодный
+    // старт может пропустить несколько процессов. Берём атомарную блокировку
+    // до инициализации Tauri и держим её всё время жизни первого экземпляра.
+    #[cfg(target_os = "macos")]
+    let instance = match single_instance_macos::claim(
+        base_data_dir().join(&context.config().identifier),
+        &context.config().identifier,
+    ) {
+        Ok(single_instance_macos::Claim::Primary(instance)) => instance,
+        Ok(single_instance_macos::Claim::Forwarded) => return,
+        Err(e) => {
+            log_line(&format!("FATAL: проверка экземпляра не удалась: {e}"));
+            std::process::exit(1);
+        }
+    };
+
+    let builder = tauri::Builder::default();
+
+    #[cfg(target_os = "macos")]
+    let builder = builder.manage(instance).plugin(
+        tauri::plugin::Builder::<_, ()>::new("single-instance")
+            .setup(|app, _api| {
+                let handle = app.clone();
+                app.state::<single_instance_macos::SingleInstance>()
+                    .on_launch(move || {
+                        log_line("single-instance: повторный запуск, показываем основное окно");
+                        let main_handle = handle.clone();
+                        if let Err(e) = handle.run_on_main_thread(move || show_main(&main_handle)) {
+                            log_line(&format!("single-instance: окно не восстановлено: {e}"));
+                        }
+                    })?;
+                Ok(())
+            })
+            .on_event(|app, event| {
+                // Finder/Dock reuse the existing process instead of starting
+                // another one, so handle their native activation event too.
+                if let tauri::RunEvent::Reopen { .. } = event {
+                    show_main(app);
+                }
+            })
+            .build(),
+    );
+
+    // Проверяем экземпляр до других плагинов, окон, трея и хоткеев.
+    // Повторный запуск возвращает пользователя в уже открытое приложение.
+    #[cfg(any(windows, target_os = "linux"))]
+    let builder = builder.plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+        log_line("single-instance: повторный запуск, показываем основное окно");
+        show_main(app);
+    }));
+
+    let builder = builder
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init());
@@ -559,7 +614,7 @@ pub fn run() {
                 let _ = window.hide();
             }
         })
-        .run(tauri::generate_context!());
+        .run(context);
 
     // Сюда доходим, только если приложение вообще не смогло стартовать (например,
     // под Windows нет рантайма WebView2). Пишем причину в лог и выходим с кодом 1;
