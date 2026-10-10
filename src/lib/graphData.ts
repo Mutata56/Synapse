@@ -150,3 +150,10 @@ function withAdjacency(nodes: GraphNode[], edges: GraphData["edges"]): GraphData
   for (const edge of edges) { adjacency[edge.a].push(edge.b); adjacency[edge.b].push(edge.a); }
   return { nodes, edges, adjacency };
 }
+
+/** Metadata updates do not require a renderer or physics restart. */
+export function sameGraphTopology(a: GraphData, b: GraphData): boolean {
+  return a.nodes.length === b.nodes.length && a.edges.length === b.edges.length
+    && a.nodes.every((node, i) => node.key === b.nodes[i].key && node.kind === b.nodes[i].kind && node.group === b.nodes[i].group && node.degree === b.nodes[i].degree)
+    && a.edges.every((edge, i) => edge.a === b.edges[i].a && edge.b === b.edges[i].b && edge.kind === b.edges[i].kind);
+}

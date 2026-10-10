@@ -9,7 +9,8 @@
 // переключение глубины перезапускает ТОЛЬКО BFS, а не полный O(N+E) rebuild.
 // Важно когда дерево вырастает.
 
-import { useMemo } from "react";
+import { useMemo, useRef } from "react";
+import type { NoteMeta } from "../lib/storage";
 import { useNotesStore } from "../store/notes";
 import { flattenNotes } from "../lib/treeUtils";
 import {
@@ -42,7 +43,16 @@ export function useLocalGraph(
   // Смежность это тяжелая часть (O(N+E) обход ссылок каждой заметки).
   // Кэшируем только по `notes`, чтобы смена глубины/центра/maxNodes
   // перезапускала только дешевый BFS.
-  const adj = useMemo(() => buildAdjacency(notes), [notes]);
+  const previous = useRef<{ notes: NoteMeta[]; adjacency: Map<string, Set<string>> }>();
+  const adj = useMemo(() => {
+    const old = previous.current;
+    const unchanged = old && old.notes.length === notes.length && notes.every((note, i) => {
+      const before = old.notes[i];
+      return note.id === before.id && note.title === before.title && (note.links === before.links || (note.links.length === before.links.length && note.links.every((link, index) => link === before.links[index])));
+    });
+    const adjacency = unchanged ? old.adjacency : buildAdjacency(notes);
+    previous.current = { notes, adjacency }; return adjacency;
+  }, [notes]);
   return useMemo(
     () =>
       noteId

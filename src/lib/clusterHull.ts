@@ -160,8 +160,8 @@ export class ClusterHullManager {
   private readonly filter: Filter;
   private readonly uniforms: UniformGroup;
   private resolution: number;
-  private readonly maxResolution: number;
-  private readonly maxPixels: number;
+  private maxResolution: number;
+  private maxPixels: number;
   private width: number;
   private height: number;
   private rt: RenderTexture;
@@ -203,6 +203,7 @@ export class ClusterHullManager {
     });
     this.output = new Sprite(this.rt);
     this.output.filters = [this.filter];
+    this.output.cacheAsTexture({ resolution: this.resolution });
     this.filter.padding = 0; // полноэкранный спрайт, лишней области нет (избегаем полос по краю)
 
     // ── По одному ядру плотности на узел в кластере ──────────────────────────
@@ -267,7 +268,17 @@ export class ClusterHullManager {
     const old = this.rt;
     this.rt = RenderTexture.create({ width, height, resolution: this.resolution });
     this.output.texture = this.rt;
+    this.output.cacheAsTexture({ resolution: this.resolution });
+    this.output.updateCacheTexture();
     old.destroy(true);
+  }
+
+  setQuality(resolution: number, maxPixels: number): boolean {
+    if (this.maxResolution === resolution && this.maxPixels === maxPixels) return false;
+    this.maxResolution = resolution; this.maxPixels = maxPixels;
+    const next = this.chooseResolution(this.width, this.height);
+    if (Math.abs(next - this.resolution) < 0.01) return false;
+    this.resize(this.width, this.height); return true;
   }
 
   /**
@@ -315,6 +326,7 @@ export class ClusterHullManager {
       clear: true,
       clearColor: [0, 0, 0, 0], // прозрачно, в буфер попадают только блобы
     });
+    this.output.updateCacheTexture();
   }
 
   destroy(): void {

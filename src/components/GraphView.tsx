@@ -1,8 +1,7 @@
 import { ArrowRight, FileText, Folder, Hash, Loader2, Maximize2, Minus, Network, Palette, Pin, PinOff, Plus, RotateCcw, Search, SlidersHorizontal, Sparkles, X } from "lucide-react";
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { openPath } from "@tauri-apps/plugin-opener";
-import { GraphScene, type GraphSceneSnapshot } from "../lib/graphScene";
-import { buildGraphData } from "../lib/graphData";
+import { GraphScene } from "../lib/graphScene";
 import { buildSearchDocs, type SearchDoc } from "../lib/fullTextSearch";
 import { getWorkspaceDir, listVaultFiles } from "../lib/storage";
 import { flattenNotes } from "../lib/treeUtils";
@@ -17,6 +16,8 @@ import GraphReferencesWorker from "../workers/graphReferences.worker.ts?worker&i
 import { BaseDirectory, exists, readTextFile } from "@tauri-apps/plugin-fs";
 import { coerceGraphStyle, readObsidianGraphPreferences, type GraphStyle } from "../lib/graphStyle";
 import "./graph.css";
+import { recordGraphDiagnostic } from "../lib/graphDiagnostics";
+import { graphSession } from "../lib/graphSession";
 
 const MODE_KEY = "synapse.graph.mode";
 const DEFAULT_APPEARANCE: Record<GraphMode, GraphAppearance> = {
@@ -36,10 +37,10 @@ export function GraphView({ documents, obsidianSettings }: { documents?: readonl
   const [mode, setMode] = useState<GraphMode>(() => {
     try { return localStorage.getItem(MODE_KEY) === "obsidian" ? "obsidian" : "volume"; } catch { return "volume"; }
   });
-  const [appearances, setAppearances] = useState(DEFAULT_APPEARANCE);
-  const [options, setOptions] = useState(DEFAULT_OPTIONS);
+  const [appearances, setAppearances] = useState(() => graphSession.preferences?.appearances ?? DEFAULT_APPEARANCE);
+  const [options, setOptions] = useState(() => graphSession.preferences?.options ?? DEFAULT_OPTIONS);
   const appearance = appearances[mode];
-  const [references, setReferences] = useState<GraphReferenceMap | null>(null);
+  const [references, setReferences] = useState<GraphReferenceMap | null>(() => graphSession.references.hasSnapshot ? graphSession.references.references : null);
   const [files, setFiles] = useState<string[]>([]);
   const [referencesLoading, setReferencesLoading] = useState(false);
   const [referenceError, setReferenceError] = useState<string | null>(null);
@@ -49,21 +50,22 @@ export function GraphView({ documents, obsidianSettings }: { documents?: readonl
   const [selected, setSelected] = useState<string | null>(null);
   const [menu, setMenu] = useState<{ key: string; x: number; y: number; pinned: boolean } | null>(null);
   const [panel, setPanel] = useState<"filters" | "physics" | "groups" | null>(null);
-  const [styleReady, setStyleReady] = useState(false);
-  const originalStyle = useRef<GraphStyle>(coerceGraphStyle(null));
-  const [query, setQuery] = useState("");
+  const [styleReady, setStyleReady] = useState(!!graphSession.preferences);
+  const originalStyle = useRef<GraphStyle>(graphSession.preferences?.originalStyle ?? coerceGraphStyle(null));
+  const [query, setQuery] = useState(() => graphSession.preferences?.query ?? "");
   const deferredQuery = useDeferredValue(query);
-  const [tags, setTags] = useState<Set<string>>(new Set());
-  const [timelineEnabled, setTimelineEnabled] = useState(false);
-  const [timeline, setTimeline] = useState(Number.MAX_SAFE_INTEGER);
+  const [tags, setTags] = useState<Set<string>>(() => new Set(graphSession.preferences?.tags ?? []));
+  const [timelineEnabled, setTimelineEnabled] = useState(() => graphSession.preferences?.timelineEnabled ?? false);
+  const [timeline, setTimeline] = useState(() => graphSession.preferences?.timeline ?? Number.MAX_SAFE_INTEGER);
   const [creating, setCreating] = useState(false);
   const host = useRef<HTMLDivElement>(null);
   const minimap = useRef<GraphMinimapHandle>(null);
   const scene = useRef<GraphScene | null>(null);
-  const layouts = useRef<Partial<Record<GraphMode, GraphSceneSnapshot>>>({});
+  const sceneMode = useRef<GraphMode>(mode);
+  const sceneRevision = useRef(0);
   const appearanceRef = useRef(appearance); appearanceRef.current = appearance;
   const filterRef = useRef<Set<string> | null>(null);
-  const graph = useMemo(() => buildGraphData(tree, mode, references, options, files), [tree, mode, references, options, files]);
+  const graph = useMemo(() => graphSession.model.update(tree, mode, references, options, files), [tree, mode, references, options, files]);
   const byKey = useMemo(() => new Map(graph.nodes.map((node) => [node.key, node])), [graph]);
   const selectedNode = selected ? byKey.get(selected) : null;
   const tagsAvailable = useMemo(() => [...new Set(notes.flatMap((note) => note.tags))].sort((a, b) => a.localeCompare(b)), [notes]);
@@ -77,6 +79,7 @@ export function GraphView({ documents, obsidianSettings }: { documents?: readonl
   filterRef.current = visible;
 
   useEffect(() => {
+    if (graphSession.preferences) return;
     let canceled = false;
     void (async () => {
       let imported: unknown = obsidianSettings;
@@ -95,7 +98,10 @@ export function GraphView({ documents, obsidianSettings }: { documents?: readonl
       setOptions(preset.options); setStyleReady(true);
     })();
     return () => { canceled = true; };
-  }, [documents, obsidianSettings]);
+  }, [!!documents, obsidianSettings]);
+  useEffect(() => {
+    if (styleReady) graphSession.preferences = { appearances, options, query, tags: [...tags], timelineEnabled, timeline, originalStyle: originalStyle.current };
+  }, [appearances, options, query, tags, timelineEnabled, timeline, styleReady]);
   useEffect(() => {
     if (!styleReady) return;
     const { colorGroups, nodeSize, lineWidth } = appearances.obsidian;
@@ -106,23 +112,21 @@ export function GraphView({ documents, obsidianSettings }: { documents?: readonl
   useEffect(() => {
     let canceled = false;
     setReferencesLoading(true); setReferenceError(null);
-    let worker: Worker;
-    try { worker = new GraphReferencesWorker(); }
-    catch (reason) { setReferencesLoading(false); setReferenceError(String(reason)); return; }
-    worker.onmessage = ({ data }: MessageEvent<{ ok: boolean; references?: GraphReferenceMap; error?: string }>) => {
-      if (canceled) return;
-      if (data.ok && data.references) setReferences(data.references);
-      else setReferenceError(data.error ?? t("Не удалось обновить связи"));
-      setReferencesLoading(false); worker.terminate();
-    };
-    worker.onerror = (event) => { worker.terminate(); console.error("Graph reference worker:", event.message); if (!canceled) { setReferenceError(t("Не удалось обновить связи")); setReferencesLoading(false); } };
-    void (async () => {
-      try {
-        const source = documents ?? await buildSearchDocs(notes);
-        if (!canceled) worker.postMessage(source.map((document) => ({ id: document.note.id, body: document.body })));
-      } catch (reason) { worker.terminate(); if (!canceled) { setReferenceError(String(reason)); setReferencesLoading(false); } }
-    })();
-    return () => { canceled = true; worker.terminate(); };
+    const supplied = documents?.map((document) => ({ id: document.note.id, body: document.body }));
+    void graphSession.references.update(notes,
+      async () => (await buildSearchDocs(notes)).map((document) => ({ id: document.note.id, body: document.body })),
+      (changed) => new Promise<GraphReferenceMap>((resolve, reject) => {
+        let worker: Worker;
+        try { worker = new GraphReferencesWorker(); recordGraphDiagnostic("referenceWorkers"); }
+        catch (reason) { reject(reason); return; }
+        worker.onmessage = ({ data }: MessageEvent<{ ok: boolean; references?: GraphReferenceMap; error?: string }>) => {
+          worker.terminate(); if (data.ok && data.references) resolve(data.references); else reject(new Error(data.error ?? t("Не удалось обновить связи")));
+        };
+        worker.onerror = (event) => { worker.terminate(); reject(new Error(event.message || t("Не удалось обновить связи"))); };
+        recordGraphDiagnostic("parsedDocuments", changed.length); worker.postMessage(changed);
+      }), supplied).then((value) => { if (!canceled) { setReferences(value); setReferencesLoading(false); } })
+      .catch((reason) => { if (!canceled) { setReferenceError(String(reason)); setReferencesLoading(false); } });
+    return () => { canceled = true; };
   }, [documents, notes, referenceRetry]);
   useEffect(() => {
     if (mode !== "obsidian" || !options.showAttachments) return;
@@ -142,19 +146,28 @@ export function GraphView({ documents, obsidianSettings }: { documents?: readonl
   }, [byKey, setView, selectNote, setCurrentFolder, expandFolder]);
   const callbacks = useRef({ openNode }); callbacks.current = { openNode };
   useEffect(() => {
-    const element = host.current; if (!element || graph.nodes.length === 0) return;
-    let canceled = false; setError(null);
+    const element = host.current; if (!element || references === null || !styleReady) return;
+    if (scene.current && sceneMode.current === mode && graph.nodes.length && !error) {
+      scene.current.updateData(graph); return;
+    }
+    if (scene.current) { graphSession.layouts[sceneMode.current] = scene.current.snapshot(); scene.current.destroy(); scene.current = null; }
+    if (!graph.nodes.length) return;
+    const revision = ++sceneRevision.current; setError(null); sceneMode.current = mode;
     const current = new GraphScene(element, graph, mode, appearanceRef.current, {
       select: setSelected, open: (key) => callbacks.current.openNode(key),
       context: (key, x, y, pinned) => setMenu({ key, x, y, pinned }),
-      minimap: (snapshot) => minimap.current?.update(snapshot), error: (message) => { if (!canceled) setError(message); },
-    }, layouts.current[mode]);
+      minimap: (snapshot) => minimap.current?.update(snapshot), error: (message) => { if (revision === sceneRevision.current) setError(message); },
+    }, graphSession.layouts[mode]);
+    scene.current = current;
     void current.start().then(() => {
-      if (canceled) { current.destroy(); return; }
-      scene.current = current; current.setAppearance(appearanceRef.current); current.setFilter(filterRef.current);
-    }).catch((reason) => { if (!canceled) setError(String(reason)); current.destroy(); });
-    return () => { canceled = true; layouts.current[mode] = current.snapshot(); if (scene.current === current) scene.current = null; current.destroy(); };
-  }, [graph, mode, retry]);
+      if (revision !== sceneRevision.current) { current.destroy(); return; }
+      current.setAppearance(appearanceRef.current); current.setFilter(filterRef.current);
+    }).catch((reason) => { if (revision === sceneRevision.current) setError(String(reason)); current.destroy(); });
+  }, [graph, mode, retry, references === null, styleReady]);
+  useEffect(() => () => {
+    sceneRevision.current++;
+    if (scene.current) { graphSession.layouts[sceneMode.current] = scene.current.snapshot(); scene.current.destroy(); scene.current = null; }
+  }, []);
   useEffect(() => { scene.current?.setAppearance(appearance); }, [appearance]);
   useEffect(() => { scene.current?.setFilter(visible); }, [visible]);
   useEffect(() => { scene.current?.setSelected(selected); }, [selected]);

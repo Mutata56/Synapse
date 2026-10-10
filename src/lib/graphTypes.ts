@@ -44,6 +44,7 @@ export type GraphAppearance = {
 export type GraphCamera = { x: number; y: number; scale: number };
 export type GraphBounds = { minX: number; minY: number; maxX: number; maxY: number };
 export type GraphMapSnapshot = {
+  geometryVersion: number;
   positions: Float32Array;
   active: Uint8Array;
   colors: readonly string[];

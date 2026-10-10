@@ -30,6 +30,8 @@
 // Все визуальные константы наверху файла, чтобы правки дизайна не
 // приходилось искать.
 
+import { GraphFrameLoop } from "../lib/graphFrameLoop";
+import { recordGraphDiagnostic } from "../lib/graphDiagnostics";
 import { Application, Container, Graphics, Text, TextStyle } from "pixi.js";
 import { useEffect, useRef } from "react";
 import { Network } from "lucide-react";
@@ -140,9 +142,11 @@ export function LocalGraphWebGL({
     app
       .init({
         backgroundAlpha: 0,
-        antialias: true,
+        antialias: false,
+        autoStart: false,
+        sharedTicker: false,
         autoDensity: true,
-        resolution: window.devicePixelRatio || 1,
+        resolution: Math.min(window.devicePixelRatio || 1, 1.5),
         resizeTo: wrap,
       })
       .then(() => {
@@ -271,7 +275,7 @@ export function LocalGraphWebGL({
         };
 
         // ── Рисование ─────────────────────────────────────────────────────
-        const paint = () => {
+        const draw = () => {
           edgesGfx.clear();
           for (const e of edges) {
             const a = nodes[e.a];
@@ -319,32 +323,26 @@ export function LocalGraphWebGL({
           }
         };
 
-        // ── Тик: интеграция + перерисовка. Парковка при стабилизации. ──────
-        let calmFrames = 0;
-        const tick = () => {
-          if (parked) {
-            return;
+        // No independent Pixi render ticker remains after layout settlement.
+        let calmFrames = 0, alpha = 1;
+        const loop = new GraphFrameLoop(() => {
+          if (!parked) {
+            const energy = sim.step(alpha); alpha *= 0.985;
+            if (!userInteracted) fitCamera();
+            calmFrames = energy < SETTLE_KE ? calmFrames + 1 : 0;
+            parked = calmFrames > 12 || alpha < 0.002;
           }
-          const ke = sim.step();
-          // Автоподгонка только пока симуляция движется И юзер не
-          // взял управление. Как только панорамирует/зумит, камеру
-          // не трогаем (автоподгонка выглядела бы как борьба).
-          if (!userInteracted) fitCamera();
-          paint();
-          if (ke < SETTLE_KE) {
-            calmFrames++;
-            if (calmFrames > 12) {
-              parked = true;
-              if (!userInteracted) {
-                fitCamera();
-                paint();
-              }
-            }
-          } else {
-            calmFrames = 0;
-          }
-        };
-        app.ticker.add(tick);
+          draw(); app.render(); recordGraphDiagnostic("localPaints");
+          return !parked;
+        });
+        const paint = () => loop.request();
+        let intersecting = true;
+        const activity = () => loop.setEnabled(!document.hidden && intersecting);
+        const hidden = () => loop.setEnabled(false);
+        document.addEventListener("visibilitychange", activity);
+        window.addEventListener("blur", hidden); window.addEventListener("focus", activity);
+        const visible = new IntersectionObserver((entries) => { intersecting = entries[0]?.isIntersecting ?? true; activity(); });
+        visible.observe(wrap); activity();
 
         // ── Hit-тест + подключение указателя ──────────────────────────────
         // Позиция -- canvas-local CSS пиксели; конвертируем в мир через
@@ -507,7 +505,9 @@ export function LocalGraphWebGL({
         app.renderer.on("resize", onRendererResize);
 
         disposeRef.current = () => {
-          app.ticker.remove(tick);
+          loop.destroy(); visible.disconnect();
+          document.removeEventListener("visibilitychange", activity);
+          window.removeEventListener("blur", hidden); window.removeEventListener("focus", activity);
           window.removeEventListener("resize", invalidateRect);
           window.removeEventListener("scroll", invalidateRect, true);
           app.canvas.removeEventListener("pointerdown", onPointerDown);

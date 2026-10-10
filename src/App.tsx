@@ -1,7 +1,8 @@
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { AnimatePresence, motion } from "framer-motion";
-import { useEffect, type ReactNode } from "react";
+import { lazy, Suspense, useEffect, type ReactNode } from "react";
+import { t } from "./lib/i18n";
 import { CalendarView } from "./components/CalendarView";
 import { CommandPalette } from "./components/CommandPalette";
 import { ConfirmDialog } from "./components/ConfirmDialog";
@@ -9,7 +10,7 @@ import { PromptDialog } from "./components/PromptDialog";
 import { TemplatePicker } from "./components/TemplatePicker";
 import { Editor2026 } from "./editor2026/Editor2026";
 import { FilesView } from "./components/FilesView";
-import { GraphView } from "./components/GraphView";
+const GraphView = lazy(() => import("./components/GraphView").then((module) => ({ default: module.GraphView })));
 import { ImageLightbox } from "./components/ImageLightbox";
 import { ImagesView } from "./components/ImagesView";
 import { InboxView } from "./components/InboxView";
@@ -266,7 +267,7 @@ function renderView(view: View, activeId: string | null): ReactNode {
     case "tags":
       return <TagsView />;
     case "graph":
-      return <GraphView />;
+      return <Suspense fallback={<div role="status" className="p-6 text-sm text-neutral-400">{t("Загрузка графа…")}</div>}><GraphView /></Suspense>;
     case "calendar":
       return <CalendarView />;
     case "overview":

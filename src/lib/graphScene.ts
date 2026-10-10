@@ -1,14 +1,17 @@
 import { DEFAULT_FORCE_SETTINGS, type ForceSettings, type PhysicsNode } from "./forceLayout";
 import { GraphFrameLoop } from "./graphFrameLoop";
 import { clamp, fitGraph, graphBounds, screenToWorld, zoomAt } from "./graphGeometry";
-import { ClassicGraphPainter, folderColors, VolumeGraphPainter, type GraphPainter } from "./graphPainters";
+import { ClassicGraphPainter, folderColors, type GraphPainter } from "./graphPainters";
 import type { GraphLayoutRequest, GraphLayoutResponse } from "./graphWorkerProtocol";
 import type { GraphAppearance, GraphCamera, GraphData, GraphMapSnapshot, GraphMode } from "./graphTypes";
 import GraphLayoutWorker from "../workers/graphLayout.worker.ts?worker&inline";
 import { classicNodeColor, classicNodeRadius } from "./graphStyle";
 import { seedClassicLayout } from "./graphSeedLayout";
+import { recordGraphDiagnostic } from "./graphDiagnostics";
+import { sameGraphTopology } from "./graphData";
+import { GraphSpatialIndex } from "./graphSpatialIndex";
 
-export type GraphSceneSnapshot = { positions: Map<string, [number, number]>; camera: GraphCamera; userInteracted: boolean };
+export type GraphSceneSnapshot = { positions: Map<string, [number, number]>; camera: GraphCamera; userInteracted: boolean; pinned: string[]; settled: boolean; data: GraphData; physics: string; width: number; height: number; focused: string | null; active: Uint8Array };
 export type GraphSceneCallbacks = {
   select: (key: string) => void;
   open: (key: string) => void;
@@ -21,16 +24,16 @@ export type GraphSceneCallbacks = {
 export class GraphScene {
   private painter: GraphPainter | null = null;
   private worker: Worker | null = null;
-  private positions: Float32Array;
-  private active: Uint8Array;
-  private radii: number[];
+  private positions!: Float32Array;
+  private active!: Uint8Array;
+  private radii!: number[];
   private maximumDegree = 0;
-  private colors: number[];
-  private mapColors: string[];
-  private keys: Map<string, number>;
-  private nodes: PhysicsNode[];
+  private colors!: number[];
+  private mapColors!: string[];
+  private keys!: Map<string, number>;
+  private nodes!: PhysicsNode[];
   private groups: number[][] = [];
-  private clusterIds: Int32Array;
+  private clusterIds!: Int32Array;
   private camera: GraphCamera = { x: 0, y: 0, scale: 1 };
   private target: GraphCamera | null = null;
   private width = 1;
@@ -60,8 +63,11 @@ export class GraphScene {
   private observer: ResizeObserver | null = null;
   private themeObserver: MutationObserver | null = null;
   private loop: GraphFrameLoop;
-  private hitBuckets = new Map<string, number[]>();
-  private nodeByKey: Map<string, number>;
+  private spatialIndex!: GraphSpatialIndex;
+  private cachedBounds: ReturnType<typeof graphBounds> | null = null;
+  private layoutRevision = 1;
+  private pendingPin: { index: number; x: number; y: number } | null = null;
+  private nodeByKey!: Map<string, number>;
   private cleanup: Array<() => void> = [];
 
   constructor(
@@ -72,50 +78,67 @@ export class GraphScene {
     private callbacks: GraphSceneCallbacks,
     private previous?: GraphSceneSnapshot,
   ) {
+    if (previous && (!previous.data || !Number.isFinite(previous.width))) previous = undefined;
+    this.previous = previous;
+    this.initializeData(data, previous);
+    this.loop = new GraphFrameLoop(this.paint);
+  }
+
+  private initializeData(data: GraphData, previous?: GraphSceneSnapshot) {
+    this.data = data;
     this.nodeByKey = this.keys = new Map(data.nodes.map((node, index) => [node.key, index]));
     this.positions = new Float32Array(data.nodes.length * 2);
     this.active = new Uint8Array(data.nodes.length).fill(1);
     this.colors = this.nodeColors();
     this.mapColors = this.minimapColors();
-    this.radii = data.nodes.map((node) => mode === "volume"
+    this.radii = data.nodes.map((node) => this.mode === "volume"
       ? (node.kind === "folder" ? 6 : 4.5) + Math.min(1.5 * Math.sqrt(node.degree), 14)
-      : classicNodeRadius(node.degree, 1, appearance.nodeSize));
+      : classicNodeRadius(node.degree, 1, this.appearance.nodeSize));
+    this.maximumDegree = 0;
     for (const node of data.nodes) this.maximumDegree = Math.max(this.maximumDegree, node.degree);
     const grouped = new Map<string, number[]>();
-    if (mode === "volume") data.nodes.forEach((node, index) => {
+    if (this.mode === "volume") data.nodes.forEach((node, index) => {
       if (node.group) { const values = grouped.get(node.group) ?? []; values.push(index); grouped.set(node.group, values); }
     });
     const groupIds = new Map([...grouped.keys()].sort().map((name, index) => [name, index]));
     this.groups = [...grouped.values()].filter((values) => values.length > 1);
     this.clusterIds = new Int32Array(data.nodes.map((node) => groupIds.get(node.group) ?? -1));
-    const classicSeed = mode === "obsidian" ? seedClassicLayout(data, appearance.linkDistance) : null;
+    const complete = previous && data.nodes.every((node) => previous.positions.has(node.key));
+    const classicSeed = this.mode === "obsidian" && !complete ? seedClassicLayout(data, this.appearance.linkDistance) : null;
+    this.pins = new Set((previous?.pinned ?? []).map((key) => this.keys.get(key)).filter((index): index is number => index !== undefined));
     this.nodes = data.nodes.map((node, index) => {
       const group = this.clusterIds[index];
       const groupAngle = Math.max(0, group) / Math.max(1, groupIds.size) * Math.PI * 2;
-      const groupDistance = mode === "volume" && group >= 0 ? 80 + groupIds.size * 20 : 0;
-      const radius = mode === "volume" ? Math.sqrt(index % 30 + 1) * 12 : Math.sqrt(index + 1) * 18;
+      const groupDistance = this.mode === "volume" && group >= 0 ? 80 + groupIds.size * 20 : 0;
+      const radius = this.mode === "volume" ? Math.sqrt(index % 30 + 1) * 12 : Math.sqrt(index + 1) * 18;
       const angle = index * 2.39996323;
       const saved = previous?.positions.get(node.key);
       const x = saved?.[0] ?? classicSeed?.[index * 2] ?? Math.cos(groupAngle) * groupDistance + Math.cos(angle) * radius;
       const y = saved?.[1] ?? classicSeed?.[index * 2 + 1] ?? Math.sin(groupAngle) * groupDistance + Math.sin(angle) * radius;
       this.positions[index * 2] = x; this.positions[index * 2 + 1] = y;
-      return { x, y, px: x, py: y, mass: 1 + 0.5 * Math.sqrt(node.degree), charge: 1, radius: this.radii[index], active: true, fixed: false };
+      return { x, y, px: x, py: y, mass: 1 + 0.5 * Math.sqrt(node.degree), charge: 1, radius: this.radii[index], active: true, fixed: this.pins.has(index) };
     });
-    this.loop = new GraphFrameLoop(this.paint);
+    this.moving = !(previous?.settled && sameGraphTopology(previous.data, data) && previous.physics === physicsSignature(this.appearance));
+    this.focused = previous?.focused ? this.keys.get(previous.focused) ?? null : null;
+    if (previous && sameGraphTopology(previous.data, data)) { this.active.set(previous.active); this.nodes.forEach((node, index) => { node.active = !!this.active[index]; }); }
+    this.spatialIndex = new GraphSpatialIndex(data.nodes.length);
+    this.cachedBounds = null;
   }
 
   async start() {
+    recordGraphDiagnostic("scenes");
     this.painter = this.mode === "volume"
-      ? await VolumeGraphPainter.create(this.host, this.data, this.radii, this.colors)
+      ? await (await import("./graphVolumePainter")).VolumeGraphPainter.create(this.host, this.data, this.radii, this.colors)
       : new ClassicGraphPainter(this.data);
     if (this.destroyed) { this.painter.destroy(); return; }
+    this.painter.updateData(this.data, this.radii, this.colors);
     const canvas = this.painter.canvas;
     canvas.className = "graph-scene-canvas"; canvas.tabIndex = 0;
     canvas.setAttribute("aria-label", this.mode === "volume" ? "Объёмный граф: колесо — масштаб, перетаскивание — перемещение" : "Граф в стиле Obsidian: колесо — масштаб, перетаскивание — перемещение");
     this.host.appendChild(canvas);
     this.width = Math.max(1, this.host.clientWidth); this.height = Math.max(1, this.host.clientHeight);
     this.painter.resize(this.width, this.height);
-    this.camera = this.previous?.camera ?? fitGraph(graphBounds(this.positions, this.active), this.width, this.height);
+    this.camera = this.previous ? { ...this.previous.camera, x: this.previous.camera.x + (this.width - this.previous.width) / 2, y: this.previous.camera.y + (this.height - this.previous.height) / 2 } : fitGraph(this.bounds(), this.width, this.height);
     this.userInteracted = this.previous?.userInteracted ?? false;
     this.rebuildHitIndex();
     this.bindEvents(canvas);
@@ -134,23 +157,27 @@ export class GraphScene {
     this.observer.observe(this.host);
     // Inline workers use a Blob URL, including in WKWebView's custom Tauri origin.
     this.worker = new GraphLayoutWorker();
+    recordGraphDiagnostic("layoutWorkers");
     this.worker.onmessage = ({ data }: MessageEvent<GraphLayoutResponse>) => {
       if (this.destroyed) return;
       if (data.type === "error") { this.loop.setEnabled(false); this.callbacks.error(data.message); return; }
+      if (data.revision !== this.layoutRevision) { this.send({ type: "recycle", buffer: data.positions.buffer as ArrayBuffer }); return; }
+      recordGraphDiagnostic("layoutFrames"); recordGraphDiagnostic("simulationMs", data.simulationMs);
+      if (this.moving && data.settled) recordGraphDiagnostic("settles");
       const dragX = this.dragged >= 0 ? this.positions[this.dragged * 2] : 0;
       const dragY = this.dragged >= 0 ? this.positions[this.dragged * 2 + 1] : 0;
       this.positions.set(data.positions);
-      this.geometryVersion++;
+      this.geometryVersion++; this.cachedBounds = null;
       if (this.dragged >= 0 && this.dragging) { this.positions[this.dragged * 2] = dragX; this.positions[this.dragged * 2 + 1] = dragY; }
       this.latestSimulationMs = data.simulationMs; this.moving = !data.settled;
       if (import.meta.env.DEV) this.host.dataset.graphMoving = String(this.moving);
       this.rebuildHitIndex();
-      if (!this.userInteracted && this.focused === null) this.camera = fitGraph(graphBounds(this.positions, this.active), this.width, this.height);
+      if (!this.userInteracted && this.focused === null) this.camera = fitGraph(this.bounds(), this.width, this.height);
       this.send({ type: "recycle", buffer: data.positions.buffer as ArrayBuffer });
       this.loop.request(); this.publishMap(data.settled);
     };
     this.worker.onerror = (event) => { if (!this.destroyed) { this.loop.setEnabled(false); this.callbacks.error(event.message || "Не удалось рассчитать расположение узлов"); } };
-    this.send({ type: "init", nodes: this.nodes, edges: this.data.edges.map((edge) => ({ a: edge.a, b: edge.b, rest: this.radii[edge.a] + this.radii[edge.b] + this.appearance.linkDistance })), settings: this.forceSettings(), groups: this.groups, clusterIds: this.clusterIds, cooling: this.mode === "obsidian" ? 0.992 : 0.982 });
+    this.send({ type: "init", revision: this.layoutRevision, settled: !this.moving, nodes: this.nodes, edges: this.data.edges.map((edge) => ({ a: edge.a, b: edge.b, rest: this.radii[edge.a] + this.radii[edge.b] + this.appearance.linkDistance })), settings: this.forceSettings(), groups: this.groups, clusterIds: this.clusterIds, cooling: this.mode === "obsidian" ? 0.992 : 0.982 });
     this.background = document.hidden;
     this.synchronizeActivity();
     this.loop.request(); this.publishMap(true);
@@ -170,9 +197,8 @@ export class GraphScene {
     const radiusChanged = this.mode === "obsidian" && value.nodeSize !== this.appearance.nodeSize;
     this.appearance = value;
     if (radiusChanged) this.radii = this.data.nodes.map((node) => classicNodeRadius(node.degree, 1, value.nodeSize));
-    if (colorChanged) this.colors = this.nodeColors();
-    this.mapColors = this.minimapColors();
-    if (simulationChanged || radiusChanged) this.send({ type: "settings", settings: this.forceSettings(), linkDistance: value.linkDistance, radii: radiusChanged ? this.radii : undefined });
+    if (colorChanged) this.refreshColors();
+    if (simulationChanged || radiusChanged) { this.moving = true; this.send({ type: "settings", settings: this.forceSettings(), linkDistance: value.linkDistance, radii: radiusChanged ? this.radii : undefined }); }
     this.synchronizeActivity(); this.loop.request(); this.publishMap(true);
   }
 
@@ -180,6 +206,12 @@ export class GraphScene {
     return this.data.nodes.map((node, index) => this.mode === "obsidian" || this.appearance.colorByFolder
       ? `#${this.colors[index].toString(16).padStart(6, "0")}`
       : node.kind === "unresolved" ? "#676771" : node.kind === "tag" ? "#7bbba4" : node.kind === "attachment" ? "#ad9875" : "#b7b7c1");
+  }
+
+  private refreshColors() {
+    const colors = this.nodeColors();
+    if (colors.length === this.colors.length && colors.every((value, i) => value === this.colors[i])) return false;
+    this.colors = colors; this.mapColors = this.minimapColors(); return true;
   }
 
   private nodeColors() {
@@ -191,6 +223,7 @@ export class GraphScene {
 
   setFilter(noteIds: Set<string> | null) {
     if (noteIds === null && this.filter === null && this.focused === null) return;
+    if (noteIds && this.filter && noteIds.size === this.filter.size && [...noteIds].every((id) => this.filter!.has(id))) return;
     this.filter = noteIds;
     this.applyActive();
   }
@@ -218,7 +251,7 @@ export class GraphScene {
       this.active[index] = Number(passes && (this.focused === null || focused.has(index)));
     }
     this.send({ type: "active", values: this.active });
-    this.geometryVersion++;
+    this.geometryVersion++; this.cachedBounds = null;
     this.synchronizeActivity(); this.fit();
   }
 
@@ -234,9 +267,9 @@ export class GraphScene {
     this.focused = index; this.selected = index; this.applyActive(); this.callbacks.select(key);
   }
 
-  clearFocus() { this.focused = null; this.applyActive(); }
+  clearFocus() { if (this.focused === null) return; this.focused = null; this.applyActive(); }
 
-  fit() { this.target = fitGraph(graphBounds(this.positions, this.active), this.width, this.height); this.userInteracted = true; this.loop.request(); }
+  fit() { this.target = fitGraph(this.bounds(), this.width, this.height); this.userInteracted = true; this.loop.request(); }
 
   center(x: number, y: number) {
     this.target = { ...this.camera, x: this.width / 2 - x * this.camera.scale, y: this.height / 2 - y * this.camera.scale };
@@ -252,8 +285,38 @@ export class GraphScene {
   zoom(factor: number) { this.target = null; this.camera = zoomAt(this.camera, this.width / 2, this.height / 2, factor); this.userInteracted = true; this.loop.request(); this.publishMap(true); }
 
   snapshot(): GraphSceneSnapshot {
-    return { camera: { ...this.camera }, userInteracted: this.userInteracted, positions: new Map(this.data.nodes.map((node, index) => [node.key, [this.positions[index * 2], this.positions[index * 2 + 1]]])) };
+    return { camera: { ...this.camera }, userInteracted: this.userInteracted,
+      positions: new Map(this.data.nodes.map((node, index) => [node.key, [this.positions[index * 2], this.positions[index * 2 + 1]]])),
+      pinned: [...this.pins].map((index) => this.data.nodes[index].key), settled: !this.moving,
+      data: this.data, physics: physicsSignature(this.appearance), width: this.width, height: this.height,
+      focused: this.focused === null ? null : this.data.nodes[this.focused].key, active: this.active.slice() };
   }
+
+  updateData(data: GraphData) {
+    if (this.destroyed) return;
+    if (sameGraphTopology(this.data, data)) {
+      const labelsChanged = this.data.nodes.some((node, index) => node.label !== data.nodes[index].label);
+      this.data = data; const colorsChanged = this.refreshColors();
+      this.painter?.updateData(data, this.radii, this.colors);
+      recordGraphDiagnostic("metadataUpdates"); if (labelsChanged || colorsChanged) { this.loop.request(); this.publishMap(true); } return;
+    }
+    const previous = this.snapshot(), selected = this.data.nodes[this.selected]?.key;
+    const preservePositions = this.data.nodes.length === data.nodes.length && this.data.nodes.every((node, i) => node.key === data.nodes[i].key);
+    this.initializeData(data, previous);
+    this.selected = selected ? this.keys.get(selected) ?? -1 : -1;
+    this.hovered = -1;
+    this.dragged = -1; this.down = null; this.dragging = false; this.pendingPin = null;
+    this.geometryVersion++; this.cachedBounds = null; this.layoutRevision++;
+    this.painter?.updateData(data, this.radii, this.colors); this.rebuildHitIndex();
+    if (this.worker) this.send({ type: "replace", revision: this.layoutRevision, preservePositions, nodes: this.nodes,
+      edges: data.edges.map((edge) => ({ a: edge.a, b: edge.b, rest: this.radii[edge.a] + this.radii[edge.b] + this.appearance.linkDistance })),
+      settings: this.forceSettings(), groups: this.groups, clusterIds: this.clusterIds });
+    recordGraphDiagnostic("topologyUpdates");
+    if (this.filter || this.focused !== null) this.applyActive();
+    this.synchronizeActivity(); this.loop.request(); this.publishMap(true);
+  }
+
+  private bounds() { return this.cachedBounds ??= graphBounds(this.positions, this.active); }
 
   private send(value: GraphLayoutRequest) { if (!this.destroyed) this.worker?.postMessage(value, value.type === "recycle" ? [value.buffer] : []); }
 
@@ -265,6 +328,7 @@ export class GraphScene {
   private paint = (now: number, delta: number): boolean => {
     if (!this.painter || this.destroyed) return false;
     const started = performance.now();
+    this.flushPin();
     if (this.target) {
       const fraction = 1 - Math.exp(-delta / 75);
       this.camera.x += (this.target.x - this.camera.x) * fraction; this.camera.y += (this.target.y - this.camera.y) * fraction;
@@ -272,8 +336,10 @@ export class GraphScene {
       if (Math.abs(this.target.x - this.camera.x) < 0.5 && Math.abs(this.target.y - this.camera.y) < 0.5 && Math.abs(this.target.scale - this.camera.scale) < 0.0005) { this.camera = this.target; this.target = null; }
     }
     const breathe = this.mode === "volume" && this.appearance.breathing && !matchMedia("(prefers-reduced-motion: reduce)").matches && now - this.lastInteraction < 1600;
-    this.painter.paint({ positions: this.positions, active: this.active, camera: this.camera, appearance: this.appearance, hovered: this.hovered, selected: this.selected, radii: this.radii, colors: this.colors, now, pulse: breathe ? 1 + Math.sin(now / 650) * 0.012 : 1, geometryVersion: this.geometryVersion, moving: this.moving });
+    const interacting = !!this.target || now - this.lastInteraction < 180;
+    this.painter.paint({ positions: this.positions, active: this.active, camera: this.camera, appearance: this.appearance, hovered: this.hovered, selected: this.selected, radii: this.radii, colors: this.colors, now, pulse: breathe ? 1 + Math.sin(now / 650) * 0.012 : 1, geometryVersion: this.geometryVersion, moving: this.moving, interacting });
     const workMs = performance.now() - started;
+    recordGraphDiagnostic("paints"); recordGraphDiagnostic("paintMs", workMs);
     this.frames++; this.metricsMs += workMs; this.paintCount++; this.paintMsTotal += workMs;
     if (import.meta.env.DEV) {
       this.host.dataset.graphPaintCount = String(this.paintCount);
@@ -285,38 +351,34 @@ export class GraphScene {
       this.frames = 0; this.metricsMs = 0; this.metricsStarted = now;
     }
     this.publishMap(false);
-    return Boolean(this.target || breathe);
+    return Boolean(this.target || breathe || (this.mode === "volume" && interacting));
   };
 
   private publishMap(force: boolean) {
     const now = performance.now(); if (!force && now - this.lastMap < 120) return;
     this.lastMap = now;
-    this.callbacks.minimap({ positions: this.positions, active: this.active, colors: this.mapColors, bounds: graphBounds(this.positions, this.active), camera: { ...this.camera }, width: this.width, height: this.height });
+    this.callbacks.minimap({ positions: this.positions, active: this.active, colors: this.mapColors, bounds: this.bounds(), camera: { ...this.camera }, width: this.width, height: this.height, geometryVersion: this.geometryVersion });
   }
 
-  private rebuildHitIndex() {
-    this.hitBuckets.clear();
-    for (let index = 0; index < this.data.nodes.length; index++) {
-      const key = `${Math.floor(this.positions[index * 2] / 64)},${Math.floor(this.positions[index * 2 + 1] / 64)}`;
-      const values = this.hitBuckets.get(key) ?? []; values.push(index); this.hitBuckets.set(key, values);
-    }
+  private rebuildHitIndex() { recordGraphDiagnostic("hitIndexRebuilds"); this.spatialIndex.update(this.positions); }
+
+  private flushPin() {
+    if (!this.pendingPin) return;
+    this.moving = true;
+    this.send({ type: "pin", fixed: true, ...this.pendingPin }); this.pendingPin = null;
   }
 
   private hit(x: number, y: number): number {
     const world = screenToWorld(x, y, this.camera);
     const radius = this.mode === "obsidian" ? (classicNodeRadius(this.maximumDegree, this.camera.scale, this.appearance.nodeSize) + 6) / this.camera.scale : 20 + 6 / this.camera.scale;
     let nearest = -1, distance = Infinity;
-    for (let cx = Math.floor((world.x - radius) / 64); cx <= Math.floor((world.x + radius) / 64); cx++) {
-      for (let cy = Math.floor((world.y - radius) / 64); cy <= Math.floor((world.y + radius) / 64); cy++) {
-        for (const index of this.hitBuckets.get(`${cx},${cy}`) ?? []) {
-          if (!this.active[index]) continue;
-          const dx = this.positions[index * 2] - world.x, dy = this.positions[index * 2 + 1] - world.y;
-          const squared = dx * dx + dy * dy;
-          const hitRadius = (this.mode === "obsidian" ? classicNodeRadius(this.data.nodes[index].degree, this.camera.scale, this.appearance.nodeSize) / this.camera.scale : this.radii[index]) + 6 / this.camera.scale;
-          if (squared <= hitRadius ** 2 && squared < distance) { nearest = index; distance = squared; }
-        }
-      }
-    }
+    this.spatialIndex.candidates(world.x, world.y, radius, (index) => {
+      if (!this.active[index]) return;
+      const dx = this.positions[index * 2] - world.x, dy = this.positions[index * 2 + 1] - world.y;
+      const squared = dx * dx + dy * dy;
+      const hitRadius = (this.mode === "obsidian" ? classicNodeRadius(this.data.nodes[index].degree, this.camera.scale, this.appearance.nodeSize) / this.camera.scale : this.radii[index]) + 6 / this.camera.scale;
+      if (squared <= hitRadius ** 2 && squared < distance) { nearest = index; distance = squared; }
+    });
     return nearest;
   }
 
@@ -331,7 +393,6 @@ export class GraphScene {
       const p = point(event); this.down = { ...p, camera: { ...this.camera } }; this.dragging = false;
       this.dragged = event.button === 0 ? this.hit(p.x, p.y) : -1;
       this.dragPinned = this.pins.has(this.dragged); this.target = null; this.userInteracted = true;
-      if (this.dragged >= 0) this.send({ type: "pin", index: this.dragged, fixed: true });
       canvas.setPointerCapture(event.pointerId); event.preventDefault();
     });
     listen("pointermove", (event) => {
@@ -341,7 +402,7 @@ export class GraphScene {
         if (this.dragged >= 0 && this.dragging) {
           const world = screenToWorld(p.x, p.y, this.camera);
           this.positions[this.dragged * 2] = world.x; this.positions[this.dragged * 2 + 1] = world.y;
-          this.send({ type: "pin", index: this.dragged, fixed: true, ...world }); this.rebuildHitIndex();
+          this.pendingPin = { index: this.dragged, ...world }; this.geometryVersion++; this.cachedBounds = null; this.spatialIndex.move(this.dragged, world.x, world.y);
         } else if (this.dragged < 0) {
           this.camera.x = this.down.camera.x + p.x - this.down.x; this.camera.y = this.down.camera.y + p.y - this.down.y;
         }
@@ -352,7 +413,8 @@ export class GraphScene {
       }
     });
     const release = (event: PointerEvent, canceled = false) => {
-      if (this.dragged >= 0) this.send({ type: "pin", index: this.dragged, fixed: this.dragPinned });
+      this.flushPin();
+      if (this.dragged >= 0 && this.dragging) this.send({ type: "pin", index: this.dragged, fixed: this.dragPinned });
       if (!canceled && this.down && !this.dragging && this.dragged >= 0) {
         const key = this.data.nodes[this.dragged].key;
         if (event.shiftKey) this.focus(key);
@@ -364,7 +426,7 @@ export class GraphScene {
     listen("pointerup", (event) => release(event)); listen("pointercancel", (event) => release(event, true));
     listen("pointerleave", () => { if (!this.down && this.hovered >= 0) { this.hovered = -1; this.loop.request(); } });
     listen("dblclick", (event) => { const p = point(event), index = this.hit(p.x, p.y); if (index >= 0) this.callbacks.open(this.data.nodes[index].key); });
-    listen("contextmenu", (event) => { event.preventDefault(); const p = point(event), index = this.hit(p.x, p.y); if (index >= 0) this.callbacks.context(this.data.nodes[index].key, event.clientX, event.clientY, this.pins.has(index)); });
+    listen("contextmenu", (event) => { event.preventDefault(); const p = point(event), index = this.hit(p.x, p.y); if (index >= 0) { event.stopPropagation(); this.callbacks.context(this.data.nodes[index].key, event.clientX, event.clientY, this.pins.has(index)); } });
     listen("wheel", (event) => { event.preventDefault(); const p = point(event); this.target = null; this.camera = zoomAt(this.camera, p.x, p.y, Math.exp(-clamp(event.deltaY, -120, 120) * 0.0025)); this.userInteracted = true; this.lastInteraction = performance.now(); this.loop.request(); this.publishMap(true); }, { passive: false });
     listen("keydown", (event) => {
       if (event.key === "Home" || event.key === "0") { event.preventDefault(); this.fit(); }
@@ -389,6 +451,8 @@ export class GraphScene {
     this.destroyed = true; this.loop.destroy(); this.worker?.terminate(); this.observer?.disconnect(); this.themeObserver?.disconnect();
     for (const cleanup of this.cleanup) cleanup(); this.cleanup = [];
     this.painter?.destroy(); this.painter = null;
-    this.hitBuckets.clear();
+
   }
 }
+
+function physicsSignature(value: GraphAppearance) { return [value.repulsion, value.damping, value.centerForce, value.linkDistance, value.linkStrength, value.cohesion, value.clusterSeparation, value.internalRepulsion, value.nodeSize].join(":"); }

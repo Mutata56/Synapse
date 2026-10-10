@@ -3,6 +3,7 @@ import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useSta
 import { clampMinimapPosition } from "../lib/graphGeometry";
 import type { GraphMapSnapshot } from "../lib/graphTypes";
 import { t } from "../lib/i18n";
+import { recordGraphDiagnostic } from "../lib/graphDiagnostics";
 
 export type GraphMinimapHandle = { update: (snapshot: GraphMapSnapshot) => void };
 const WIDTH = 194, HEIGHT = 132, HEADER = 32;
@@ -12,6 +13,8 @@ type Position = { x: number; y: number };
 export const GraphMinimap = forwardRef<GraphMinimapHandle, { host: RefObject<HTMLDivElement | null>; center: (x: number, y: number) => void }>(function GraphMinimap({ host, center }, ref) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const snapshot = useRef<GraphMapSnapshot | null>(null);
+  const backdrop = useRef<HTMLCanvasElement | null>(null);
+  const lastBackdrop = useRef<{ version: number; colors: readonly string[]; positions: Float32Array; ratio: number } | null>(null);
   const transform = useRef({ x: 0, y: 0, scale: 1 });
   const [expanded, setExpanded] = useState(() => {
     try { return JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "null")?.expanded !== false; } catch { return true; }
@@ -54,11 +57,20 @@ export const GraphMinimap = forwardRef<GraphMinimapHandle, { host: RefObject<HTM
     transform.current = { x: centerX, y: centerY, scale };
     const sx = (x: number) => WIDTH / 2 + (x - centerX) * scale;
     const sy = (y: number) => HEIGHT / 2 + (y - centerY) * scale;
-    for (let index = 0; index < value.active.length; index++) {
-      if (!value.active[index]) continue;
-      ctx.fillStyle = value.colors[index] ?? "#969ba7";
-      ctx.fillRect(sx(value.positions[index * 2]) - 1, sy(value.positions[index * 2 + 1]) - 1, 2, 2);
+    const previous = lastBackdrop.current;
+    if (!backdrop.current) backdrop.current = document.createElement("canvas");
+    if (!previous || previous.version !== value.geometryVersion || previous.colors !== value.colors || previous.positions !== value.positions || previous.ratio !== ratio) {
+      const layer = backdrop.current; layer.width = WIDTH * ratio; layer.height = HEIGHT * ratio;
+      const background = layer.getContext("2d")!; background.setTransform(ratio, 0, 0, ratio, 0, 0);
+      for (let index = 0; index < value.active.length; index++) {
+        if (!value.active[index]) continue;
+        background.fillStyle = value.colors[index] ?? "#969ba7";
+        background.fillRect(sx(value.positions[index * 2]) - 1, sy(value.positions[index * 2 + 1]) - 1, 2, 2);
+      }
+      lastBackdrop.current = { version: value.geometryVersion, colors: value.colors, positions: value.positions, ratio };
+      recordGraphDiagnostic("minimapBackgrounds");
     }
+    ctx.drawImage(backdrop.current, 0, 0, WIDTH, HEIGHT); recordGraphDiagnostic("minimapViews");
     const left = sx(-value.camera.x / value.camera.scale), top = sy(-value.camera.y / value.camera.scale);
     const width = value.width / value.camera.scale * scale, height = value.height / value.camera.scale * scale;
     ctx.strokeStyle = "#a5b4fc"; ctx.fillStyle = "rgba(165,180,252,0.08)"; ctx.lineWidth = 1.1;
