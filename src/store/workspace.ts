@@ -98,7 +98,8 @@ export const useWorkspaceStore = create<State>((set, get) => ({
   fileSort: ["name", "modified", "created"].includes(ui.fileSort) ? ui.fileSort : "name",
   vaultLabel: typeof ui.vaultLabel === "string" && ui.vaultLabel.trim() ? ui.vaultLabel.slice(0, 80) : "Synapse Vault",
   helpVisible: false,
-  openNote: (noteId, newTab = false) => navigate(openWorkspaceTarget(get(), { kind: "note", noteId }, id(), newTab && useNotesStore.getState().settings.modules.home)),
+  // Explicit article tabs are navigation; the home module controls empty start tabs.
+  openNote: (noteId, newTab = false) => navigate(openWorkspaceTarget(get(), { kind: "note", noteId }, id(), newTab)),
   openView: (view) => isViewEnabled(useNotesStore.getState().settings, view) ? navigate(openWorkspaceTarget(get(), { kind: "view", view }, id(), useNotesStore.getState().settings.modules.home)) : Promise.resolve(),
   newTab: () => {
     if (!useNotesStore.getState().settings.modules.home) return Promise.resolve();

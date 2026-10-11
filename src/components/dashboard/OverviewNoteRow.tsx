@@ -4,8 +4,8 @@ import { EMOJI_FONT_STACK, formatRelativeDate } from "../../lib/format";
 import { t } from "../../lib/i18n";
 import type { NoteMeta } from "../../lib/storage";
 
-export const OverviewNoteRow = memo(function OverviewNoteRow({ note, onOpen }: { note: NoteMeta; onOpen: (id: string) => void }) {
-  return <button type="button" className="overview-note-row" onClick={() => onOpen(note.id)}>
+export const OverviewNoteRow = memo(function OverviewNoteRow({ note, onOpen }: { note: NoteMeta; onOpen: (id: string, newTab?: boolean) => void }) {
+  return <button type="button" className="overview-note-row" onClick={event => onOpen(note.id, event.metaKey)}>
     <span className="overview-note-icon">{note.icon ? <span style={{ fontFamily: EMOJI_FONT_STACK }}>{note.icon}</span> : <FileText size={17} />}</span>
     <span className="overview-note-copy"><span className="overview-note-title">{note.title || t("Без названия")}</span><span className="overview-note-folder">{note.folder || t("Без папки")}</span></span>
     <span className="overview-note-tags">{note.tags.slice(0, 2).map(tag => <span key={tag}>#{tag.replace(/^#/, "")}</span>)}</span>

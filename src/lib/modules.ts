@@ -13,7 +13,7 @@ export const APP_MODULES = [
   { id: "images", title: "Изображения", description: "Библиотека изображений и вложений хранилища.", group: "navigation" },
   { id: "overview", title: "Обзор", description: "Статистика заметок, активности и объёма текстов.", group: "navigation" },
   { id: "trash", title: "Корзина", description: "Просмотр, восстановление и очистка удалённых файлов.", group: "navigation" },
-  { id: "home", title: "Новая вкладка", description: "Стартовая страница и создание дополнительных вкладок.", group: "tools" },
+  { id: "home", title: "Новая вкладка", description: "Стартовая страница и создание пустых вкладок.", group: "tools" },
   { id: "newNote", title: "Новая заметка", description: "Создание заметок и глобальное окно быстрой записи.", group: "tools" },
   { id: "canvas", title: "Холст", description: "Создание холстов и вставка доски в заметку.", group: "tools" },
   { id: "database", title: "База данных", description: "Создание и вставка таблиц с данными в заметку.", group: "tools" },

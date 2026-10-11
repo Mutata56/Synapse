@@ -4,13 +4,14 @@ import { gradientClassName, parseCover } from "../lib/covers";
 import { formatRelativeDate, EMOJI_FONT_STACK } from "../lib/format";
 import { resolveCoverImageUrl, type NoteMeta } from "../lib/storage";
 import { useI18n } from "./LanguageProvider";
+import { noteClickAction } from "../lib/noteClick";
 import { libraryExcerpt } from "../lib/noteLibrary";
 type Props = {
     note: NoteMeta;
     selected: boolean;
     selecting: boolean;
     previewing: boolean;
-    onOpen: (id: string) => void;
+    onOpen: (id: string, newTab?: boolean) => void;
     onPreview: (id: string, trigger: HTMLButtonElement) => void;
     onSelect: (id: string) => void;
     onFavorite: (id: string) => void;
@@ -21,10 +22,13 @@ export const LibraryNoteCard = memo(function LibraryNoteCard({ note, selected, s
     const { t } = useI18n();
     const title = note.title || t("Без названия"), folder = note.folder || t("Без папки");
     const click = (event: MouseEvent<HTMLButtonElement>) => {
-        if (selecting || event.ctrlKey || event.metaKey)
+        const action = noteClickAction(event, selecting);
+        if (action === "select")
             onSelect(note.id);
-        else
-            onOpen(note.id);
+        else {
+            if (action === "new-tab") event.preventDefault();
+            onOpen(note.id, action === "new-tab");
+        }
     };
     const tags = [...new Set(note.tags)].slice(0, 2);
     const excerpt = libraryExcerpt(note), date = new Date(note.updatedAt);

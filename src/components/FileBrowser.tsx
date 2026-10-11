@@ -1,3 +1,4 @@
+import { useWorkspaceStore } from "../store/workspace";
 import { ArrowDown, ArrowUp, Check, ChevronRight, Copy, FilePlus, FileText, Folder, FolderPlus, MoreHorizontal, PanelRightOpen, RotateCcw, Search, Trash2, X } from "lucide-react";
 import { useCallback, useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import { createPortal } from "react-dom";
@@ -105,7 +106,7 @@ export function FileBrowser({ mode, readBody, initialSelected = [] }: Props) {
   const open = (entry: FileEntry) => {
     if (blocked) return;
     if (entry.kind === "folder") navigate(entry.path);
-    else if (mode === "files") { const state = useNotesStore.getState(); state.setView("notes"); void state.selectNote(entry.path).catch(error => reportError(t("Не удалось открыть заметку"), "FileBrowser open:", error)); }
+    else if (mode === "files") { void useWorkspaceStore.getState().openNote(entry.path).catch(error => reportError(t("Не удалось открыть заметку"), "FileBrowser open:", error)); }
     else { setSelected(new Set([entry.key])); setActive(entry.key); setDetails(true); setPreviewKey(entry.key); }
   };
   const execute = async (operation: () => Promise<unknown>) => {
@@ -209,7 +210,7 @@ export function FileBrowser({ mode, readBody, initialSelected = [] }: Props) {
         </div>
           {rows.length ? <div className="fs-row-space" role="presentation" style={{ height: rows.length * ROW_HEIGHT }}>{rows.slice(windowed.start, windowed.end).map((entry, offset) => {
             const position = windowed.start + offset, checked = selected.has(entry.key);
-            return <div key={entry.key} id={`fs-${mode}-row-${position}`} role="row" aria-selected={checked} aria-rowindex={position + 2} className={`fs-row${checked ? " is-selected" : ""}${active === entry.key ? " is-active" : ""}`} style={{ position: "absolute", top: position * ROW_HEIGHT, height: ROW_HEIGHT, width: "100%" }} draggable={mode === "files" && !blocked} onClick={event => selectAt(position, event.metaKey || event.ctrlKey, event.shiftKey)} onDoubleClick={event => { if (!event.shiftKey && !event.ctrlKey && !event.metaKey) open(entry); }} onContextMenu={event => showMenu(event, entry)} onDragStart={event => {
+            return <div key={entry.key} id={`fs-${mode}-row-${position}`} role="row" aria-selected={checked} aria-rowindex={position + 2} className={`fs-row${checked ? " is-selected" : ""}${active === entry.key ? " is-active" : ""}`} style={{ position: "absolute", top: position * ROW_HEIGHT, height: ROW_HEIGHT, width: "100%" }} draggable={mode === "files" && !blocked} onClick={event => { if (event.metaKey && entry.kind === "note" && mode === "files") { event.preventDefault(); if (!blocked) void useWorkspaceStore.getState().openNote(entry.path, true); return; } selectAt(position, event.metaKey || event.ctrlKey, event.shiftKey); }} onDoubleClick={event => { if (!event.shiftKey && !event.ctrlKey && !event.metaKey) open(entry); }} onContextMenu={event => showMenu(event, entry)} onDragStart={event => {
               const items = checked ? selectedItems.map(entryTarget) : [entryTarget(entry)]; setDragData(event.dataTransfer, items, { label: entry.name, meta: entry.parent || t("Хранилище") });
             }} onDragOver={mode === "files" && entry.kind === "folder" ? event => { event.preventDefault(); event.stopPropagation(); event.dataTransfer.dropEffect = "move"; event.currentTarget.classList.add("is-drop-target"); } : undefined} onDragLeave={event => event.currentTarget.classList.remove("is-drop-target")} onDrop={event => { if (entry.kind !== "folder") return; event.preventDefault(); event.stopPropagation(); event.currentTarget.classList.remove("is-drop-target"); void drop(decodeDrag(event.dataTransfer), entry.path); }}>
               <div role="gridcell" className="fs-check-cell"><button type="button" tabIndex={-1} role="checkbox" aria-checked={checked} aria-label={t("Выбрать {name}", { name: entry.name })} className={checked ? "fs-checked" : "fs-checkbox"} disabled={blocked} onDoubleClick={event => event.stopPropagation()} onClick={event => { event.stopPropagation(); selectAt(position, true, event.shiftKey); }}>{checked && <Check size={13} />}</button></div>

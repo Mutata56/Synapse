@@ -33,6 +33,7 @@ import {
 import { exportNoteMarkdown } from "../lib/export";
 import { FOLDER_COLORS } from "../lib/folderColors";
 import { DEFAULT_NOTE_TITLE } from "../lib/format";
+import { noteClickAction } from "../lib/noteClick";
 import type { TreeNode } from "../lib/storage";
 import { stableKey } from "../lib/treeKeys";
 import { confirmDialog } from "../store/confirm";
@@ -823,12 +824,14 @@ function NoteRow({
 
   const onClick = (e: React.MouseEvent) => {
     if (renaming) return;
-    if (e.ctrlKey || e.metaKey || ctx.selecting) {
+    const action = noteClickAction(e, ctx.selecting);
+    if (action === "select") {
       e.preventDefault();
       ctx.toggleNote(note.id);
       return;
     }
-    void useWorkspaceStore.getState().openNote(note.id);
+    if (action === "new-tab") e.preventDefault();
+    void useWorkspaceStore.getState().openNote(note.id, action === "new-tab");
   };
 
   return (

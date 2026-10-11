@@ -1,3 +1,4 @@
+import { useWorkspaceStore } from "../store/workspace";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowRight, BarChart3, CalendarDays, CircleMinus, Clock3, FileText, Folder, Hash, LayoutDashboard, Plus, Search, Star, X } from "lucide-react";
 import { openCommandPalette } from "../lib/commandPaletteEvents";
@@ -71,11 +72,10 @@ export function WritingDashboard({ loadWords }: { loadWords?: OverviewWordLoader
     return () => observer.disconnect();
   }, [panel, today]);
 
-  const openNote = useCallback(async (id: string) => {
+  const openNote = useCallback(async (id: string, newTab = false) => {
     setError(null);
     try {
-      await useNotesStore.getState().selectNote(id);
-      if (useNotesStore.getState().activeId === id) useNotesStore.getState().setView("notes");
+      await useWorkspaceStore.getState().openNote(id, newTab);
     } catch { setError(t("Не удалось открыть заметку")); }
   }, []);
   const openCollection = useCallback(async (path: string | null) => {

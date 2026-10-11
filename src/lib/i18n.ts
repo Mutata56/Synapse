@@ -198,7 +198,7 @@ const en: Record<string, string> = {
   "Библиотека изображений и вложений хранилища.": "A library of images and vault attachments.",
   "Статистика заметок, активности и объёма текстов.": "Statistics for notes, activity and writing volume.",
   "Просмотр, восстановление и очистка удалённых файлов.": "Browse, restore and remove deleted files.",
-  "Стартовая страница и создание дополнительных вкладок.": "A start page and additional workspace tabs.",
+  "Стартовая страница и создание пустых вкладок.": "A start page and empty workspace tabs.",
   "Создание заметок и глобальное окно быстрой записи.": "New notes and a global quick capture window.",
   "Создание холстов и вставка доски в заметку.": "Create canvases and insert boards into notes.",
   "Создание и вставка таблиц с данными в заметку.": "Create databases and insert them into notes.",

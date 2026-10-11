@@ -1,3 +1,4 @@
+import { useWorkspaceStore } from "../store/workspace";
 import { FileText, Link2 } from "lucide-react";
 import { useMemo } from "react";
 import { computeBacklinks } from "../editor2026/backlinks";
@@ -20,7 +21,6 @@ import { useNotesStore } from "../store/notes";
 export function Backlinks({ compact = false }: { compact?: boolean }) {
   const activeNote = useNotesStore((s) => s.activeNote);
   const tree = useNotesStore((s) => s.tree);
-  const selectNote = useNotesStore((s) => s.selectNote);
 
   const backlinks = useMemo(
     () => computeBacklinks(tree, activeNote).map((b) => b.note),
@@ -45,7 +45,7 @@ export function Backlinks({ compact = false }: { compact?: boolean }) {
             <button
               key={n.id}
               type="button"
-              onClick={() => void selectNote(n.id)}
+              onClick={event => void useWorkspaceStore.getState().openNote(n.id, event.metaKey)}
               className="group flex items-center gap-2.5 px-3 py-2 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-elevated)] hover:border-[var(--color-border-strong)] hover:bg-[var(--color-bg-overlay)] transition-colors text-left"
             >
               <span className="shrink-0 w-5 flex justify-center">

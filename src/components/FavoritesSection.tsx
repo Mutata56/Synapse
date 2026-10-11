@@ -1,3 +1,4 @@
+import { useWorkspaceStore } from "../store/workspace";
 import { motion } from "framer-motion";
 import { FileText, Star } from "lucide-react";
 import { useMemo, useState } from "react";
@@ -22,8 +23,6 @@ export function FavoritesSection() {
   const tree = useNotesStore((s) => s.tree);
   const activeId = useNotesStore((s) => s.activeId);
   const view = useNotesStore((s) => s.view);
-  const selectNote = useNotesStore((s) => s.selectNote);
-  const setView = useNotesStore((s) => s.setView);
   const toggleFavorite = useNotesStore((s) => s.toggleFavorite);
 
   const favorites = useMemo(
@@ -37,9 +36,8 @@ export function FavoritesSection() {
   // Не занимаем место в сайдбаре, когда показывать нечего.
   if (favorites.length === 0) return null;
 
-  const openNote = (id: string) => {
-    setView("notes");
-    void selectNote(id);
+  const openNote = (id: string, newTab = false) => {
+    void useWorkspaceStore.getState().openNote(id, newTab);
   };
 
   return (
@@ -51,7 +49,7 @@ export function FavoritesSection() {
             key={note.id}
             note={note}
             active={view === "notes" && activeId === note.id}
-            onOpen={() => openNote(note.id)}
+            onOpen={event => openNote(note.id, event?.metaKey === true)}
             onUnfavorite={() => void toggleFavorite(note.id)}
           />
         ))}
@@ -89,7 +87,7 @@ function FadedDivider() {
 type FavoriteRowProps = {
   note: NoteMeta;
   active: boolean;
-  onOpen: () => void;
+  onOpen: (event?: { metaKey: boolean }) => void;
   onUnfavorite: () => void;
 };
 
@@ -109,7 +107,7 @@ function FavoriteRow({
   const onKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
     if (e.key === "Enter" || e.key === " ") {
       e.preventDefault();
-      onOpen();
+      onOpen(e);
     }
   };
 

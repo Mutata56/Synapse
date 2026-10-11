@@ -12,7 +12,7 @@ import { useI18n } from "./LanguageProvider";
 const PLUGINS = [remarkGfm];
 const PREVIEW_LIMIT = 24000;
 type Body = { id: string; text: string; truncated: boolean; words: number };
-type Props = { note: NoteMeta; selectedTags: readonly string[]; files: VaultFileIndex; loadNote: (id: string) => Promise<Note | null>; onOpen: (id: string) => void; onTrash: (id: string) => void; onTag: (tag: string) => void; onAddFilter: () => void };
+type Props = { note: NoteMeta; selectedTags: readonly string[]; files: VaultFileIndex; loadNote: (id: string) => Promise<Note | null>; onOpen: (id: string, newTab?: boolean) => void; onTrash: (id: string) => void; onTag: (tag: string) => void; onAddFilter: () => void };
 
 /** Only the selected note is read. Five bounded previews, no covers or remote images. */
 export default function TagReadingPane({ note, selectedTags, files, loadNote, onOpen, onTrash, onTag, onAddFilter }: Props) {
@@ -46,7 +46,7 @@ export default function TagReadingPane({ note, selectedTags, files, loadNote, on
   const visibleBody = body?.id === id ? body : null;
   const markdown = useMemo(() => obsidianMarkdownPreview(visibleBody?.text ?? ""), [visibleBody]);
   const components = useMemo(() => ({
-    img: ({ alt }: { alt?: string }) => <button type="button" className="tags-attachment" onClick={() => onOpen(id)}><Image size={15} aria-hidden="true" />{alt || t("Вложение")}<span>{t("Открыть в заметке")}</span></button>,
+    img: ({ alt }: { alt?: string }) => <button type="button" className="tags-attachment" onClick={event => onOpen(id, event.metaKey)}><Image size={15} aria-hidden="true" />{alt || t("Вложение")}<span>{t("Открыть в заметке")}</span></button>,
     a: ({ href = "", children }: { href?: string; children?: React.ReactNode }) => <a href={href || undefined} onClick={(event) => {
       event.preventDefault();
       if (href.startsWith("#")) {
@@ -59,7 +59,7 @@ export default function TagReadingPane({ note, selectedTags, files, loadNote, on
       const reference = wiki ? decodeURIComponent(href.slice("synapse-note:".length)) : href;
       const target = wikiTarget(reference);
       const path = resolveVaultReference(target.path, id, files, { note: true, relativeFirst: !wiki });
-      if (path) onOpen(path.slice(0, -3));
+      if (path) onOpen(path.slice(0, -3), event.metaKey);
       else useToastStore.getState().push(t("Ссылка не найдена или неоднозначна"));
     }}>{children}</a>,
   }), [files, id, onOpen, t]);
@@ -67,10 +67,10 @@ export default function TagReadingPane({ note, selectedTags, files, loadNote, on
   const date = useMemo(() => new Intl.DateTimeFormat(lang === "ru" ? "ru-RU" : "en-GB", { day: "numeric", month: "long", year: "numeric" }).format(note.updatedAt), [lang, note.updatedAt]);
 
   return <>
-    <div className="tags-reader-toolbar"><span className="tags-reader-folder" title={note.folder || "/"}>{note.folder || "/"}</span><button type="button" className="tags-open-note" aria-label={t("Открыть заметку")} onClick={() => onOpen(id)}>{t("Открыть")}<ExternalLink size={13} aria-hidden="true" /></button><details ref={menuRef} className="tags-note-menu" onKeyDown={(event) => { if (event.key === "Escape" && menuRef.current) { menuRef.current.open = false; menuRef.current.querySelector("summary")?.focus(); } }}><summary aria-label={t("Действия с заметкой")}><Ellipsis size={17} /></summary><div><button type="button" onClick={() => { if (menuRef.current) menuRef.current.open = false; onTrash(id); }}><Trash2 size={15} />{t("В корзину")}</button></div></details></div>
+    <div className="tags-reader-toolbar"><span className="tags-reader-folder" title={note.folder || "/"}>{note.folder || "/"}</span><button type="button" className="tags-open-note" aria-label={t("Открыть заметку")} onClick={event => onOpen(id, event.metaKey)}>{t("Открыть")}<ExternalLink size={13} aria-hidden="true" /></button><details ref={menuRef} className="tags-note-menu" onKeyDown={(event) => { if (event.key === "Escape" && menuRef.current) { menuRef.current.open = false; menuRef.current.querySelector("summary")?.focus(); } }}><summary aria-label={t("Действия с заметкой")}><Ellipsis size={17} /></summary><div><button type="button" onClick={() => { if (menuRef.current) menuRef.current.open = false; onTrash(id); }}><Trash2 size={15} />{t("В корзину")}</button></div></details></div>
     <div className="tags-reader-scroll tags-scroll" ref={contentRef}>
       <header className="tags-note-header"><h2>{note.title}</h2><div className="tags-note-tags">{orderedTags.map((tag) => <button type="button" key={tag} className="tags-inline-tag" onClick={() => onTag(tag)} title={t("Добавить или убрать фильтр {tag}", { tag })}><Hash size={12} />{tag}</button>)}</div><div className="tags-note-meta"><span>{t("Изменено {date}", { date })}</span>{visibleBody && <span>{t("{n} слов", { n: visibleBody.words })}</span>}<span className="tags-readonly"><FileText size={12} />{t("Только чтение")}</span></div></header>
-      {error ? <div className="tags-empty" role="alert"><h3>{t("Не удалось прочитать заметку")}</h3><p>{t("Файл мог измениться или стать недоступным.")}</p><button type="button" className="tags-button" onClick={() => { cache.current.delete(`${id}:${note.updatedAt}`); setRetry((value) => value + 1); }}><RefreshCw size={14} />{t("Повторить")}</button></div> : !visibleBody ? <div className="tags-preview-loading" role="status">{t("Загрузка…")}</div> : <><div className="tags-markdown">{renderedMarkdown}</div>{visibleBody.truncated && <div className="tags-preview-limit"><p>{t("Показано начало длинной заметки")}</p><button type="button" className="tags-button" onClick={() => onOpen(id)}>{t("Открыть целиком")}</button></div>}</>}
+      {error ? <div className="tags-empty" role="alert"><h3>{t("Не удалось прочитать заметку")}</h3><p>{t("Файл мог измениться или стать недоступным.")}</p><button type="button" className="tags-button" onClick={() => { cache.current.delete(`${id}:${note.updatedAt}`); setRetry((value) => value + 1); }}><RefreshCw size={14} />{t("Повторить")}</button></div> : !visibleBody ? <div className="tags-preview-loading" role="status">{t("Загрузка…")}</div> : <><div className="tags-markdown">{renderedMarkdown}</div>{visibleBody.truncated && <div className="tags-preview-limit"><p>{t("Показано начало длинной заметки")}</p><button type="button" className="tags-button" onClick={event => onOpen(id, event.metaKey)}>{t("Открыть целиком")}</button></div>}</>}
     </div>
     <footer className="tags-reader-footer"><span>{t("Теги")}</span><div>{orderedTags.slice(0, 3).map((tag) => <button type="button" className="tags-inline-tag" key={tag} onClick={() => onTag(tag)}><Hash size={12} />{tag}</button>)}<button type="button" className="tags-add-filter" onClick={onAddFilter}><Plus size={13} />{t("Добавить фильтр")}</button></div></footer>
   </>;
