@@ -36,7 +36,16 @@ export const useTasksStore = create<TasksState>((set, get) => {
   };
   return {
     tasks: [], loaded: false, loading: false, error: null,
-    flush: () => mutations,
+    flush: async () => {
+      // A second edit can be accepted while the first write is being awaited.
+      // Exit must drain that newer tail as well, even after Calendar unmounts.
+      let pending: Promise<void>;
+      do {
+        pending = mutations;
+        try { await pending; }
+        catch (error) { if (pending === mutations) throw error; }
+      } while (pending !== mutations);
+    },
     load: () => {
       if (get().loaded) return Promise.resolve();
       if (pendingLoad) return pendingLoad;

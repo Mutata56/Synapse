@@ -34,6 +34,8 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
 
 Index note dates once per tree revision; selecting a day and navigating periods must not reread Markdown or rescan the vault. Expand task/event occurrences once for the visible date range. Bound lists and cell previews. No polling or animation loop while idle; only a midnight clock update and explicit/stale calendar synchronization. Measure model cost and mounted DOM on synthetic large libraries; report hardware and scenario limits.
 
+Stability follow-up preserves this visual contract: one midnight timer with focus/visibility recovery, timezone-aware date cache invalidation, offline feed backoff, and an application-level task exit barrier. IANA/UTC recurrence, nonexistent month dates, WKST, individual moves/cancellations and all-day DST ends are covered by regression fixtures. The model soak, browser cycles and installed-bundle limitations are recorded in `docs/CALENDAR_WORKSPACE.md`.
+
 ## Implemented extension
 
 The direction contract and seed above remain the provenance for this scoped Operate extension. The built calendar uses the established dark semantic palette and Inter family, with amber local tasks, blue external events, lavender writing marks and violet selection/focus. OWN-WORLD's light-surface language is resolved as local token compatibility: mobile-light.png injects synthetic semantic tokens into the review fixture. The application still ships its dark palette, and no global light theme is added.

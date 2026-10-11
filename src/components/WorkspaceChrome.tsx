@@ -1,9 +1,10 @@
-import { invoke, isTauri } from "@tauri-apps/api/core";
+import { isTauri } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { CalendarDays, ChartNoAxesCombined, ChevronDown, FilePlus2, FileText, FolderOpen, Hash, HelpCircle, Home, Image, Inbox, LayoutGrid, List, Network, PanelLeft, PanelRight, Plus, Search, Settings2, Shapes, Table2, Trash2, X, type LucideIcon } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type ButtonHTMLAttributes, type ReactNode } from "react";
 import { emptyModel } from "../editor2026/dataTable/model";
 import { hashString } from "../lib/hashString";
+import { exitAfterSaving } from "../lib/applicationExit";
 import { cn } from "../lib/cn";
 import { t } from "../lib/i18n";
 import { flattenNotes } from "../lib/treeUtils";
@@ -59,7 +60,7 @@ function useWorkspaceController() {
       else if (command === "settings") void state.openView("settings");
       else if (command === "help") state.showHelp(true);
       else if (command === "quit-app") {
-        void flushAllPending().then(() => invoke("exit_application")).catch(error => useToastStore.getState().push(error instanceof Error ? error.message : t("Не удалось сохранить заметку"), "error"));
+        void exitAfterSaving().catch(error => useToastStore.getState().push(t("Не удалось сохранить изменения. Приложение осталось открытым.") + ": " + String(error), "error"));
       }
       else if (command === "quick-switcher") window.dispatchEvent(new CustomEvent(QUICK_SWITCHER_EVENT));
       else if (command === "new-note" || command === "new-database" || command === "new-canvas") void createWorkspaceDocument(command === "new-database" ? "database" : command === "new-canvas" ? "canvas" : "note");

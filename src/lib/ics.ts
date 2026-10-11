@@ -8,13 +8,13 @@
  *   базовое разворачивание RRULE (DAILY, WEEKLY+BYDAY, MONTHLY, YEARLY,
  *     INTERVAL, COUNT, UNTIL) плюс исключения EXDATE
  *
- * Про таймзоны важно: базы IANA tz у нас нет, поэтому локальное время `TZID=…`
- * трактуем в зоне *самой машины*. Время в UTC (`Z`) точное. Для дневника одного
- * юзера, чей календарь в его же таймзоне, это верно; разъезжается, только если
- * смотришь событие из чужой таймзоны в поездке.
+ * IANA TZID uses Intl's timezone database; UTC repeats stay UTC. Floating
+ * times and all-day dates follow the machine's zone. Custom VTIMEZONE aliases
+ * without an IANA name are reported as unsupported, never silently remapped.
  */
 
-const DAY_MS = 86_400_000;
+import { ICAL_DAY_MS as DAY_MS, parseIcsTime, wallDate, wallInstant } from "./icsTime";
+
 /** Жёсткий лимит на число сгенерированных повторов одного события, страховка от
  *  кривого/бесконечного RRULE, который крутился бы вечно. Хватает, чтобы пройти
  *  десятилетия ежедневной/недельной серии, начавшейся задолго до видимого окна. */
@@ -30,6 +30,7 @@ type RRule = {
   until?: number;
   /** Дни недели для WEEKLY (0=вс, 6=сб), как у JS `Date.getDay()`. */
   byday?: number[];
+  weekStart?: number;
 };
 
 /** Событие календаря, как распарсили из фида. Через `rrule` может описывать
@@ -43,6 +44,11 @@ export type ParsedEvent = {
   /** Конец первого повтора, ms epoch. */
   end: number;
   allDay: boolean;
+  timeZone?: string;
+  /** Calendar-day length for DATE values; a DST day need not be 24 hours. */
+  durationDays?: number;
+  recurrenceId?: number;
+  cancelled?: boolean;
   rrule?: RRule;
   /** Исключённые начала повторов (ms epoch). */
   exDates?: number[];
@@ -74,16 +80,22 @@ export function parseIcs(text: string): ParsedEvent[] {
     }
     if (line === "END:VEVENT") {
       if (cur && typeof cur.start === "number") {
+        const allDay = cur.allDay ?? false;
+        const defaultEnd = new Date(cur.start);
+        if (allDay) defaultEnd.setDate(defaultEnd.getDate() + 1);
+        const end = typeof cur.end === "number" ? cur.end : allDay ? defaultEnd.getTime() : cur.start;
+        const durationDays = allDay ? Math.max(1, Math.round((wallDate(end).getTime() - wallDate(cur.start).getTime()) / DAY_MS)) : undefined;
         events.push({
           uid: cur.uid || randomId(),
           summary: cur.summary || "(без названия)",
           location: cur.location,
           start: cur.start,
-          end:
-            typeof cur.end === "number"
-              ? cur.end
-              : cur.start + (cur.allDay ? DAY_MS : 0),
-          allDay: cur.allDay ?? false,
+          end,
+          allDay,
+          timeZone: cur.timeZone,
+          durationDays,
+          recurrenceId: cur.recurrenceId,
+          cancelled: cur.cancelled,
           rrule: cur.rrule,
           exDates: exDates.length ? exDates : undefined,
         });
@@ -112,6 +124,7 @@ export function parseIcs(text: string): ParsedEvent[] {
         if (d) {
           cur.start = d.ms;
           cur.allDay = d.allDay;
+          cur.timeZone = d.zone;
         }
         break;
       }
@@ -125,6 +138,12 @@ export function parseIcs(text: string): ParsedEvent[] {
         if (r) cur.rrule = r;
         break;
       }
+      case "RECURRENCE-ID": {
+        const date = parseIcsDate(value, params);
+        if (date) { cur.recurrenceId = date.ms; if (cur.start === undefined) { cur.start = date.ms; cur.allDay = date.allDay; cur.timeZone = date.zone; } }
+        break;
+      }
+      case "STATUS": cur.cancelled = value.trim().toUpperCase() === "CANCELLED"; break;
       case "EXDATE": {
         for (const piece of value.split(",")) {
           const d = parseIcsDate(piece, params);
@@ -148,32 +167,39 @@ export function expandEvents(
   rangeEnd: number,
 ): CalEvent[] {
   const out: CalEvent[] = [];
+  const overrides = new Map<string, Set<number>>();
+  for (const event of events) if (event.recurrenceId !== undefined) {
+    if (!overrides.has(event.uid)) overrides.set(event.uid, new Set());
+    overrides.get(event.uid)!.add(event.recurrenceId);
+  }
 
   for (const ev of events) {
-    const dur = Math.max(ev.allDay ? DAY_MS : 0, ev.end - ev.start);
+    if (ev.cancelled) continue;
+    const dur = Math.max(0, ev.end - ev.start);
+    const touches = (event: CalEvent) => event.start < rangeEnd && (event.end > rangeStart || event.end === event.start && event.start >= rangeStart);
 
-    if (!ev.rrule) {
-      if (ev.start < rangeEnd && ev.start + dur > rangeStart) {
-        out.push(toCal(ev, ev.start, dur));
-      }
+    if (!ev.rrule || ev.recurrenceId !== undefined) {
+      const event = toCal(ev, ev.start, dur);
+      if (touches(event)) out.push(event);
       continue;
     }
 
     const rule = ev.rrule;
-    const excluded = new Set(ev.exDates ?? []);
+    const excluded = new Set([...(ev.exDates ?? []), ...(overrides.get(ev.uid) ?? [])]);
     let guard = 0;
 
-    // `idx` это настоящая 0-based позиция повтора в серии, так что COUNT остаётся
-    // верным, даже когда генератор перематывает вперёд к `rangeStart`.
-    for (const { ms: s, idx } of occurrences(rule, ev.start, rangeStart - dur)) {
-      if (++guard > MAX_OCCURRENCES) break;
+    // COUNT counts valid instances, including ones removed by EXDATE.
+    for (const { ms: s, idx } of occurrences(rule, ev.start, rangeStart - dur - (ev.allDay ? DAY_MS : 0), ev.timeZone)) {
       if (rule.until != null && s > rule.until) break;
       if (rule.count != null && idx >= rule.count) break;
       // Повторы монотонны, всё за окном уже не покажется.
       if (s >= rangeEnd) break;
+      if (s < rangeStart - dur - (ev.allDay ? DAY_MS : 0)) continue;
+      if (++guard > MAX_OCCURRENCES) break;
       // EXDATE убирает повтор, но в COUNT выше он всё равно засчитался.
       if (excluded.has(s)) continue;
-      if (s + dur > rangeStart) out.push(toCal(ev, s, dur));
+      const event = toCal(ev, s, dur);
+      if (touches(event)) out.push(event);
     }
   }
 
@@ -183,108 +209,49 @@ export function expandEvents(
 
 // ─── Повторы ─────────────────────────────────────────────────────────────────
 
-/**
- * Лениво отдаёт повторы по возрастанию как `{ ms, idx }`, где `idx` это
- * настоящая 0-based позиция повтора в серии (чтобы проверка COUNT у потребителя
- * осталась верной). Для безграничных правил бесконечен, останавливает его
- * вызывающий.
- *
- * Чтобы не жечь бюджет повторов вызывающего, генератор перематывает близко к
- * `seekMs` (началу окна), а не шагает от DTSTART: прикидывает, сколько
- * interval-шагов влезает до `seekMs`, откатывается на один шаг назад на случай
- * дрейфа календаря/DST и стартует оттуда с подогнанным `idx`. Серия, начавшаяся
- * десятилетия назад, так доходит до видимого окна за пару итераций.
- */
-function* occurrences(
-  rule: RRule,
-  startMs: number,
-  seekMs: number,
-): Generator<{ ms: number; idx: number }> {
-  const start = new Date(startMs);
-  const hh = start.getHours();
-  const mm = start.getMinutes();
-  const ss = start.getSeconds();
-
-  if (rule.freq === "WEEKLY" && rule.byday && rule.byday.length > 0) {
-    const days = [...rule.byday].sort((a, b) => a - b);
-    const perWeek = days.length;
-    const dayStart = start.getDay();
-    // Воскресенье недели старта, используем как якорь для шагов.
-    const weekStart = new Date(
-      start.getFullYear(),
-      start.getMonth(),
-      start.getDate() - dayStart,
-    );
-    // Неделя 0 частичная: считаются только дни в день недели DTSTART и позже.
-    const firstWeekCount = days.filter((d) => d >= dayStart).length;
-
-    // Перематываем целые interval-шаги (каждый = `interval` недель) к seek.
-    const est = Math.floor((seekMs - startMs) / (DAY_MS * 7 * rule.interval));
-    const j0 = Math.max(0, est - 1); // откат на шаг назад для надёжности
-    let idx = j0 === 0 ? 0 : firstWeekCount + (j0 - 1) * perWeek;
-
-    for (let j = j0; ; j++) {
-      const w = j * rule.interval;
-      for (const d of days) {
-        const occ = new Date(
-          weekStart.getFullYear(),
-          weekStart.getMonth(),
-          weekStart.getDate() + w * 7 + d,
-          hh,
-          mm,
-          ss,
-        );
-        const ms = occ.getTime();
-        if (ms < startMs) continue; // до DTSTART (бывает только на неделе 0)
-        yield { ms, idx: idx++ };
+/** Unbounded rules seek near the visible range. Finite rules count only valid
+ * instances, so skipped month dates and DST gaps cannot consume COUNT. */
+function* occurrences(rule: RRule, startMs: number, seekMs: number, zone?: string): Generator<{ ms: number; idx: number }> {
+  const start = wallDate(startMs, zone), seek = wallDate(seekMs, zone);
+  const day = start.getUTCDate(), month = start.getUTCMonth();
+  const weekStart = rule.weekStart ?? 1;
+  const weekOffset = (start.getUTCDay() - weekStart + 7) % 7;
+  const week = new Date(start); week.setUTCDate(day - weekOffset);
+  const offsets = rule.freq === "WEEKLY" && rule.byday?.length
+    ? [...new Set(rule.byday.map(value => (value - weekStart + 7) % 7))].sort((a, b) => a - b) : null;
+  let estimate = 0;
+  if (rule.freq === "DAILY" || rule.freq === "WEEKLY") estimate = Math.floor((seek.getTime() - start.getTime()) / (DAY_MS * rule.interval * (rule.freq === "WEEKLY" ? 7 : 1)));
+  else if (rule.freq === "MONTHLY") estimate = Math.floor(((seek.getUTCFullYear() - start.getUTCFullYear()) * 12 + seek.getUTCMonth() - month) / rule.interval);
+  else estimate = Math.floor((seek.getUTCFullYear() - start.getUTCFullYear()) / rule.interval);
+  // Finite COUNT needs the actual number of valid instances before the window.
+  // Typical finite subscriptions are short; unbounded historical series jump.
+  const exactSlots = zone === "UTC" && (rule.freq === "DAILY" || rule.freq === "WEEKLY");
+  const first = rule.count === undefined || exactSlots ? Math.max(0, estimate - 1) : 0;
+  let idx = exactSlots ? offsets && first > 0 ? offsets.filter(offset => offset >= weekOffset).length + (first - 1) * offsets.length : first : 0;
+  for (let step = first, guard = 0; guard++ < 100_000; step++) {
+    const n = step * rule.interval;
+    const candidates: Date[] = [];
+    if (offsets) {
+      for (const offset of offsets) { const date = new Date(week); date.setUTCDate(week.getUTCDate() + n * 7 + offset); candidates.push(date); }
+    } else {
+      const date = new Date(start);
+      if (rule.freq === "DAILY" || rule.freq === "WEEKLY") date.setUTCDate(day + n * (rule.freq === "WEEKLY" ? 7 : 1));
+      else if (rule.freq === "MONTHLY") {
+        date.setUTCDate(1); date.setUTCMonth(month + n); const target = date.getUTCMonth(); date.setUTCDate(day);
+        if (date.getUTCMonth() !== target) continue;
+      } else {
+        date.setUTCFullYear(start.getUTCFullYear() + n);
+        if (date.getUTCMonth() !== month || date.getUTCDate() !== day) continue;
       }
+      candidates.push(date);
     }
-  }
-
-  // Линейные частоты: ровно один повтор на interval-шаг, поэтому `idx === i`.
-  let est = 0;
-  switch (rule.freq) {
-    case "DAILY":
-      est = Math.floor((seekMs - startMs) / (DAY_MS * rule.interval));
-      break;
-    case "WEEKLY":
-      est = Math.floor((seekMs - startMs) / (DAY_MS * 7 * rule.interval));
-      break;
-    case "MONTHLY": {
-      const seek = new Date(seekMs);
-      const months =
-        (seek.getFullYear() - start.getFullYear()) * 12 +
-        (seek.getMonth() - start.getMonth());
-      est = Math.floor(months / rule.interval);
-      break;
+    for (const date of candidates) {
+      if (!Number.isFinite(date.getTime())) return;
+      const ms = wallInstant(date, zone, true);
+      if (ms === null || ms < startMs) continue;
+      if (rule.count !== undefined && idx >= rule.count) return;
+      yield { ms, idx: idx++ };
     }
-    case "YEARLY":
-      est = Math.floor(
-        (new Date(seekMs).getFullYear() - start.getFullYear()) / rule.interval,
-      );
-      break;
-  }
-  const i0 = Math.max(0, est - 1); // откат на шаг назад для надёжности
-
-  for (let i = i0; ; i++) {
-    const n = i * rule.interval;
-    let occ: Date;
-    switch (rule.freq) {
-      case "DAILY":
-        occ = new Date(start.getFullYear(), start.getMonth(), start.getDate() + n, hh, mm, ss);
-        break;
-      case "WEEKLY":
-        occ = new Date(start.getFullYear(), start.getMonth(), start.getDate() + n * 7, hh, mm, ss);
-        break;
-      case "MONTHLY":
-        occ = new Date(start.getFullYear(), start.getMonth() + n, start.getDate(), hh, mm, ss);
-        break;
-      case "YEARLY":
-        occ = new Date(start.getFullYear() + n, start.getMonth(), start.getDate(), hh, mm, ss);
-        break;
-    }
-    const ms = occ.getTime();
-    if (ms >= startMs) yield { ms, idx: i }; // страховка от дрейфа до DTSTART
   }
 }
 
@@ -318,8 +285,11 @@ function parseRRule(value: string): RRule | null {
     const days = kv.BYDAY.split(",")
       .map((tok) => map[tok.trim().slice(-2).toUpperCase()])
       .filter((n): n is number => n !== undefined);
-    if (days.length) rule.byday = days;
+    if (days.length) rule.byday = [...new Set(days)];
   }
+  const weekdays = ["SU", "MO", "TU", "WE", "TH", "FR", "SA"];
+  rule.weekStart = kv.WKST ? weekdays.indexOf(kv.WKST.toUpperCase()) : 1;
+  if (rule.weekStart < 0) rule.weekStart = 1;
   return rule;
 }
 
@@ -371,28 +341,7 @@ function parseContentLine(
 }
 
 /** Парсит дату или дату-время iCalendar в ms epoch плюс флаг all-day. */
-function parseIcsDate(
-  value: string,
-  params: Record<string, string>,
-): { ms: number; allDay: boolean } | null {
-  const v = value.trim();
-
-  // Весь день: VALUE=DATE или голый YYYYMMDD.
-  if (params.VALUE === "DATE" || /^\d{8}$/.test(v)) {
-    const m = /^(\d{4})(\d{2})(\d{2})$/.exec(v);
-    if (!m) return null;
-    return { ms: new Date(+m[1], +m[2] - 1, +m[3]).getTime(), allDay: true };
-  }
-
-  const m = /^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})(Z)?$/.exec(v);
-  if (!m) return null;
-  const [, Y, Mo, D, H, Mi, S, z] = m;
-  const ms =
-    z === "Z"
-      ? Date.UTC(+Y, +Mo - 1, +D, +H, +Mi, +S)
-      : new Date(+Y, +Mo - 1, +D, +H, +Mi, +S).getTime(); // floating/TZID, берём local
-  return { ms, allDay: false };
-}
+const parseIcsDate = parseIcsTime;
 
 /** Разэкранирует TEXT-значения iCalendar: `\n`/`\N` это перевод строки, `\,` `\;` `\\` берём как есть. */
 function unescapeText(v: string): string {
@@ -402,12 +351,14 @@ function unescapeText(v: string): string {
 }
 
 function toCal(ev: ParsedEvent, start: number, dur: number): CalEvent {
+  let end = start + dur;
+  if (ev.allDay) { const date = new Date(start); date.setDate(date.getDate() + (ev.durationDays ?? Math.max(1, Math.round(dur / DAY_MS)))); end = date.getTime(); }
   return {
     uid: ev.uid,
     summary: ev.summary,
     location: ev.location,
     start,
-    end: start + dur,
+    end,
     allDay: ev.allDay,
   };
 }
