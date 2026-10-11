@@ -25,6 +25,7 @@ import {
 import type { PartialBlock } from "@blocknote/core";
 import { ColumnBlock, ColumnListBlock } from "@blocknote/xl-multi-column";
 import { calloutBlock } from "./blocks/callout";
+import { checkListBlock } from "./blocks/checkList";
 import { fileCardBlock } from "./blocks/fileCard";
 import { galleryBlock } from "./blocks/gallery";
 import { whiteboardBlock } from "./blocks/whiteboard/whiteboardBlock";
@@ -63,6 +64,7 @@ export function createNotesSchema() {
 
       // Фаза 1:
       callout: calloutBlock(),
+      checkListItem: checkListBlock(),
       sourceMarkdown: sourceMarkdownBlock(),
 
       // Фаза 2:

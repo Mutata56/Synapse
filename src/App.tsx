@@ -27,9 +27,7 @@ import { VersionHistory } from "./components/VersionHistory";
 import { WikiLinkPicker } from "./components/WikiLinkPicker";
 const WritingDashboard = lazy(() => import("./components/WritingDashboard").then(module => ({ default: module.WritingDashboard })));
 import { warmAssetResolver } from "./editor2026/lib/assets";
-import { warmIndex } from "./lib/fullTextSearch";
 import { seedTemplatesIfEmpty } from "./lib/templates";
-import { flattenNotes } from "./lib/treeUtils";
 import { flushAllPending, useNotesStore, type View } from "./store/notes";
 import { useTemplatesStore } from "./store/templates";
 
@@ -100,8 +98,6 @@ export default function App({ bootstrap = true }: { bootstrap?: boolean } = {}) 
         console.error("seedTemplatesIfEmpty failed (ignored):", e);
       });
       void useTemplatesStore.getState().refresh();
-      const flatNotes = flattenNotes(useNotesStore.getState().tree);
-      void warmIndex(flatNotes);
       // Статистика слов загружается только по выбору «Объём текстов» в Обзоре.
       // Параллельный прогрев здесь дублировал чтения холодного search-кэша.
       if (useNotesStore.getState().settings.openDailyOnStartup) {

@@ -15,7 +15,8 @@ function loadSession() {
   try { return parseWorkspaceSession(localStorage.getItem(SESSION_KEY), id()); } catch { return emptySession(id()); }
 }
 export const defaultSidebarWidth = () => Math.min(860, Math.max(240, window.innerWidth * 0.445 - 56));
-export const clampSidebarWidth = (width: number) => Math.min(Math.max(240, window.innerWidth - 368), Math.max(220, width));
+export const clampSidebarWidth = (width: number, reserved = 0) => Math.min(Math.max(240, window.innerWidth - 368 - reserved), Math.max(220, width));
+export const clampContextWidth = (width: number, sidebarVisible: boolean, sidebarWidth: number) => Math.min(window.innerWidth <= 1000 ? Math.min(600, window.innerWidth - 95) : Math.max(240, Math.min(600, window.innerWidth - 56 - (sidebarVisible ? sidebarWidth : 0) - 312)), Math.max(240, width));
 type SidePane = "files" | "search" | "bookmarks";
 type FileSort = "name" | "modified" | "created";
 type State = WorkspaceSession & {
@@ -24,6 +25,8 @@ type State = WorkspaceSession & {
   sidebarWidth: number;
   sidebarPane: SidePane;
   rightVisible: boolean;
+  rightWidth: number;
+  rightPane: "outline" | "links" | "graph";
   fileSort: FileSort;
   vaultLabel: string;
   helpVisible: boolean;
@@ -38,6 +41,8 @@ type State = WorkspaceSession & {
   showSidebar: (pane?: SidePane) => void;
   setSidebarWidth: (width: number) => void;
   toggleRight: () => void;
+  setRightWidth: (width: number) => void;
+  setRightPane: (pane: "outline" | "links" | "graph") => void;
   setFileSort: (sort: FileSort) => void;
   setVaultLabel: (label: string) => void;
   showHelp: (value: boolean) => void;
@@ -90,6 +95,8 @@ export const useWorkspaceStore = create<State>((set, get) => ({
   sidebarWidth: Number.isFinite(ui.sidebarWidth) ? clampSidebarWidth(ui.sidebarWidth) : defaultSidebarWidth(),
   sidebarPane: ["files", "search", "bookmarks"].includes(ui.sidebarPane) ? ui.sidebarPane : "files",
   rightVisible: ui.rightVisible === true,
+  rightWidth: Number.isFinite(ui.rightWidth) ? Math.max(240, Math.min(600, ui.rightWidth)) : 270,
+  rightPane: ["outline", "links", "graph"].includes(ui.rightPane) ? ui.rightPane : "outline",
   fileSort: ["name", "modified", "created"].includes(ui.fileSort) ? ui.fileSort : "name",
   vaultLabel: typeof ui.vaultLabel === "string" && ui.vaultLabel.trim() ? ui.vaultLabel.slice(0, 80) : "Synapse Vault",
   helpVisible: false,
@@ -109,8 +116,10 @@ export const useWorkspaceStore = create<State>((set, get) => ({
   reorder: (source, before) => set(reorderWorkspaceTabs(get(), source, before)),
   toggleSidebar: () => set(state => ({ sidebarVisible: !state.sidebarVisible })),
   showSidebar: (pane = "files") => set({ sidebarVisible: true, sidebarPane: pane }),
-  setSidebarWidth: width => set({ sidebarWidth: clampSidebarWidth(width) }),
-  toggleRight: () => set(state => ({ rightVisible: !state.rightVisible })),
+  setSidebarWidth: width => set({ sidebarWidth: clampSidebarWidth(width, get().rightVisible && window.innerWidth > 1000 ? clampContextWidth(get().rightWidth, get().sidebarVisible, get().sidebarWidth) : 0) }),
+  toggleRight: () => set(state => ({ rightVisible: !state.rightVisible, sidebarWidth: !state.rightVisible && window.innerWidth > 1000 ? clampSidebarWidth(state.sidebarWidth, state.rightWidth) : state.sidebarWidth })),
+  setRightWidth: width => set({ rightWidth: clampContextWidth(width, get().sidebarVisible, get().sidebarWidth) }),
+  setRightPane: rightPane => set({ rightPane }),
   setFileSort: fileSort => set({ fileSort }),
   setVaultLabel: vaultLabel => set({ vaultLabel: vaultLabel.trim().slice(0, 80) || "Synapse Vault" }),
   showHelp: helpVisible => set({ helpVisible }),
@@ -125,9 +134,9 @@ export const useWorkspaceStore = create<State>((set, get) => ({
 useWorkspaceStore.subscribe((state, previous) => {
   try {
     if (state.tabs !== previous.tabs || state.activeTabId !== previous.activeTabId) localStorage.setItem(SESSION_KEY, serializeWorkspaceSession(state));
-    const { sidebarVisible, sidebarWidth, sidebarPane, rightVisible, fileSort, vaultLabel } = state;
-    if (sidebarVisible !== previous.sidebarVisible || sidebarWidth !== previous.sidebarWidth || sidebarPane !== previous.sidebarPane || rightVisible !== previous.rightVisible || fileSort !== previous.fileSort || vaultLabel !== previous.vaultLabel) {
-      localStorage.setItem(UI_KEY, JSON.stringify({ sidebarVisible, sidebarWidth, sidebarPane, rightVisible, fileSort, vaultLabel }));
+    const { sidebarVisible, sidebarWidth, sidebarPane, rightVisible, rightWidth, rightPane, fileSort, vaultLabel } = state;
+    if (sidebarVisible !== previous.sidebarVisible || sidebarWidth !== previous.sidebarWidth || sidebarPane !== previous.sidebarPane || rightVisible !== previous.rightVisible || rightWidth !== previous.rightWidth || rightPane !== previous.rightPane || fileSort !== previous.fileSort || vaultLabel !== previous.vaultLabel) {
+      localStorage.setItem(UI_KEY, JSON.stringify({ sidebarVisible, sidebarWidth, sidebarPane, rightVisible, rightWidth, rightPane, fileSort, vaultLabel }));
     }
   } catch { /* Private mode and quota do not block navigation. */ }
 });

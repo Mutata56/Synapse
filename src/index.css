@@ -15,17 +15,12 @@
 .markdown-source-panes { display: flex; flex: 1; min-width: 0; min-height: 0; }
 .markdown-source-input { display: block; flex: 1; width: 100%; min-width: 0; resize: none; padding: 24px; background: transparent; color: var(--text); font: 13px/1.8 ui-monospace, SFMono-Regular, Menlo, monospace; border: 0; outline: none; tab-size: 4; }
 .markdown-source-preview { flex: 1; min-width: 0; overflow: auto; }
-.markdown-source-split > * { width: 50%; }
-.markdown-source-split .markdown-source-input { border-right: 1px solid var(--border); }
 .markdown-source-body { max-width: 840px; margin: 0 auto; padding: 0 40px 80px; overflow-wrap: anywhere; }
 .markdown-source-body img { max-width: 100%; object-fit: contain; }
 .markdown-source-body table { display: block; max-width: 100%; overflow-x: auto; }
 .markdown-source-missing { display: inline-block; padding: 8px 12px; border: 1px dashed var(--border-strong); color: var(--text-muted); font-size: 12px; }
 .markdown-source-attachment { display: inline-block; padding: 8px 12px; color: var(--link); border: 1px solid var(--border-strong); border-radius: 6px; }
 @media (max-width: 900px) {
-  .markdown-source-split { flex-direction: column; }
-  .markdown-source-split > * { width: 100%; min-height: 200px; }
-  .markdown-source-split .markdown-source-input { border-right: 0; border-bottom: 1px solid var(--border); }
   .markdown-source-body { padding: 0 24px 48px; }
 }
 
@@ -462,53 +457,7 @@ input:focus-visible {
   --e26-callout-border: rgba(16, 185, 129, 0.32);
   --e26-callout-accent: #4fd1b1;
 }
-/* Меню выбора типа по правому клику (выносится через портал в <body>) */
-.e26-callout__menu {
-  z-index: 100;
-  min-width: 170px;
-  padding: 4px;
-  border-radius: 10px;
-  border: 1px solid var(--color-border-strong, rgba(255, 255, 255, 0.18));
-  background: #232326;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
-}
-.e26-callout__menu button {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  padding: 6px 8px;
-  background: transparent;
-  border: none;
-  border-radius: 6px;
-  color: var(--color-text, #e5e5e5);
-  font-size: 13px;
-  text-align: left;
-  cursor: pointer;
-}
-.e26-callout__menu button:hover {
-  background: rgba(255, 255, 255, 0.08);
-}
-.e26-callout__menu button.is-active {
-  color: var(--color-accent, #6366f1);
-  background: rgba(255, 255, 255, 0.06);
-}
-.e26-callout__menuicon {
-  font-size: 14px;
-}
-.e26-callout__menulabel {
-  flex: 1;
-}
-.e26-callout__menu button.is-active svg {
-  color: var(--color-accent, #6366f1);
-}
-.e26-callout__menutitle {
-  padding: 3px 8px 6px;
-  font-size: 11px;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--color-text-secondary);
-}
+
 
 /* Gallery block. */
 .e26-gallery {

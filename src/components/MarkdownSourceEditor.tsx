@@ -1,10 +1,9 @@
-import { ArrowLeft, Blocks, Columns2, FileCode2, History, RefreshCw, Save } from "lucide-react";
+import { ArrowLeft, Blocks, FileCode2, History, RefreshCw, Save } from "lucide-react";
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import {
   indexVaultFiles,
   normalizeSourceEdit,
   resolveVaultReference,
-  splitMarkdownSource,
   wikiTarget,
   type VaultFileIndex,
 } from "../lib/obsidianImport";
@@ -15,9 +14,10 @@ import { useToastStore } from "../store/toasts";
 import { NoteHero } from "./NoteHero";
 import { Editor2026 } from "../editor2026/Editor2026";
 import { decodeImportedMap, type ImportedBlock, type ImportedSourceMap } from "../editor2026/importedMarkdown";
+import { changeNoteMarker } from "../lib/noteBlockMarkdown";
 import { VaultMarkdown, VaultMarkdownContext, scrollToMarkdownHeading as scrollToHeading } from "./VaultMarkdown";
 
-type Mode = "blocks" | "preview" | "source" | "split";
+type Mode = "blocks" | "preview" | "source";
 const EMPTY_INDEX = indexVaultFiles([]);
 const draftKey = (id: string) => `synapse:markdown-draft:${id}`;
 const anchorKey = (id: string) => `synapse:markdown-anchor:${id}`;
@@ -204,7 +204,6 @@ export function MarkdownSourceEditor() {
   };
 
   const deferredText = useDeferredValue(text);
-  const preview = useMemo(() => splitMarkdownSource(deferredText).body, [deferredText]);
   const navigate = useCallback((reference: string, relativeFirst = false) => {
     const target = wikiTarget(reference);
     const path = resolveVaultReference(target.path, id, files, { note: true, relativeFirst });
@@ -256,7 +255,6 @@ export function MarkdownSourceEditor() {
         <button type="button" aria-pressed={mode === "blocks"} onClick={() => { void switchMode("blocks"); }}><Blocks size={14} /> Блоки</button>
         <button type="button" aria-pressed={mode === "preview"} onClick={() => { void switchMode("preview"); }}>Чтение</button>
         <button type="button" aria-pressed={mode === "source"} onClick={() => { void switchMode("source"); }}><FileCode2 size={14} /> Markdown</button>
-        <button type="button" aria-pressed={mode === "split"} onClick={() => { void switchMode("split"); }}><Columns2 size={14} /> Рядом</button>
       </div>
       <span className="markdown-source-status" role="status">{saving ? "Сохраняю…" : dirty ? "Черновик" : "Сохранено"}</span>
       <button type="button" onClick={() => openVersionHistory(id)} title="История версий" aria-label="История версий"><History size={16} /></button>
@@ -267,12 +265,12 @@ export function MarkdownSourceEditor() {
     <div className="markdown-source-location" title={id}>{id}.md</div>
     <div className={`markdown-source-panes markdown-source-${mode}`}>
       {mode === "blocks" ? <Editor2026 key={`${id}:${blockGeneration}`} imported={bridge} /> : null}
-      {mode === "source" || mode === "split" ? <textarea className="markdown-source-input" aria-label="Исходный Markdown включая свойства YAML" spellCheck={false} value={text} onChange={(event) => changeSource(event.target.value)} onKeyDown={(event) => {
+      {mode === "source" ? <textarea className="markdown-source-input" aria-label="Исходный Markdown включая свойства YAML" spellCheck={false} value={text} onChange={(event) => changeSource(event.target.value)} onKeyDown={(event) => {
         if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "s") { event.preventDefault(); void save(true).catch(() => undefined); }
       }} /> : null}
-      {mode === "preview" || mode === "split" ? <div className="markdown-source-preview group/hero" data-editor-scroll>
+      {mode === "preview" ? <div className="markdown-source-preview group/hero" data-editor-scroll>
         <NoteHero key={id} />
-        <div className="md-content markdown-source-body"><VaultMarkdown source={preview} /></div>
+        <div className="md-content markdown-source-body"><VaultMarkdown source={deferredText} onMarkerChange={(kind, index, value) => changeSource(changeNoteMarker(textRef.current, kind, index, value))} /></div>
       </div> : null}
     </div>
   </div></VaultMarkdownContext.Provider>;

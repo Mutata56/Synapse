@@ -1,7 +1,7 @@
 import { isTauri } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { CalendarDays, ChartNoAxesCombined, ChevronDown, FilePlus2, FileText, FolderOpen, Hash, HelpCircle, Home, Image, Inbox, LayoutGrid, List, Network, PanelLeft, PanelRight, Plus, Search, Settings2, Shapes, Table2, Trash2, X, type LucideIcon } from "lucide-react";
-import { useEffect, useMemo, useRef, useState, type ButtonHTMLAttributes, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ButtonHTMLAttributes, type CSSProperties, type ReactNode } from "react";
 import { emptyModel } from "../editor2026/dataTable/model";
 import { hashString } from "../lib/hashString";
 import { exitAfterSaving } from "../lib/applicationExit";
@@ -12,7 +12,7 @@ import { QUICK_SWITCHER_EVENT, WORKSPACE_COMMAND_EVENT, type WorkspaceCommand } 
 import { activeWorkspaceTab, type WorkspaceTarget } from "../lib/workspaceTabs";
 import { flushAllPending, useNotesStore, type View } from "../store/notes";
 import { useToastStore } from "../store/toasts";
-import { connectWorkspaceNavigation, useWorkspaceStore } from "../store/workspace";
+import { clampContextWidth, connectWorkspaceNavigation, useWorkspaceStore } from "../store/workspace";
 import { Sidebar } from "./Sidebar";
 import { WorkspaceContext } from "./WorkspaceContext";
 import "./workspace.css";
@@ -96,8 +96,11 @@ export function WorkspaceChrome({ children }: { children: ReactNode }) {
   const empty = useWorkspaceStore(state => activeWorkspaceTab(state).target.kind === "empty");
   const pending = useWorkspaceStore(state => state.pending);
   const rightVisible = useWorkspaceStore(state => state.rightVisible);
+  const rightWidth = useWorkspaceStore(state => state.rightWidth);
+  const sideWidth = useWorkspaceStore(state => state.sidebarWidth);
+  const sideVisible = useWorkspaceStore(state => state.sidebarVisible);
   const helpVisible = useWorkspaceStore(state => state.helpVisible);
-  return <div className={cn("workspace-shell", isMac && "is-mac")}>
+  return <div className={cn("workspace-shell", isMac && "is-mac")} style={{ "--workspace-right-width": rightVisible ? `${clampContextWidth(rightWidth, sideVisible, sideWidth)}px` : "0px" } as CSSProperties}>
     <WorkspaceRibbon />
     <Sidebar />
     <section className="workspace-center" aria-label={t("Рабочая область")}>

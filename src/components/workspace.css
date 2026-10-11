@@ -77,7 +77,19 @@
 .workspace-side-empty { color:var(--color-text-secondary); font-size:13px; line-height:1.65; padding:22px 10px; }
 .workspace-bookmarks { padding-top:18px; overflow-y:auto; }
 .workspace-bookmarks>h2,.workspace-context-content>h2 { margin:0 0 14px; font-size:13px; font-weight:600; color:var(--color-text-secondary); }
-.workspace-context { width:270px; flex-shrink:0; display:flex; flex-direction:column; border-left:1px solid var(--color-border); background:var(--color-bg-elevated); }
+.workspace-context { position:relative; width:270px; flex-shrink:0; display:flex; flex-direction:column; border-left:1px solid var(--color-border); background:var(--color-bg-elevated); }
+.workspace-context-resize { position:absolute; z-index:46; width:7px; left:-4px; top:0; bottom:0; cursor:col-resize; touch-action:none; }
+.workspace-context-resize:hover { background:color-mix(in srgb,var(--color-accent) 35%,transparent); }
+.workspace-open-graph { padding:7px 10px; margin-top:14px; font-size:12px; background:var(--color-bg-overlay); color:var(--color-text-secondary); border:1px solid var(--color-border); border-radius:5px; cursor:pointer; }
+.workspace-localgraph-caption { margin:10px 0 0; min-height:34px; color:var(--color-text-secondary); font-size:12px; line-height:1.5; overflow-wrap:anywhere; }
+.workspace-localgraph-empty { padding:20px 12px; color:var(--color-text-secondary); font-size:13px; line-height:1.6; border:1px solid var(--color-border); border-radius:6px; }
+.workspace-context-content .workspace-localgraph h3,.workspace-context-content .workspace-localgraph button { color:var(--color-text-secondary); font-size:12px; }
+.workspace-context-content .workspace-localgraph h3 { text-transform:none; letter-spacing:0; white-space:nowrap; }
+.workspace-context-content .workspace-localgraph button { min-height:26px; white-space:nowrap; }
+.workspace-context-content .workspace-localgraph button:disabled { opacity:.45; cursor:not-allowed; }
+.workspace-context svg g[role=button]:focus-visible { outline:none; }
+.workspace-context svg g[role=button]:focus-visible circle { stroke:var(--color-link); stroke-width:4px; }
+@media(min-width:1001px) { .workspace-sidebar { max-width:max(220px,calc(100vw - 368px - var(--workspace-right-width,0px))); } }
 .workspace-context-header { height:var(--workspace-bar-height); min-height:var(--workspace-bar-height); display:flex; justify-content:space-between; align-items:center; padding:0 10px; border-bottom:1px solid var(--color-border); }
 .workspace-context-header>div { display:flex; gap:5px; }
 .workspace-context-content { padding:20px 12px; flex:1; min-height:0; overflow-y:auto; }

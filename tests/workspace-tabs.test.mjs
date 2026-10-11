@@ -127,3 +127,16 @@ test("existing gallery/tag/graph navigation is recorded in the active tab", asyn
   assert.equal(workspace.getState().tabs.length, 2);
   assert.equal(notes.getState().view, "graph");
 });
+test("right pane choice and width persist without rewriting document destinations", async t => {
+  const { workspace, saved } = await fixture(t);
+  await workspace.getState().openNote("A");
+  const session = saved.get("synapse-workspace-session-v1");
+  workspace.getState().setRightPane("graph");
+  workspace.getState().setRightWidth(10000);
+  const preferences = JSON.parse(saved.get("synapse-workspace-ui-v1"));
+  assert.equal(preferences.rightPane,"graph");
+  assert(preferences.rightWidth>=240 && preferences.rightWidth<=600);
+  assert.equal(saved.get("synapse-workspace-session-v1"),session);
+  workspace.getState().toggleRight();workspace.getState().toggleRight();
+  assert.equal(workspace.getState().rightPane,"graph");
+});
