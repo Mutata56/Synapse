@@ -775,6 +775,26 @@ input:focus-visible {
   border-radius: 10px;
   overflow: hidden;
 }
+.e26-db__text {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+}
+.e26-db__text > input,
+.e26-db__measure {
+  grid-area: 1 / 1;
+}
+.e26-db__text > input {
+  min-width: 0;
+  width: 100%;
+}
+.e26-db__text > .e26-db__measure {
+  width: max-content;
+  white-space: pre;
+  visibility: hidden;
+  pointer-events: none;
+  user-select: none;
+}
 .e26-db__h {
   position: relative;
   display: flex;

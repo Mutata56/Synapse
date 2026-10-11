@@ -121,7 +121,8 @@ export function DataTableView({ block, editor }: { block: any; editor: any }) {
     e.preventDefault();
     e.stopPropagation();
     (e.target as HTMLElement).setPointerCapture(e.pointerId);
-    setDrag({ colId: col.id, startX: e.clientX, startW: col.width, w: col.width });
+    const startW = e.currentTarget.parentElement?.getBoundingClientRect().width ?? col.width;
+    setDrag({ colId: col.id, startX: e.clientX, startW, w: startW });
   };
   const onResizeMove = (e: React.PointerEvent) =>
     setDrag((d) =>
@@ -162,7 +163,7 @@ export function DataTableView({ block, editor }: { block: any; editor: any }) {
   };
 
   const gridTemplateColumns =
-    model.columns.map((c) => `${widthOf(c)}px`).join(" ") + " 40px";
+    model.columns.map((c) => `minmax(${widthOf(c)}px, max-content)`).join(" ") + " 40px";
   const menuCol = menu ? model.columns.find((c) => c.id === menu.colId) : undefined;
 
   return (
@@ -304,18 +305,26 @@ function CellText({
     setDraft(value);
   }, [value]);
   return (
-    <input
-      className={className}
-      placeholder={placeholder}
-      value={draft}
-      onChange={(e) => setDraft(e.target.value)}
-      onBlur={() => {
-        if (draft !== value) onCommit(draft);
-      }}
-      onKeyDown={(e) => {
-        if (e.key === "Enter") (e.target as HTMLInputElement).blur();
-      }}
-    />
+    <div className="e26-db__text">
+      {/* Native inputs have no intrinsic width for their value. The hidden
+          mirror lets CSS size the whole column, including uncommitted edits. */}
+      <span className={`${className} e26-db__measure`} aria-hidden="true">
+        {draft || placeholder || "\u00a0"}
+      </span>
+      <input
+        className={className}
+        size={1}
+        placeholder={placeholder}
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={() => {
+          if (draft !== value) onCommit(draft);
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+        }}
+      />
+    </div>
   );
 }
 
