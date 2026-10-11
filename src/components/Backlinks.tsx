@@ -1,7 +1,8 @@
+import { NoteIcon } from "./NoteIcon";
 import { FileText, Link2 } from "lucide-react";
 import { useMemo } from "react";
 import { computeBacklinks } from "../editor2026/backlinks";
-import { DEFAULT_NOTE_TITLE, EMOJI_FONT_STACK } from "../lib/format";
+import { DEFAULT_NOTE_TITLE } from "../lib/format";
 import { t } from "../lib/i18n";
 import { useNotesStore } from "../store/notes";
 
@@ -49,20 +50,11 @@ export function Backlinks({ compact = false }: { compact?: boolean }) {
               className="group flex items-center gap-2.5 px-3 py-2 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-elevated)] hover:border-[var(--color-border-strong)] hover:bg-[var(--color-bg-overlay)] transition-colors text-left"
             >
               <span className="shrink-0 w-5 flex justify-center">
-                {n.icon ? (
-                  <span
-                    style={{ fontFamily: EMOJI_FONT_STACK }}
-                    className="text-base leading-none select-none"
-                  >
-                    {n.icon}
-                  </span>
-                ) : (
-                  <FileText
+                <NoteIcon note={n} size={14} fallback={<FileText
                     size={15}
                     strokeWidth={1.8}
                     className="text-zinc-500"
-                  />
-                )}
+                  />} />
               </span>
               <span className="text-[13px] text-zinc-200 truncate flex-1">
                 {n.title || DEFAULT_NOTE_TITLE}

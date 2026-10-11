@@ -32,6 +32,7 @@ import {
   prettyAccelerator,
 } from "../lib/settings";
 import { getWorkspaceDir } from "../lib/storage";
+import { IconizeSettings } from "./IconizeSettings";
 import { useCalendarStore } from "../store/calendar";
 import { useNotesStore } from "../store/notes";
 import { useToastStore } from "../store/toasts";
@@ -100,7 +101,10 @@ export function SettingsView() {
             </div>
           </Section>
 
-          <Section icon={Sparkles} title={t("Поведение")} index={1} reduced={reduced}>
+          <Section icon={Palette} title={t("Иконки")} index={1} reduced={reduced}>
+            <IconizeSettings />
+          </Section>
+          <Section icon={Sparkles} title={t("Поведение")} index={2} reduced={reduced}>
             <div className="grid grid-cols-1 gap-4 @2xl:grid-cols-2 items-start">
               <DailyCard
                 value={settings.openDailyOnStartup}

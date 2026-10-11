@@ -1,3 +1,5 @@
+import { EMOJI_FONT_STACK } from "../lib/format";
+import { NoteIcon } from "./NoteIcon";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Check,
@@ -20,7 +22,7 @@ import {
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { cn } from "../lib/cn";
 import { dailyDateOf, dayKey, toISODate } from "../lib/daily";
-import { DEFAULT_NOTE_TITLE, EMOJI_FONT_STACK } from "../lib/format";
+import { DEFAULT_NOTE_TITLE } from "../lib/format";
 import { expandEvents, type CalEvent } from "../lib/ics";
 import { t } from "../lib/i18n";
 import { moodColor, moodFace } from "../lib/mood";
@@ -691,20 +693,11 @@ export function CalendarView() {
                     className="group flex items-center gap-2.5 px-3 py-2 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-elevated)] hover:border-[var(--color-border-strong)] hover:bg-[var(--color-bg-overlay)] transition-colors text-left"
                   >
                     <span className="shrink-0 w-5 flex justify-center">
-                      {note.icon ? (
-                        <span
-                          style={{ fontFamily: EMOJI_FONT_STACK }}
-                          className="text-base leading-none select-none"
-                        >
-                          {note.icon}
-                        </span>
-                      ) : (
-                        <FileText
+                      <NoteIcon note={note} size={16} fallback={<FileText
                           size={15}
                           strokeWidth={1.8}
                           className="text-zinc-500"
-                        />
-                      )}
+                        />} />
                     </span>
                     <span className="text-[13px] text-zinc-200 truncate flex-1">
                       {note.title || DEFAULT_NOTE_TITLE}

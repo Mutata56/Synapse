@@ -1,3 +1,5 @@
+import { useIconizeStore } from "../store/iconize";
+import { InlineIcon, VaultLinkIcon, remarkIconize } from "./IconizeMarkdown";
 import { ExternalLink, Ellipsis, FileText, Hash, Image, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -9,7 +11,6 @@ import { normalizeTag } from "../lib/tagExplorer";
 import { useToastStore } from "../store/toasts";
 import { useI18n } from "./LanguageProvider";
 
-const PLUGINS = [remarkGfm];
 const PREVIEW_LIMIT = 24000;
 type Body = { id: string; text: string; truncated: boolean; words: number };
 type Props = { note: NoteMeta; selectedTags: readonly string[]; files: VaultFileIndex; loadNote: (id: string) => Promise<Note | null>; onOpen: (id: string) => void; onTrash: (id: string) => void; onTag: (tag: string) => void; onAddFilter: () => void };
@@ -45,9 +46,11 @@ export default function TagReadingPane({ note, selectedTags, files, loadNote, on
   }, [id, note.updatedAt, retry, loadNote]);
   const visibleBody = body?.id === id ? body : null;
   const markdown = useMemo(() => obsidianMarkdownPreview(visibleBody?.text ?? ""), [visibleBody]);
+  const iconSettings = useIconizeStore(state => state.data.settings);
+  const iconPlugins = useMemo(() => [remarkGfm, [remarkIconize, { identifier: iconSettings.iconIdentifier, enabled: iconSettings.iconsInNotesEnabled }]] as import("unified").PluggableList, [iconSettings.iconIdentifier, iconSettings.iconsInNotesEnabled]);
   const components = useMemo(() => ({
     img: ({ alt }: { alt?: string }) => <button type="button" className="tags-attachment" onClick={() => onOpen(id)}><Image size={15} aria-hidden="true" />{alt || t("Вложение")}<span>{t("Открыть в заметке")}</span></button>,
-    a: ({ href = "", children }: { href?: string; children?: React.ReactNode }) => <a href={href || undefined} onClick={(event) => {
+    a: ({ href = "", children }: { href?: string; children?: React.ReactNode }) => href.startsWith("synapse-icon:") ? <InlineIcon id={href.slice("synapse-icon:".length)}>{children}</InlineIcon> : <a href={href || undefined} onClick={(event) => {
       event.preventDefault();
       if (href.startsWith("#")) {
         const heading = decodeURIComponent(href.slice(1)).replace(/-/g, " ").toLocaleLowerCase();
@@ -61,9 +64,9 @@ export default function TagReadingPane({ note, selectedTags, files, loadNote, on
       const path = resolveVaultReference(target.path, id, files, { note: true, relativeFirst: !wiki });
       if (path) onOpen(path.slice(0, -3));
       else useToastStore.getState().push(t("Ссылка не найдена или неоднозначна"));
-    }}>{children}</a>,
+    }}><VaultLinkIcon href={href} noteId={id} files={files} />{children}</a>,
   }), [files, id, onOpen, t]);
-  const renderedMarkdown = useMemo(() => <ReactMarkdown remarkPlugins={PLUGINS} components={components} urlTransform={(url) => /^synapse-(?:note|embed):/.test(url) ? url : defaultUrlTransform(url)}>{markdown || t("Заметка пока пустая")}</ReactMarkdown>, [markdown, components, t]);
+  const renderedMarkdown = useMemo(() => <ReactMarkdown remarkPlugins={iconPlugins} components={components} urlTransform={(url) => /^synapse-(?:note|embed|icon):/.test(url) ? url : defaultUrlTransform(url)}>{markdown || t("Заметка пока пустая")}</ReactMarkdown>, [markdown, components, iconPlugins, t]);
   const date = useMemo(() => new Intl.DateTimeFormat(lang === "ru" ? "ru-RU" : "en-GB", { day: "numeric", month: "long", year: "numeric" }).format(note.updatedAt), [lang, note.updatedAt]);
 
   return <>

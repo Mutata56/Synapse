@@ -19,7 +19,9 @@ import { resolveCoverImageUrl } from "../lib/storage";
 import { registerFlusher, useNotesStore } from "../store/notes";
 import { useTemplatesStore } from "../store/templates";
 import { CoverPicker } from "./CoverPicker";
-import { EmojiPicker } from "./EmojiPicker";
+import { NoteIcon } from "./NoteIcon";
+import { resolveIcon } from "../lib/iconize";
+import { useIconizeStore } from "../store/iconize";
 import { MoodPicker } from "./MoodPicker";
 
 /** Дебаунс перед записью инпута заголовка на диск. */
@@ -43,6 +45,8 @@ export function NoteHero() {
   const activeNote = useNotesStore((s) => s.activeNote);
   const saveNote = useNotesStore((s) => s.saveNote);
   const toggleFavorite = useNotesStore((s) => s.toggleFavorite);
+  const iconize = useIconizeStore(s => s.data);
+  const noteIcon = activeNote ? resolveIcon(iconize, "file", activeNote.id + ".md", activeNote) : null;
 
   const [coverUrl, setCoverUrl] = useState<string | null>(null);
   /** Ставится, когда `<img>` обложки стрельнул `error`. Сбрасывается при
@@ -51,7 +55,6 @@ export function NoteHero() {
   const [coverImgFailed, setCoverImgFailed] = useState(false);
 
   const [coverPickerOpen, setCoverPickerOpen] = useState(false);
-  const [iconPickerOpen, setIconPickerOpen] = useState(false);
   const [title, setTitle] = useState(activeNote?.title ?? "");
   const titleTimerRef = useRef<number | null>(null);
   const titleInputRef = useRef<HTMLTextAreaElement>(null);
@@ -66,7 +69,6 @@ export function NoteHero() {
   useEffect(() => {
     setTitle(activeNote?.title ?? "");
     setCoverPickerOpen(false);
-    setIconPickerOpen(false);
     setCoverImgFailed(false);
     return () => {
       if (titleTimerRef.current !== null) {
@@ -146,9 +148,22 @@ export function NoteHero() {
   useEffect(() => {
     const el = titleInputRef.current;
     if (!el) return;
-    el.style.height = "auto";
-    el.style.height = `${el.scrollHeight}px`;
-  }, [title]);
+    const update = () => {
+      const inline = noteIcon?.icon && iconize.settings.iconInTitleEnabled && iconize.settings.iconInTitlePosition === "inline";
+      if (inline) {
+        const context = document.createElement("canvas").getContext("2d");
+        const style = getComputedStyle(el);
+        if (context) context.font = style.fontWeight + " " + style.fontSize + " " + style.fontFamily;
+        const width = Math.max(80, (context?.measureText(title || t(DEFAULT_NOTE_TITLE)).width ?? 160) + 8);
+        el.style.width = Math.min(width, Math.max(80, (el.parentElement?.clientWidth ?? 800) - 54)) + "px";
+      } else el.style.width = "100%";
+      el.style.height = "auto"; el.style.height = `${el.scrollHeight}px`;
+    };
+    update();
+    const observer = new ResizeObserver(update);
+    if (el.parentElement) observer.observe(el.parentElement);
+    return () => observer.disconnect();
+  }, [title, noteIcon?.icon, iconize.settings.iconInTitleEnabled, iconize.settings.iconInTitlePosition]);
 
   // ─── Резолвим обложки `file:*` в URL ассета Tauri ───────────────────────
   // Градиентным и внешним URL-обложкам резолв не нужен: ставим `coverUrl =
@@ -186,26 +201,13 @@ export function NoteHero() {
   // без обложки поповеры налезут друг на друга (оба привязаны к
   // `top-full mt-2 left-0` ряда с кнопками).
   const toggleCoverPicker = useCallback(() => {
-    setIconPickerOpen(false);
     setCoverPickerOpen((v) => !v);
   }, []);
   const toggleIconPicker = useCallback(() => {
     setCoverPickerOpen(false);
-    setIconPickerOpen((v) => !v);
+    const current = useNotesStore.getState().activeNote;
+    if (current) useIconizeStore.getState().openPicker({ targets: [{ kind: "file", path: current.id + ".md" }], current: resolveIcon(useIconizeStore.getState().data, "file", current.id + ".md", current) ?? undefined });
   }, []);
-
-  const handleRemoveIcon = useCallback(() => {
-    void saveNote({ icon: null });
-    setIconPickerOpen(false);
-  }, [saveNote]);
-
-  const handlePickIcon = useCallback(
-    (emoji: string) => {
-      void saveNote({ icon: emoji });
-      setIconPickerOpen(false);
-    },
-    [saveNote],
-  );
 
   if (!activeNote) return null;
 
@@ -306,7 +308,7 @@ export function NoteHero() {
         )}
       >
         <AnimatePresence>
-          {activeNote.icon && (
+          {noteIcon?.icon && iconize.settings.iconInTitleEnabled && iconize.settings.iconInTitlePosition === "above" && (
             <motion.button
               type="button"
               aria-label="Изменить иконку"
@@ -324,7 +326,7 @@ export function NoteHero() {
               }}
               className="relative flex items-center justify-center rounded-2xl hover:bg-white/[0.04] transition-colors select-none mb-2"
             >
-              {activeNote.icon}
+              <NoteIcon note={activeNote} size={ICON_FONT_PX} surface="title" />
             </motion.button>
           )}
         </AnimatePresence>
@@ -337,7 +339,7 @@ export function NoteHero() {
               onClick={toggleCoverPicker}
             />
           )}
-          {!activeNote.icon && (
+          {(!noteIcon?.icon || !iconize.settings.iconInTitleEnabled) && (
             <ActionPill
               icon={Smile}
               label={t("Добавить иконку")}
@@ -373,20 +375,10 @@ export function NoteHero() {
               />
             </div>
           )}
-          {iconPickerOpen && (
-            <div
-              className="absolute top-full mt-2 left-0"
-              style={{ zIndex: Z_HERO_POPOVER }}
-            >
-              <EmojiPicker
-                onPick={handlePickIcon}
-                onClose={() => setIconPickerOpen(false)}
-                onRemove={activeNote.icon ? handleRemoveIcon : undefined}
-              />
-            </div>
-          )}
         </div>
 
+        <div className="iconize-title-row">
+        {noteIcon?.icon && iconize.settings.iconInTitleEnabled && iconize.settings.iconInTitlePosition === "inline" && <button type="button" className="iconize-title-inline" onClick={toggleIconPicker} aria-label={t("Изменить иконку")}><NoteIcon note={activeNote} size={40} surface="title" /></button>}
         <textarea
           ref={titleInputRef}
           value={title}
@@ -405,6 +397,7 @@ export function NoteHero() {
           rows={1}
           className="hero-title block w-full bg-transparent text-white outline-none placeholder:text-[var(--color-text-muted)] py-2 text-center resize-none overflow-hidden"
         />
+        </div>
 
         {isDaily && (
           <div className="w-full flex items-center justify-center gap-2 mt-1">

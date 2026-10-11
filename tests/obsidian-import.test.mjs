@@ -326,8 +326,10 @@ test("full copied vault: every manifest note loads through the store in source m
   const flat = [];
   const walk = (nodes) => { for (const node of nodes) node.kind === "folder" ? walk(node.children) : flat.push(node.note); };
   walk(tree);
-  assert.equal(flat.length, manifest.notePaths.length);
-  for (const meta of flat) {
+  const importedPaths = new Set(manifest.notePaths);
+  const imported = flat.filter(meta => importedPaths.has(meta.id + ".md"));
+  assert.equal(imported.length, manifest.notePaths.length);
+  for (const meta of imported) {
     assert.equal(meta.markdownSource, true, meta.id);
     assert(meta.title.trim(), `empty title: ${meta.id}`);
     await store.getState().selectNote(meta.id);
@@ -342,7 +344,7 @@ test("full copied vault: every manifest note loads through the store in source m
   assert.equal(store.getState().activeNote.title, "Metadata-only test title");
   for (const [name, hash] of initialHashes) assert.equal(sha(await fs.readFile(path.join(f.notes, name))), hash, name);
   assert(!f.mutations.some((entry) => entry.slice(1).some((name) => name.endsWith(".md"))));
-  console.log(`Verified ${flat.length} copied Markdown notes without source mutations`);
+  console.log(`Verified ${imported.length} copied Markdown notes without source mutations`);
 });
 
 

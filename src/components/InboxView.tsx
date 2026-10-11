@@ -1,7 +1,8 @@
+import { NoteIcon } from "./NoteIcon";
 import { FileText, FolderInput, Pencil, Trash2, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { cn } from "../lib/cn";
-import { DEFAULT_NOTE_TITLE, EMOJI_FONT_STACK } from "../lib/format";
+import { DEFAULT_NOTE_TITLE } from "../lib/format";
 import { INBOX_FOLDER } from "../lib/inbox";
 import type { NoteMeta, TreeNode } from "../lib/storage";
 import { flattenNotes } from "../lib/treeUtils";
@@ -139,16 +140,7 @@ function InboxCard({
     <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-elevated)] overflow-hidden">
       <div className="flex items-start gap-3 p-3">
         <span className="shrink-0 w-5 flex justify-center pt-0.5">
-          {note.icon ? (
-            <span
-              style={{ fontFamily: EMOJI_FONT_STACK }}
-              className="text-base leading-none select-none"
-            >
-              {note.icon}
-            </span>
-          ) : (
-            <FileText size={15} strokeWidth={1.8} className="text-zinc-500" />
-          )}
+          <NoteIcon note={note} size={18} fallback={<FileText size={15} strokeWidth={1.8} className="text-zinc-500" />} />
         </span>
 
         <div className="min-w-0 flex-1">

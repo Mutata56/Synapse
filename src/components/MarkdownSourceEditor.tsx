@@ -1,3 +1,5 @@
+import { useIconizeStore } from "../store/iconize";
+import { InlineIcon, VaultLinkIcon, remarkIconize } from "./IconizeMarkdown";
 import { ArrowLeft, Columns2, FileCode2, History, RefreshCw, Save } from "lucide-react";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { openPath, openUrl } from "@tauri-apps/plugin-opener";
@@ -20,7 +22,6 @@ import { useToastStore } from "../store/toasts";
 import { NoteHero } from "./NoteHero";
 
 type Mode = "preview" | "source" | "split";
-const REMARK_PLUGINS = [remarkGfm];
 const EMPTY_INDEX = indexVaultFiles([]);
 const draftKey = (id: string) => `synapse:markdown-draft:${id}`;
 const anchorKey = (id: string) => `synapse:markdown-anchor:${id}`;
@@ -46,7 +47,7 @@ function scrollToHeading(heading: string): void {
 }
 
 function previewUrl(url: string): string {
-  return /^synapse-(?:note|embed):/.test(url) ? url : defaultUrlTransform(url);
+  return /^synapse-(?:note|embed|icon):/.test(url) ? url : defaultUrlTransform(url);
 }
 
 /** The imported source is never parsed and then serialized by BlockNote. */
@@ -195,8 +196,11 @@ export function MarkdownSourceEditor() {
     useNotesStore.getState().openLinkMatch(nextId);
   }, [id, files]);
 
+  const iconSettings = useIconizeStore(state => state.data.settings);
+  const iconPlugins = useMemo(() => [remarkGfm, [remarkIconize, { identifier: iconSettings.iconIdentifier, enabled: iconSettings.iconsInNotesEnabled }]] as import("unified").PluggableList, [iconSettings.iconIdentifier, iconSettings.iconsInNotesEnabled]);
   const components = useMemo(() => ({
     a: ({ href = "", children }: { href?: string; children?: React.ReactNode }) => {
+      if (href.startsWith("synapse-icon:")) return <InlineIcon id={href.slice("synapse-icon:".length)}>{children}</InlineIcon>;
       const wiki = href.startsWith("synapse-note:");
       const external = /^(?:https?:|mailto:)/i.test(href);
       return <a href={href || undefined} onClick={(event) => {
@@ -209,7 +213,7 @@ export function MarkdownSourceEditor() {
         const path = resolveVaultReference(target.path, id, files, { relativeFirst: true });
         if (path && workspace) void openPath(`${workspace}/${path}`).catch((e) => useToastStore.getState().push(String(e)));
         else useToastStore.getState().push(`Файл не найден: ${href}`);
-      }}>{children}</a>;
+      }}><VaultLinkIcon href={href} noteId={id} files={files} />{children}</a>;
     },
     img: ({ src = "", alt = "", title }: { src?: string; alt?: string; title?: string }) => <VaultPreviewImage source={src} alt={alt} title={title} files={files} noteId={id} workspace={workspace} navigate={navigate} />,
   }), [files, id, workspace, navigate]);
@@ -235,7 +239,7 @@ export function MarkdownSourceEditor() {
       }} /> : null}
       {mode !== "source" ? <div className="markdown-source-preview group/hero" data-editor-scroll>
         <NoteHero key={id} />
-        <div className="md-content markdown-source-body"><ReactMarkdown remarkPlugins={REMARK_PLUGINS} components={components} urlTransform={previewUrl}>{preview}</ReactMarkdown></div>
+        <div className="md-content markdown-source-body"><ReactMarkdown remarkPlugins={iconPlugins} components={components} urlTransform={previewUrl}>{preview}</ReactMarkdown></div>
       </div> : null}
     </div>
   </div>;

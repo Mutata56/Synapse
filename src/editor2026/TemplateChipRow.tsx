@@ -1,3 +1,4 @@
+import { IconGlyph } from "../components/NoteIcon";
 // src/editor2026/TemplateChipRow.tsx
 //
 // Строка быстрого применения шаблонов, показывается ТОЛЬКО когда текущий
@@ -95,7 +96,7 @@ export function TemplateChipRow({ visible, editor, schema: _schema }: TemplateCh
                 title={`Применить шаблон «${meta.name}»`}
               >
                 {meta.icon ? (
-                  <span className="mr-1.5">{meta.icon}</span>
+                  <span className="mr-1.5"><IconGlyph value={meta.icon} size={16} /></span>
                 ) : null}
                 {meta.name}
               </button>

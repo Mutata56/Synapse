@@ -3,6 +3,7 @@ use std::sync::Mutex;
 #[cfg(target_os = "macos")]
 mod single_instance_macos;
 mod image_previews;
+mod iconize_import;
 #[cfg(desktop)]
 mod image_inventory;
 #[cfg(desktop)]
@@ -511,6 +512,7 @@ pub fn run() {
         .manage(CaptureShortcut::default())
         .manage(image_previews::PreviewJobs::default())
         .invoke_handler(tauri::generate_handler![
+            iconize_import::read_iconize_import,
             image_previews::image_preview,
             image_inventory::image_inventory,
             set_capture_shortcut,

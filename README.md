@@ -76,6 +76,7 @@ https://github.com/user-attachments/assets/9db144f0-f82d-4251-ba05-e5130e225cc1
 
 **Организация**
 - Дерево папок, избранное, входящие, галерея заметок.
+- Iconize: полный офлайн-каталог иконок и логотипов, свои SVG/PNG, цвета, наследование папок, правила и импорт назначений Obsidian. [Использование](docs/ICONIZE.md).
 
 <img width="2200" height="565" alt="image" src="https://github.com/user-attachments/assets/42dfb822-4d09-4bf1-a013-088bdca2411e" />
 
