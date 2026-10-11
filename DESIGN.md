@@ -549,7 +549,7 @@ At library container widths of (680px) and below the view title becomes (23px) a
 
 The `files-` title roles distinguish the view from the properties heading. The main title condenses at the three Files container thresholds; the narrow title keeps its own line height. Single-line names use the row role, search and named actions use the control role, and type/date context uses the metadata role. Table headings and mint membership summaries use the smaller column/tag steps. Dates use tabular figures. The empty-state heading remains a secondary title rather than a competing page heading.
 
-The properties heading becomes (18px) on narrow layouts, while row names become (13px). Quick-look prose uses the local reader role and a bounded measure (72ch); its Markdown headings step through (20px), (18px) and the local reader-heading role. These are Files adaptations of the incumbent Inter family, not a new global type ramp.
+The properties heading becomes (18px) on narrow layouts, while row names become (13px). The separate Quick Look modal uses local reader overrides: prose at (15px) with a line height of (1.75) and a bounded measure (72ch), and Markdown headings at (28px), (23px) and (18px). At viewport widths of (640px) and below the prose becomes (14px) and the first Markdown heading becomes (24px). These are Files adaptations of the incumbent Inter family, not a new global type ramp.
 
 ### Workspace hierarchy
 
@@ -685,9 +685,9 @@ Single clicks select, modifier clicks toggle, and Shift selects a range. The gri
 
 ### Files properties and dialogs
 
-Properties shows the selected item or aggregate, real location and metadata; without selection it describes the current folder. It exposes Open, Move/Trash or Restore/Permanent delete as appropriate. A single note can expose an explicit quick-look section. Tags are bounded summaries, and unsupported sizes or deletion dates are not fabricated.
+Properties shows the selected item or aggregate, real location and metadata; without selection it describes the current folder. It exposes Open, Move/Trash or Restore/Permanent delete as appropriate, with bounded tag summaries and no preview controls or note body. Quick look for a selected note or folder in either Files or Trash opens a separate native HTML modal through Space or the context menu. Unsupported sizes or deletion dates are not fabricated.
 
-**The Explicit Quick Look Rule.** A selected note does not read its body until quick look is explicitly requested. Show loading, retry and truncation states in the properties region, and keep image references as inert attachment labels.
+**The Explicit Quick Look Rule.** A selected note does not read its body until quick look is explicitly requested. Loading, retry and truncation states belong inside the modal reader; image references remain inert attachment labels and links remain inert text. Folder previews use cached subtree counts and a bounded list of immediate children. The modal contains keyboard focus, navigates the current visible entries with left/right arrows, and returns focus to the grid on dismissal, including after context-menu entry.
 
 Creation and rename dialogs use a labeled name field and inline validation. The move/navigation picker shows real folder hierarchy, a windowed destination list and an explicit destination summary; moving a folder into itself or a descendant is unavailable. Dialogs trap focus, restore their connected opener on close, and close with Escape or outside interaction when idle. Destructive confirmations explain folder contents and permanence. The full note opens through the existing editor rather than embedding an editor in the browser.
 

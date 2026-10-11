@@ -14,7 +14,7 @@ import "./files-bench.css";
 
 // In-memory demonstration data. No connector or filesystem call is allowed.
 const params = new URLSearchParams(location.search);
-const longPreview = Array.from({ length: 90 }, (_, i) => `## Раздел ${i}\n\n| Поле | Значение |\n| --- | --- |\n| Строка | **Пример** для проверки чтения и прокрутки |\n\n- Пункт списка\n- Ещё один пункт\n`).join("\n");
+const longPreview = Array.from({ length: params.has("preview_limit") ? 200 : 90 }, (_, i) => `## Раздел ${i}\n\n| Поле | Значение |\n| --- | --- |\n| Строка | **Пример** для проверки чтения и прокрутки |\n\n- Пункт списка\n- Ещё один пункт\n`).join("\n");
 if (params.has("large_preview")) for (const event of ["click", "keydown", "scroll"])
   document.addEventListener(event, measureFrames, { passive: true, capture: true });
 const leaf = "Ascend/RoadMaps/DBA RoadMap/Этап 02 SELECT";
@@ -85,7 +85,7 @@ useNotesStore.setState({ tree, trashTree, currentFolder: leaf, currentTrashFolde
 function App() {
   const view = useNotesStore(state => state.view);
   const [initial] = useState([`note:${leaf}/n-0`, `note:${leaf}/n-1`]);
-  return <LanguageProvider><main className="files-bench-shell"><Sidebar />{view === "files" || view === "trash" ? <FileBrowser key={view} mode={view} initialSelected={params.has("unselected") || view === "trash" ? [] : initial} readBody={async id => { metrics.reads++; const output = document.getElementById("files-bench-metrics"); if (output) output.textContent = JSON.stringify(metrics); return bodies.get(id) || "Синтетический пример"; }} /> : <section className="files-bench-note"><h1>Локальная заметка</h1><button onClick={() => useNotesStore.setState({ view: "files" })}>Вернуться к файлам</button></section>}<ConfirmDialog /><Toaster /><output id="files-performance-metrics" hidden /><output id="files-bench-metrics" hidden>{JSON.stringify(metrics)}</output></main></LanguageProvider>;
+  return <LanguageProvider><main className="files-bench-shell"><Sidebar />{view === "files" || view === "trash" ? <FileBrowser key={view} mode={view} initialSelected={params.has("unselected") || view === "trash" ? [] : initial} readBody={async id => { metrics.reads++; const output = document.getElementById("files-bench-metrics"); if (output) output.textContent = JSON.stringify(metrics); if (params.has("preview_error") && metrics.reads === 1) throw new Error("Synthetic preview read failure"); return bodies.get(id) || "Синтетический пример"; }} /> : <section className="files-bench-note"><h1>Локальная заметка</h1><button onClick={() => useNotesStore.setState({ view: "files" })}>Вернуться к файлам</button></section>}<ConfirmDialog /><Toaster /><output id="files-performance-metrics" hidden /><output id="files-bench-metrics" hidden>{JSON.stringify(metrics)}</output></main></LanguageProvider>;
 }
 useNotesStore.subscribe(() => { const output = document.getElementById("files-bench-metrics"); if (output) output.textContent = JSON.stringify(metrics); });
 createRoot(document.getElementById("root")!).render(<App />);
