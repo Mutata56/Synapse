@@ -14,6 +14,7 @@ import {
 } from "../lib/settings";
 import { pluralRu } from "../lib/format";
 import { t } from "../lib/i18n";
+import { normalizeTag, type TagMatch } from "../lib/tagExplorer";
 import { rebaseKeys } from "../lib/treeKeys";
 import {
   findFolderByPath,
@@ -147,6 +148,8 @@ type State = {
   currentFolder: string;
   currentTrashFolder: string;
   currentTag: string | null;
+  /** In-memory finder state survives opening a note; never stored in Markdown. */
+  tagsFilter: { tags: string[]; match: TagMatch; untagged: boolean };
   /** Цвет папки (hex), ключ это путь. Загружается из метафайла воркспейса,
    *  перебазируется при переименовании/перемещении. Отсутствующий путь
    *  означает цвет по умолчанию. */
@@ -183,6 +186,7 @@ type Actions = {
   setCurrentFolder: (folder: string) => void;
   setCurrentTrashFolder: (folder: string) => void;
   setCurrentTag: (tag: string | null) => void;
+  setTagsFilter: (patch: Partial<State["tagsFilter"]>) => void;
   closeActiveNote: () => Promise<void>;
   goBack: () => void;
   /** Резолвит `[[title]]` wiki-ссылку: переходит при одном совпадении, открывает
@@ -1291,6 +1295,7 @@ export const useNotesStore = create<Store>((set, get) => {
     currentFolder: "",
     currentTrashFolder: "",
     currentTag: null,
+    tagsFilter: { tags: [], match: "all", untagged: false },
     folderColors: {},
     settings: { ...DEFAULT_SETTINGS },
     linkPicker: null,
@@ -1306,7 +1311,20 @@ export const useNotesStore = create<Store>((set, get) => {
     setView: (v) => set({ view: v }),
     setCurrentFolder: (folder) => set({ currentFolder: folder }),
     setCurrentTrashFolder: (folder) => set({ currentTrashFolder: folder }),
-    setCurrentTag: (tag) => set({ currentTag: tag }),
+    // Existing editor/dashboard links still open a fresh single-tag filter.
+    setCurrentTag: (tag) => {
+      const canonical = tag ? normalizeTag(tag) : null;
+      set({ currentTag: canonical, tagsFilter: { tags: canonical ? [canonical] : [], match: "all", untagged: false } });
+    },
+    setTagsFilter: (patch) => set((state) => {
+      const tagsFilter = { ...state.tagsFilter, ...patch };
+      if (patch.tags) {
+        tagsFilter.tags = [...new Set(patch.tags.map(normalizeTag).filter(Boolean))];
+        if (patch.untagged !== true) tagsFilter.untagged = false;
+      }
+      if (tagsFilter.untagged) tagsFilter.tags = [];
+      return { tagsFilter, currentTag: tagsFilter.tags[0] ?? null };
+    }),
     // Возврат в галерею завершает сессию навигации "назад".
     closeActiveNote: async () => {
       // Обходим selectNote , нужно сбросить таймеры вручную. Без этого

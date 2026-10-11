@@ -29,6 +29,23 @@ const storeBuild = await build({ ...buildOptions, stdin: { contents: "export * f
 
 const sha = (bytes) => createHash("sha256").update(bytes).digest("hex");
 
+test("tag finder keeps multi-tag filters across navigation and preserves legacy single-tag links without file writes", async (t) => {
+  const f = await fixture(t, {}, undefined, true);
+  const store = f.storage.useNotesStore;
+  store.getState().setTagsFilter({ tags: ['#WMS', 'wms', 'WTMS'], match: 'any' });
+  store.getState().setView('notes');
+  store.getState().setView('tags');
+  assert.deepEqual(store.getState().tagsFilter, { tags: ['wms', 'wtms'], match: 'any', untagged: false });
+  store.getState().setTagsFilter({ untagged: true });
+  assert.deepEqual(store.getState().tagsFilter.tags, []);
+  store.getState().setCurrentTag('#WMS/Picking');
+  assert.equal(store.getState().currentTag, 'wms/picking');
+  assert.deepEqual(store.getState().tagsFilter, { tags: ['wms/picking'], match: 'all', untagged: false });
+  store.getState().setCurrentTag(null);
+  assert.deepEqual(store.getState().tagsFilter.tags, []);
+  assert.deepEqual(f.mutations, []);
+});
+
 async function fixture(t, sources = {}, existingVault, withStore = false) {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "synapse-import-test-"));
   const notes = path.join(root, "notes");
