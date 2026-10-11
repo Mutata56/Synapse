@@ -48,7 +48,11 @@ const COLOR_RE = /^#[0-9a-fA-F]{6}$/;
 
 /** true для корректного ключа дня `YYYY-MM-DD`. */
 export function isValidDay(v: string): boolean {
-  return DAY_RE.test(v);
+  if (!DAY_RE.test(v)) return false;
+  const [year, month, day] = v.split("-").map(Number);
+  const date = new Date(0);
+  date.setUTCFullYear(year, month - 1, day);
+  return year >= 1 && date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day;
 }
 
 /** Нормализует ввод времени к `HH:MM`, или null если пусто/невалидно. */
@@ -90,14 +94,22 @@ function parseDay(iso: string): Date {
   return new Date(y, m - 1, d);
 }
 
-function toIsoDay(d: Date): string {
-  const p = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+/** Calendar-day arithmetic is independent of DST and the machine's UTC offset. */
+function dayOrdinal(iso: string): number {
+  const [year, month, day] = iso.split("-").map(Number);
+  const date = new Date(0);
+  date.setUTCFullYear(year, month - 1, day);
+  date.setUTCHours(0, 0, 0, 0);
+  return date.getTime() / 86400000;
+}
+
+function ordinalDay(ordinal: number): string {
+  const date = new Date(ordinal * 86400000);
+  return `${String(date.getUTCFullYear()).padStart(4, "0")}-${String(date.getUTCMonth() + 1).padStart(2, "0")}-${String(date.getUTCDate()).padStart(2, "0")}`;
 }
 
 function daysBetween(aIso: string, bIso: string): number {
-  const MS = 86400000;
-  return Math.round((parseDay(bIso).getTime() - parseDay(aIso).getTime()) / MS);
+  return dayOrdinal(bIso) - dayOrdinal(aIso);
 }
 
 /** Выпадает ли задача на дату `iso` с учётом повтора. Разовая выпадает только
@@ -136,16 +148,25 @@ export function occurrencesInRange(
   if (!task.repeat) {
     return task.day >= fromIso && task.day <= toIso ? [task.day] : [];
   }
+  const rep = task.repeat;
+  const every = Number.isFinite(rep.every) ? Math.max(1, Math.floor(rep.every)) : 1;
+  const start = task.day > fromIso ? task.day : fromIso;
+  const end = rep.until && rep.until < toIso ? rep.until : toIso;
+  if (start > end) return [];
   const out: string[] = [];
-  const startIso = task.day > fromIso ? task.day : fromIso;
-  const cur = parseDay(startIso);
-  const end = parseDay(toIso);
-  // Видимый диапазон это месяц/неделя (десятки дней), так что посуточный проход
-  // дешёвый и не требует отдельной математики под каждый freq.
-  while (cur.getTime() <= end.getTime()) {
-    const iso = toIsoDay(cur);
-    if (occursOn(task, iso)) out.push(iso);
-    cur.setDate(cur.getDate() + 1);
+  if (rep.freq === "daily" || rep.freq === "weekly") {
+    const interval = every * (rep.freq === "weekly" ? 7 : 1);
+    const origin = dayOrdinal(task.day), lower = dayOrdinal(start), upper = dayOrdinal(end);
+    for (let day = origin + Math.max(0, Math.ceil((lower - origin) / interval)) * interval; day <= upper; day += interval) out.push(ordinalDay(day));
+  } else {
+    const [year, month, day] = task.day.split("-").map(Number);
+    const [fromYear, fromMonth] = start.split("-").map(Number);
+    const [endYear, endMonth] = end.split("-").map(Number);
+    const origin = year * 12 + month - 1, lower = fromYear * 12 + fromMonth - 1, upper = endYear * 12 + endMonth - 1;
+    for (let value = origin + Math.max(0, Math.ceil((lower - origin) / every)) * every; value <= upper; value += every) {
+      const iso = `${String(Math.floor(value / 12)).padStart(4, "0")}-${String(value % 12 + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+      if (iso >= start && iso <= end && isValidDay(iso)) out.push(iso);
+    }
   }
   return out;
 }
@@ -166,7 +187,7 @@ function coerceRecurrence(raw: unknown): Recurrence | null {
   const every =
     typeof o.every === "number" && o.every >= 1 ? Math.floor(o.every) : 1;
   const until =
-    typeof o.until === "string" && DAY_RE.test(o.until) ? o.until : null;
+    typeof o.until === "string" && isValidDay(o.until) ? o.until : null;
   return { freq: o.freq, every, until };
 }
 
@@ -181,7 +202,7 @@ export function coerceTasks(raw: unknown): Task[] {
     if (!r || typeof r !== "object") continue;
     const o = r as Record<string, unknown>;
     if (typeof o.id !== "string" || typeof o.title !== "string") continue;
-    if (typeof o.day !== "string" || !DAY_RE.test(o.day)) continue;
+    if (typeof o.day !== "string" || !isValidDay(o.day)) continue;
     const now = Date.now();
     out.push({
       id: o.id,
@@ -192,7 +213,7 @@ export function coerceTasks(raw: unknown): Task[] {
       repeat: coerceRecurrence(o.repeat),
       doneDates: Array.isArray(o.doneDates)
         ? o.doneDates.filter(
-            (x): x is string => typeof x === "string" && DAY_RE.test(x),
+            (x): x is string => typeof x === "string" && isValidDay(x),
           )
         : [],
       color:

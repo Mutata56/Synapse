@@ -27,6 +27,11 @@
         "name": "workspace-icon-state",
         "value": "background-color 120ms, color 120ms",
         "purpose": "Workspace icon hover/active response; removed with reduced motion."
+      },
+      {
+        "name": "calendar-selected-date",
+        "value": "background-color 120ms cubic-bezier(.16, 1, .3, 1)",
+        "purpose": "Selected month-date background only; enabled when reduced motion is not requested."
       }
     ],
     "shadows": [
@@ -84,6 +89,11 @@
         "name": "workspace-right-overlay",
         "value": "-6px 4px 22px rgba(0,0,0,.24)",
         "purpose": "Right outline/backlinks pane only when it overlaps the work area."
+      },
+      {
+        "name": "calendar-popovers",
+        "value": "var(--shadow-float)",
+        "purpose": "Date jump and connection popovers inherit the full existing shadow; Calendar work regions remain flat."
       }
     ],
     "breakpoints": [
@@ -130,6 +140,22 @@
       {
         "name": "workspace-left-overlay-viewport",
         "value": "759px"
+      },
+      {
+        "name": "calendar-hide-preview-times-container",
+        "value": "1100px"
+      },
+      {
+        "name": "calendar-full-day-plan-container",
+        "value": "1000px"
+      },
+      {
+        "name": "calendar-toolbar-wrap-container",
+        "value": "720px"
+      },
+      {
+        "name": "calendar-small-container",
+        "value": "450px"
       }
     ],
     "colorMeta": {
@@ -248,6 +274,76 @@
           "oklch(0.7214 0 0 / .5)",
           "oklch(0.8357 0 0 / .5)",
           "oklch(0.9500 0 0 / .5)"
+        ]
+      },
+      "calendar-task": {
+        "role": "secondary",
+        "displayName": "Calendar local plan",
+        "tonalRamp": [
+          "oklch(0.1500 0.10919 76.69)",
+          "oklch(0.2643 0.10919 76.69)",
+          "oklch(0.3786 0.10919 76.69)",
+          "oklch(0.4929 0.10919 76.69)",
+          "oklch(0.6071 0.10919 76.69)",
+          "oklch(0.7214 0.10919 76.69)",
+          "oklch(0.8357 0.10919 76.69)",
+          "oklch(0.9500 0.10919 76.69)"
+        ]
+      },
+      "calendar-event": {
+        "role": "secondary",
+        "displayName": "Calendar external event",
+        "tonalRamp": [
+          "oklch(0.1500 0.10575 255.85)",
+          "oklch(0.2643 0.10575 255.85)",
+          "oklch(0.3786 0.10575 255.85)",
+          "oklch(0.4929 0.10575 255.85)",
+          "oklch(0.6071 0.10575 255.85)",
+          "oklch(0.7214 0.10575 255.85)",
+          "oklch(0.8357 0.10575 255.85)",
+          "oklch(0.9500 0.10575 255.85)"
+        ]
+      },
+      "calendar-note": {
+        "role": "secondary",
+        "displayName": "Calendar writing mark",
+        "tonalRamp": [
+          "oklch(0.1500 0.09967 285.73)",
+          "oklch(0.2643 0.09967 285.73)",
+          "oklch(0.3786 0.09967 285.73)",
+          "oklch(0.4929 0.09967 285.73)",
+          "oklch(0.6071 0.09967 285.73)",
+          "oklch(0.7214 0.09967 285.73)",
+          "oklch(0.8357 0.09967 285.73)",
+          "oklch(0.9500 0.09967 285.73)"
+        ]
+      },
+      "calendar-danger": {
+        "role": "tertiary",
+        "displayName": "Calendar task/error feedback",
+        "tonalRamp": [
+          "oklch(0.1500 0.11918 13.77)",
+          "oklch(0.2643 0.11918 13.77)",
+          "oklch(0.3786 0.11918 13.77)",
+          "oklch(0.4929 0.11918 13.77)",
+          "oklch(0.6071 0.11918 13.77)",
+          "oklch(0.7214 0.11918 13.77)",
+          "oklch(0.8357 0.11918 13.77)",
+          "oklch(0.9500 0.11918 13.77)"
+        ]
+      },
+      "calendar-muted": {
+        "role": "neutral",
+        "displayName": "Calendar secondary context",
+        "tonalRamp": [
+          "oklch(0.1500 0.00344 286.31)",
+          "oklch(0.2643 0.00344 286.31)",
+          "oklch(0.3786 0.00344 286.31)",
+          "oklch(0.4929 0.00344 286.31)",
+          "oklch(0.6071 0.00344 286.31)",
+          "oklch(0.7214 0.00344 286.31)",
+          "oklch(0.8357 0.00344 286.31)",
+          "oklch(0.9500 0.00344 286.31)"
         ]
       }
     },
@@ -395,6 +491,50 @@
       "workspace-result-context": {
         "displayName": "Workspace result context",
         "purpose": "Folder and content snippet underneath a search/bookmark title."
+      },
+      "calendar-page-title": {
+        "displayName": "Calendar view title",
+        "purpose": "Scoped view heading; adapts to 24px at the compact toolbar threshold."
+      },
+      "calendar-period-title": {
+        "displayName": "Calendar period title",
+        "purpose": "Displayed month/week heading; adapts to 17px at the smallest container threshold."
+      },
+      "calendar-day-title": {
+        "displayName": "Calendar selected-day title",
+        "purpose": "Date heading in the docked or full-width day plan; also the compact focus destination."
+      },
+      "calendar-workspace-text": {
+        "displayName": "Calendar inherited action text",
+        "purpose": "Workspace base and effective single-class button text after the more-specific font reset."
+      },
+      "calendar-control-label": {
+        "displayName": "Calendar compact controls",
+        "purpose": "Segmented controls, search and composer fields whose more-specific rules set this size."
+      },
+      "calendar-context": {
+        "displayName": "Calendar secondary context",
+        "purpose": "Day/week context and explicit task-editor fields."
+      },
+      "calendar-cell-preview": {
+        "displayName": "Calendar month-cell preview",
+        "purpose": "Ancillary task/event preview text in month-cell spans; full detail remains in the day plan."
+      },
+      "calendar-cell-overflow": {
+        "displayName": "Calendar month-cell remainder",
+        "purpose": "Small remainder count inside the bounded date cell."
+      },
+      "calendar-time-label": {
+        "displayName": "Calendar preview time/count",
+        "purpose": "Ancillary month-preview times and weekly date counts, not primary action text."
+      },
+      "calendar-narrow-hour": {
+        "displayName": "Calendar narrow hour label",
+        "purpose": "Ancillary hour context at the smallest container threshold; does not describe overridden button sizes."
+      },
+      "calendar-primary-label": {
+        "displayName": "Calendar primary label",
+        "purpose": "Primary task/save actions retain their scoped 550 weight; the base font size remains inherited."
       }
     }
   },
@@ -563,11 +703,66 @@
       "description": "The shell working-region silhouette; miniature preview records shape rather than a screen composition.",
       "html": "<div class=\"ds-workspace-stage\"><div class=\"ds-workspace-stage-empty\">Новая вкладка</div></div>",
       "css": ".ds-workspace-stage{height:190px;overflow:hidden;border:1px solid var(--color-border);border-radius:30px;background:var(--color-bg);color:var(--color-text-secondary)}.ds-workspace-stage-empty{display:grid;place-items:center;height:100%;background:var(--color-bg-overlay);font-family:var(--font-sans);font-size:14px}@media(max-width:759px){.ds-workspace-stage{border-radius:18px}}"
+    },
+    {
+      "name": "Calendar primary action",
+      "kind": "button",
+      "refersTo": "calendar-button-primary",
+      "description": "Calendar action with effective inherited text size, implemented hover and keyboard focus.",
+      "html": "<button type=\"button\" class=\"ds-calendar-primary\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" aria-hidden=\"true\"><path d=\"M12 5v14M5 12h14\"/></svg>Новая задача</button>",
+      "css": ".ds-calendar-primary{display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:7px 11px;border:1px solid transparent;border-radius:6px;background:var(--color-accent);color:#fff;font-family:var(--font-sans,Inter,system-ui,sans-serif);font-size:13px;font-weight:550;white-space:nowrap;cursor:pointer}.ds-calendar-primary:hover:not(:disabled){filter:brightness(1.08)}.ds-calendar-primary:focus-visible{outline:2px solid var(--color-accent);outline-offset:3px;}.ds-calendar-primary:disabled{opacity:.45;cursor:default}"
+    },
+    {
+      "name": "Calendar outline action",
+      "kind": "button",
+      "refersTo": "calendar-button",
+      "description": "Calendar action with effective inherited text size, implemented hover and keyboard focus.",
+      "html": "<button type=\"button\" class=\"ds-calendar-outline\">Сегодня</button>",
+      "css": ".ds-calendar-outline{display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:7px 11px;border:1px solid var(--color-border-strong);border-radius:6px;background:transparent;color:var(--color-text);font-family:var(--font-sans,Inter,system-ui,sans-serif);font-size:13px;white-space:nowrap;cursor:pointer}.ds-calendar-outline:hover:not(:disabled){background:var(--color-bg-overlay)}.ds-calendar-outline:focus-visible{outline:2px solid var(--color-accent);outline-offset:3px;}.ds-calendar-outline:disabled{opacity:.45;cursor:default}"
+    },
+    {
+      "name": "Calendar period modes",
+      "kind": "nav",
+      "refersTo": "calendar-mode",
+      "description": "One tonal mode group preserving the shared chosen date across month, week and list.",
+      "html": "<div class=\"ds-calendar-mode\" role=\"group\" aria-label=\"Вид календаря\"><button type=\"button\" aria-pressed=\"true\">Месяц</button><button type=\"button\" aria-pressed=\"false\">Неделя</button><button type=\"button\" aria-pressed=\"false\">Список</button></div>",
+      "css": ".ds-calendar-mode{display:inline-flex;align-items:center;padding:3px;border:1px solid var(--color-border);border-radius:7px;background:var(--color-bg-elevated)}.ds-calendar-mode button{padding:5px 11px;border:0;border-radius:4px;background:transparent;color:var(--cal-muted,color-mix(in srgb,var(--color-text) 70%,var(--color-bg)));font-family:var(--font-sans,Inter,system-ui,sans-serif);font-size:12px;cursor:pointer}.ds-calendar-mode button[aria-pressed=\"true\"]{color:var(--color-text);background:var(--color-bg-overlay)}.ds-calendar-mode button:hover{color:var(--color-text)}.ds-calendar-mode button:focus-visible{outline:2px solid var(--color-accent);outline-offset:3px;}"
+    },
+    {
+      "name": "Calendar metadata search",
+      "kind": "input",
+      "refersTo": "calendar-search",
+      "description": "Period metadata search; the shortcut is secondary context and does not load note bodies.",
+      "html": "<label class=\"ds-calendar-search\"><svg width=\"15\" height=\"15\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" aria-hidden=\"true\"><circle cx=\"11\" cy=\"11\" r=\"8\"/><path d=\"m21 21-4.3-4.3\"/></svg><input aria-label=\"Поиск в периоде\" placeholder=\"Поиск в периоде…\"/><kbd>/</kbd></label>",
+      "css": ".ds-calendar-search{display:flex;align-items:center;gap:7px;width:208px;max-width:100%;min-width:130px;color:var(--cal-muted,color-mix(in srgb,var(--color-text) 70%,var(--color-bg)))}.ds-calendar-search svg{flex-shrink:0}.ds-calendar-search input{width:100%;min-width:0;height:29px;border:0;background:transparent;color:var(--color-text);font-family:var(--font-sans,Inter,system-ui,sans-serif);font-size:12px;caret-color:var(--color-accent)}.ds-calendar-search input::placeholder{color:var(--cal-muted,color-mix(in srgb,var(--color-text) 70%,var(--color-bg)));opacity:1}.ds-calendar-search input:focus-visible{outline:2px solid var(--color-accent);outline-offset:3px;}.ds-calendar-search kbd{padding:0 4px;border:1px solid var(--color-border-strong);border-radius:3px;font-family:var(--font-sans,Inter,system-ui,sans-serif);font-size:10px}"
+    },
+    {
+      "name": "Calendar day composer",
+      "kind": "custom",
+      "refersTo": "calendar-composer",
+      "description": "Direct selected-day task composer with its explicit submit action; date/time intent comes from the Calendar context.",
+      "html": "<form class=\"ds-calendar-composer\" aria-label=\"Добавить задачу на выбранный день\"><div><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" aria-hidden=\"true\"><path d=\"M12 5v14M5 12h14\"/></svg><input aria-label=\"Название новой задачи\" placeholder=\"Что запланировать?\"/><button type=\"submit\" aria-label=\"Добавить задачу\"><svg width=\"17\" height=\"17\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"m9 18 6-6-6-6\"/></svg></button></div></form>",
+      "css": ".ds-calendar-composer{padding:7px 8px;border:1px solid var(--color-border-strong);border-radius:7px;background:var(--color-bg);color:var(--cal-muted,color-mix(in srgb,var(--color-text) 70%,var(--color-bg)))}.ds-calendar-composer:focus-within{border-color:var(--color-accent)}.ds-calendar-composer>div{display:flex;align-items:center;gap:7px}.ds-calendar-composer svg{flex-shrink:0}.ds-calendar-composer input{flex:1;min-width:0;height:30px;border:0;background:transparent;color:var(--color-text);font-family:var(--font-sans,Inter,system-ui,sans-serif);font-size:12px;caret-color:var(--color-accent)}.ds-calendar-composer input::placeholder{color:inherit;opacity:1}.ds-calendar-composer button{display:inline-flex;align-items:center;justify-content:center;width:31px;height:31px;padding:0;border:0;border-radius:6px;background:transparent;color:inherit;cursor:pointer}.ds-calendar-composer button:hover{background:var(--color-bg-overlay);color:var(--color-text)}.ds-calendar-composer input:focus-visible,.ds-calendar-composer button:focus-visible{outline:2px solid var(--color-accent);outline-offset:3px;}"
+    },
+    {
+      "name": "Calendar selected date",
+      "kind": "custom",
+      "description": "Illustrative selected month date with bounded preview spans, note count and full accessible date/count label.",
+      "html": "<div class=\"ds-calendar-date\"><button type=\"button\" aria-pressed=\"true\" aria-label=\"11 октября 2026, задач: 1, событий: 1, записей: 3\"><strong>11</strong><span class=\"ds-calendar-previews\"><span class=\"ds-calendar-preview ds-calendar-task\"><i></i><small>10:30</small><span>План на день</span></span><span class=\"ds-calendar-preview ds-calendar-event\"><i></i><span>Встреча</span></span></span><span class=\"ds-calendar-note-count\">Записей: 3</span></button></div>",
+      "css": ".ds-calendar-date{height:96px;min-width:0}.ds-calendar-date>button{display:flex;flex-direction:column;align-items:flex-start;width:100%;height:100%;padding:7px 8px 6px;border:0;background:color-mix(in srgb,var(--color-accent) 7%,var(--color-bg));box-shadow:inset 0 0 0 1px var(--color-accent);color:var(--color-text);text-align:left;overflow:hidden;font-family:var(--font-sans,Inter,system-ui,sans-serif);font-size:13px;cursor:pointer}.ds-calendar-date>button:focus-visible{outline:2px solid var(--color-accent);outline-offset:3px;}.ds-calendar-date strong{display:inline-flex;align-items:center;justify-content:center;min-width:26px;height:24px;border-radius:6px;font-size:14px;line-height:1;font-weight:550}.ds-calendar-previews{display:flex;flex-direction:column;align-self:stretch;gap:2px;min-width:0;margin:4px 0 2px}.ds-calendar-preview{display:flex;align-items:center;min-width:0;gap:4px;font-size:10px;line-height:1.1}.ds-calendar-preview>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.ds-calendar-preview i{width:5px;height:5px;border-radius:50%;background:currentColor;flex-shrink:0}.ds-calendar-preview small{font-size:9px;opacity:.9}.ds-calendar-task{color:var(--cal-task,#e0af64)}.ds-calendar-event{color:var(--cal-event,#86b6f6)}.ds-calendar-note-count{margin-top:auto;min-height:14px;color:var(--cal-muted,color-mix(in srgb,var(--color-text) 70%,var(--color-bg)));font-size:10px}"
+    },
+    {
+      "name": "Calendar bounded hourly previews",
+      "kind": "custom",
+      "refersTo": "calendar-hour-row",
+      "description": "Illustrative mixed crowded hour: two combined previews and a reachable +1 overflow within the implemented fixed slot.",
+      "html": "<div class=\"ds-calendar-hour\"><span>11:00</span><div class=\"ds-calendar-slot\"><div class=\"ds-calendar-slot-items\"><button type=\"button\" class=\"ds-calendar-hour-chip ds-calendar-hour-task\">План</button><button type=\"button\" class=\"ds-calendar-hour-chip ds-calendar-hour-event\">Встреча</button><button type=\"button\" class=\"ds-calendar-more\" aria-label=\"Открыть ещё одну запись этого дня\">+1</button></div></div></div>",
+      "css": ".ds-calendar-hour{display:grid;grid-template-columns:48px minmax(0,1fr);height:63px;border-bottom:1px solid var(--color-border);font-family:var(--font-sans,Inter,system-ui,sans-serif);font-size:13px}.ds-calendar-hour>span{display:flex;align-items:flex-start;justify-content:flex-end;padding:8px 8px 0 0;border-top:1px solid var(--color-border);color:var(--cal-muted,color-mix(in srgb,var(--color-text) 70%,var(--color-bg)));font-size:10px}.ds-calendar-slot{min-width:0;border-top:1px solid var(--color-border);border-right:1px solid var(--color-border)}.ds-calendar-slot-items{display:flex;flex-direction:column;gap:2px;margin:3px;max-height:57px;overflow:hidden}.ds-calendar-hour-chip{display:flex;align-items:center;flex:0 0 auto;height:18px;min-width:0;max-width:100%;padding:3px 4px;border:0;border-radius:3px;background:color-mix(in srgb,currentColor 9%,transparent);font-family:var(--font-sans,Inter,system-ui,sans-serif);font-size:13px;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer}.ds-calendar-hour-task{color:var(--cal-task,#e0af64)}.ds-calendar-hour-event{color:var(--cal-event,#86b6f6)}.ds-calendar-more{flex:0 0 auto;padding:1px 4px;border:0;background:transparent;color:var(--cal-muted,color-mix(in srgb,var(--color-text) 70%,var(--color-bg)));font-family:var(--font-sans,Inter,system-ui,sans-serif);font-size:13px;line-height:12px;text-align:left;cursor:pointer}.ds-calendar-hour-chip:focus-visible,.ds-calendar-more:focus-visible{outline:2px solid var(--color-accent);outline-offset:3px;}"
     }
   ],
   "narrative": {
     "northStar": "Existing Synapse desktop interface",
-    "overview": "This records the incumbent visual system, rather than a new identity. The authority is `src/index.css`, the existing Sidebar, TagsView, NoteCard, and the running desktop interface. New local surfaces inherit this shell; their own layout decisions stay in surface briefs.\n\nThe implemented Tags finder supplies a scoped extension, evidenced by `src/components/TagsView.css` and the approved actual viewport. Its dense rows, mint tag markers and quiet reading area use the incumbent shell and semantic tokens. The `tags-` entries below describe this surface; they do not replace the global type or shape vocabulary.\n\nThe implemented All Notes library supplies a second scoped extension, evidenced by `src/components/NotesGallery.css` and the finished desktop, narrow and reading captures. Its `library-` entries retain the incumbent palette and font family while recording the library's content cards, context contrast and compact controls. Surface composition and acceptance evidence stay in `.impeccable/surfaces/src-components-notesgallery-tsx.md`.\n\nThe implemented Files and Trash workspace supplies a scoped extension, evidenced by `src/components/fileBrowser.css`, the shared `FileBrowser` and the finished dark desktop, narrow and Trash captures. Its `files-` entries record a dense work table, a current-folder route, selection actions and a collapsible properties region. It inherits the same Inter family, dark surfaces and violet interaction states. Surface direction and delegated-choice provenance stay in `.impeccable/surfaces/src-components-filesview-tsx.md`; operation details stay in `docs/FILES_BROWSER.md`.\n\nThe implemented workspace shell supplies an approved shell extension, evidenced by `src/components/workspace.css`, `WorkspaceChrome`, `Sidebar`, and the finished desktop and narrow captures. It keeps the incumbent palette while adding docked utility chrome, document tabs and a bounded active work region. The `workspace-` entries describe the shell itself; the specific Obsidian reference, pinned composition and quality bar stay in `.impeccable/surfaces/src-app-tsx.md`. Existing local views retain their own scoped systems inside the work region.",
+    "overview": "This records the incumbent visual system, rather than a new identity. The authority is `src/index.css`, the existing Sidebar, TagsView, NoteCard, and the running desktop interface. New local surfaces inherit this shell; their own layout decisions stay in surface briefs.\n\nThe implemented Tags finder supplies a scoped extension, evidenced by `src/components/TagsView.css` and the approved actual viewport. Its dense rows, mint tag markers and quiet reading area use the incumbent shell and semantic tokens. The `tags-` entries below describe this surface; they do not replace the global type or shape vocabulary.\n\nThe implemented All Notes library supplies a second scoped extension, evidenced by `src/components/NotesGallery.css` and the finished desktop, narrow and reading captures. Its `library-` entries retain the incumbent palette and font family while recording the library's content cards, context contrast and compact controls. Surface composition and acceptance evidence stay in `.impeccable/surfaces/src-components-notesgallery-tsx.md`.\n\nThe implemented Files and Trash workspace supplies a scoped extension, evidenced by `src/components/fileBrowser.css`, the shared `FileBrowser` and the finished dark desktop, narrow and Trash captures. Its `files-` entries record a dense work table, a current-folder route, selection actions and a collapsible properties region. It inherits the same Inter family, dark surfaces and violet interaction states. Surface direction and delegated-choice provenance stay in `.impeccable/surfaces/src-components-filesview-tsx.md`; operation details stay in `docs/FILES_BROWSER.md`.\n\nThe implemented workspace shell supplies an approved shell extension, evidenced by `src/components/workspace.css`, `WorkspaceChrome`, `Sidebar`, and the finished desktop and narrow captures. It keeps the incumbent palette while adding docked utility chrome, document tabs and a bounded active work region. The `workspace-` entries describe the shell itself; the specific Obsidian reference, pinned composition and quality bar stay in `.impeccable/surfaces/src-app-tsx.md`. Existing local views retain their own scoped systems inside the work region.\n\nThe implemented Calendar workspace supplies a scoped extension, evidenced by src/components/calendar.css, CalendarView, CalendarTaskRow, CalendarWeek and the finished synthetic review captures. Its calendar- entries retain the incumbent Inter family, dark semantic surfaces and violet interaction states while recording local source colors, compact date context and bounded planning controls. Direction, composition, benchmark limits and review acceptance stay in .impeccable/surfaces/src-components-calendarview-tsx.md. Local light overrides were tested with synthetic semantic tokens; the application still ships the established dark palette.",
     "keyCharacteristics": [
       "Dark tonal surfaces",
       "Violet selection",
@@ -596,8 +791,18 @@
         "section": "colors"
       },
       {
+        "name": "The Calendar Source Rule",
+        "body": "Within Calendar, violet marks the selected date, today, completion, focus and primary actions; amber identifies local task previews, blue identifies external events and lavender identifies notes and journal marks. Preserve user task colors as task metadata, and pair source color with text or outline icons.",
+        "section": "colors"
+      },
+      {
         "name": "The Dense Context Rule",
         "body": "Small type carries metadata and compact tag summaries; note titles, search and primary actions remain visually stronger. Preserve the observed small interface steps instead of enlarging every row or flattening the hierarchy.",
+        "section": "typography"
+      },
+      {
+        "name": "The Calendar Detail Rule",
+        "body": "Within Calendar, the smallest type carries cell times, counts and narrow hour context. Task titles, editable fields and the selected-day plan remain stronger; a full accessible date label and reachable day plan provide the detailed reading path.",
         "section": "typography"
       },
       {
@@ -611,8 +816,18 @@
         "section": "layout"
       },
       {
+        "name": "The Calendar Hour Bounds Rule",
+        "body": "Within the hourly week, keep the combined task/event previews at two inside the fixed hour row and retain a reachable overflow action. The day plan exposes the complete paged lists instead of increasing slot height.",
+        "section": "layout"
+      },
+      {
         "name": "The Explicit Quick Look Rule",
         "body": "A selected note does not read its body until quick look is explicitly requested. Show loading, retry and truncation states in the properties region, and keep image references as inert attachment labels.",
+        "section": "components"
+      },
+      {
+        "name": "The Calendar Date Context Rule",
+        "body": "Within Calendar, period arrows follow the displayed anchor while preserving a useful selected day. Changing month/week/list retains the chosen date; opening a compact day plan transfers focus after commit, and closing it restores a visible date target or pane toggle.",
         "section": "components"
       }
     ],
@@ -633,14 +848,18 @@
       "Do load Files quick look only on request and describe Trash dates as modification dates.",
       "Do keep workspace geometry and shape roles scoped to the shell while retaining each local view's container behavior.",
       "Do use the existing link and secondary foreground roles for workspace text states.",
-      "Do keep shell controls reachable when panels collapse and preserve save-before-navigation behavior."
+      "Do keep shell controls reachable when panels collapse and preserve save-before-navigation behavior.",
+      "Do keep Calendar source, context, type and corner roles scoped to the calendar workspace.",
+      "Do preserve the displayed date anchor, bounded previews, complete paged day lists and focus restoration when changing visible Calendar regions.",
+      "Do pair Calendar source color with labels or icons and keep task editing, journal opening and external sending explicit."
     ],
     "donts": [
       "Don't let a local feature silently change the global palette or typography.",
       "Don't impose decorative image covers or motion on dense note indexes.",
       "Don't turn preview tag actions into note edits or load image covers while filtering Tags.",
-      "Don't invent file sizes or deletion timestamps in Files and Trash."
+      "Don't invent file sizes or deletion timestamps in Files and Trash.",
+      "Don't treat Calendar's synthetic light-token capture as a shipped global application light theme."
     ]
   },
-  "generatedAt": "2026-10-11T08:34:36.291915+00:00"
+  "generatedAt": "2026-10-11T13:20:21.910573+00:00"
 }
