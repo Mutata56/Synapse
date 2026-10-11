@@ -16,13 +16,13 @@
 .workspace-sidebar-body { flex:1; min-height:0; display:flex; flex-direction:column; padding:0 12px; }
 .workspace-file-actions { height:48px; flex-shrink:0; display:flex; align-items:center; justify-content:center; gap:7px; }
 .workspace-file-tree { padding-top:10px; }
-.workspace-file-tree .workspace-tree-row { min-height:38px; font-size:15px; color:var(--color-text-secondary); }
+.workspace-file-tree .workspace-tree-row { min-height:38px; font-size:var(--font-ui-medium); color:var(--color-text-secondary); }
 .workspace-file-tree .workspace-tree-row.is-folder { color:var(--color-text-strong); }
 .workspace-file-tree .workspace-tree-row>svg { width:16px; height:16px; }
 .workspace-file-tree .workspace-tree-row .workspace-folder-chevron>svg { width:14px; height:14px; }
 .workspace-file-tree .workspace-tree-row:hover { background:var(--color-bg-overlay); }
 .workspace-vault-footer { display:flex; align-items:center; gap:4px; height:54px; flex-shrink:0; padding:7px 18px; }
-.workspace-vault-name { flex:1; min-width:0; border:0; background:transparent; display:flex; gap:12px; align-items:center; color:var(--color-text-strong); cursor:pointer; font-family:inherit; font-size:16px; font-weight:400; text-align:left; }
+.workspace-vault-name { flex:1; min-width:0; border:0; background:transparent; display:flex; gap:12px; align-items:center; color:var(--color-text-strong); cursor:pointer; font-family:inherit; font-size:var(--font-ui-medium); font-weight:400; text-align:left; }
 .workspace-vault-name span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .workspace-vault-name svg { flex-shrink:0; color:var(--color-text-muted); }
 .workspace-sidebar-resize { position:absolute; z-index:20; width:7px; right:-4px; top:0; bottom:0; cursor:col-resize; touch-action:none; }
@@ -37,7 +37,7 @@
 .workspace-tab.is-active { background:var(--color-bg-overlay); color:var(--color-text-strong); border-color:var(--color-accent-border); }
 .workspace-tab.is-active::after { content:""; position:absolute; height:2px; bottom:-1px; left:12px; right:12px; border-radius:1px; background:var(--color-link); pointer-events:none; }
 .workspace-tab.is-active::before,.workspace-tab.is-active + .workspace-tab::before,.workspace-tab:hover::before,.workspace-tab:hover + .workspace-tab::before { background:transparent; }
-.workspace-tab-select { font-family:inherit; height:100%; flex:1; min-width:0; display:flex; gap:8px; align-items:center; border:0; border-radius:7px; padding:0 8px 0 11px; background:transparent; color:inherit; cursor:pointer; font-size:13px; font-weight:500; line-height:1.4; text-align:left; }
+.workspace-tab-select { font-family:inherit; height:100%; flex:1; min-width:0; display:flex; gap:8px; align-items:center; border:0; border-radius:7px; padding:0 8px 0 11px; background:transparent; color:inherit; cursor:pointer; font-size:var(--font-ui-small); font-weight:500; line-height:1.4; text-align:left; }
 .workspace-tab-select span { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .workspace-tab-select svg { flex-shrink:0; color:var(--color-text-secondary); }
 .workspace-tab.is-active .workspace-tab-select svg { color:var(--color-link); }
@@ -52,7 +52,7 @@
 .workspace-stage.is-pending { cursor:progress; }
 .workspace-empty { flex:1; min-height:0; display:grid; place-items:center; background:var(--color-bg-overlay); }
 .workspace-empty-actions { display:flex; flex-direction:column; gap:9px; width:268px; margin-top:16px; }
-.workspace-empty-actions button { display:flex; align-items:center; gap:11px; min-height:40px; padding:8px 14px; border:1px solid var(--color-border); border-radius:24px; background:transparent; color:var(--color-text-secondary); font-size:14px; cursor:pointer; text-align:left; }
+.workspace-empty-actions button { display:flex; align-items:center; gap:11px; min-height:40px; padding:8px 14px; border:1px solid var(--color-border); border-radius:24px; background:transparent; color:var(--color-text-secondary); font-size:var(--font-ui-medium); cursor:pointer; text-align:left; }
 .workspace-empty-actions button:hover { background:var(--color-bg-elevated); border-color:var(--color-border-strong); color:var(--color-text-strong); }
 .workspace-empty-actions button span { flex:1; }
 .workspace-empty-actions button svg { flex-shrink:0; }

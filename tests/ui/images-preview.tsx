@@ -8,7 +8,7 @@ import { useNotesStore } from '../../src/store/notes';
 import type { ImageLibrary, LibraryImage } from '../../src/lib/imageLibrary';
 import type { ImagePreview } from '../../src/lib/imagePreviews';
 import type { Note } from '../../src/lib/storage';
-import '@blocknote/core/fonts/inter.css';
+
 import '../../src/index.css';
 import './tags-preview.css';
 const mode=new URLSearchParams(location.search).get('data')??'vault';

@@ -101,7 +101,7 @@ test("writing streak is anchored to today or yesterday", () => {
 
 const mocks = { name: "calendar-store-mocks", setup(builder) {
   builder.onResolve({ filter: /(^@tauri-apps\/api\/core$|\/lib\/storage$|^\.\/notes$)/ }, args => ({ path: args.path, namespace: "calendar-test" }));
-  builder.onLoad({ filter: /.*/, namespace: "calendar-test" }, args => ({ contents: args.path.includes("storage") ? "export const readTasks = () => globalThis.calendarTest.read(); export const writeTasks = value => globalThis.calendarTest.write(value);" : args.path === "./notes" ? "export const useNotesStore = { getState: () => ({ settings: { calendarIcsUrl: globalThis.calendarTest.url } }) };" : "export const invoke = (name,args) => globalThis.calendarTest.invoke(name,args);" }));
+  builder.onLoad({ filter: /.*/, namespace: "calendar-test" }, args => ({ contents: args.path.includes("storage") ? "export const readTasks = () => globalThis.calendarTest.read(); export const writeTasks = value => globalThis.calendarTest.write(value);" : args.path === "./notes" ? "export const useNotesStore = { getState: () => ({ settings: { calendarIcsUrl: globalThis.calendarTest.url, modules: { calendar: true } } }) };" : "export const invoke = (name,args) => globalThis.calendarTest.invoke(name,args);" }));
 } };
 const deferred = () => { let resolve, reject; const promise = new Promise((yes, no) => { resolve = yes; reject = no; }); return { promise, resolve, reject }; };
 test("task load is shared and durable edits queue without losing simultaneous additions", async () => {

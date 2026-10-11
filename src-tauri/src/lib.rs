@@ -161,8 +161,21 @@ fn set_capture_shortcut(
     app: AppHandle,
     state: tauri::State<'_, CaptureShortcut>,
     accelerator: String,
+    enabled: Option<bool>,
 ) -> Result<(), String> {
     use tauri_plugin_global_shortcut::GlobalShortcutExt;
+
+    if enabled == Some(false) {
+        let mut current = state.0.lock().map_err(|e| e.to_string())?;
+        if let Some(previous) = current.as_ref() {
+            app.global_shortcut().unregister(*previous).map_err(|e| e.to_string())?;
+            *current = None;
+        }
+        if let Some(window) = app.get_webview_window("capture") {
+            let _ = window.hide();
+        }
+        return Ok(());
+    }
 
     let shortcut: Shortcut = accelerator
         .parse()

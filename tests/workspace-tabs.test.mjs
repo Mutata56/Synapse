@@ -56,7 +56,7 @@ test("session recovery rejects invalid data and serializes no document content o
 let fixtureNumber = 0;
 async function fixture(t, select) {
   const saved = new Map(), events = [], writes = [], original = {};
-  const notes = createStore(() => ({ tree: [], view: "notes", activeId: null, activeNote: null,
+  const notes = createStore(() => ({ tree: [], settings: {modules: {notes:true,files:true,search:true,graph:true,calendar:true,tags:true,images:true,inbox:true,overview:true,trash:true,home:true,newNote:true,canvas:true,database:true,bookmarks:true,context:true,help:true}}, view: "notes", activeId: null, activeNote: null,
     selectNote: async id => { events.push(`read:${id}`); await select?.(id); notes.setState({ activeId: id, activeNote: id === "missing" ? null : { id } }); },
     closeActiveNote: async () => { events.push("close"); notes.setState({ activeId: null, activeNote: null }); },
     setView: view => notes.setState({ view }),
@@ -139,4 +139,32 @@ test("right pane choice and width persist without rewriting document destination
   assert.equal(saved.get("synapse-workspace-session-v1"),session);
   workspace.getState().toggleRight();workspace.getState().toggleRight();
   assert.equal(workspace.getState().rightPane,"graph");
+});
+
+test("disabling a module closes its tabs, preserves document tabs and blocks every direct view entry", async t => {
+  const { workspace, notes } = await fixture(t);
+  await workspace.getState().openNote("A");
+  await workspace.getState().openView("graph");
+  notes.setState(s=>({settings:{...s.settings,modules:{...s.settings.modules,graph:false}}}));
+  await workspace.getState().activateTab(workspace.getState().activeTabId);
+  assert(!workspace.getState().tabs.some(tab=>tab.target.kind==='view'&&tab.target.view==='graph'));
+  assert.equal(model.activeWorkspaceTab(workspace.getState()).target.noteId,'A');
+  await workspace.getState().openView('graph');
+  assert.equal(model.activeWorkspaceTab(workspace.getState()).target.noteId,'A');
+});
+test("restored disabled sections fall back to settings and do not hide access to configuration", async t => {
+  const { workspace, notes } = await fixture(t);
+  notes.setState(s=>({settings:{...s.settings,modules:{...s.settings.modules,graph:false}}}));
+  workspace.setState({tabs:[{id:'old',target:{kind:'view',view:'graph'}}],activeTabId:'old'});
+  await workspace.getState().restore();
+  assert.deepEqual(model.activeWorkspaceTab(workspace.getState()).target,{kind:'view',view:'settings'});
+});
+test("disabling new tabs preserves open documents but prevents every additional-tab action", async t => {
+  const { workspace, notes } = await fixture(t);
+  await workspace.getState().openNote('A'); await workspace.getState().openNote('B',true);
+  notes.setState(s=>({settings:{...s.settings,modules:{...s.settings.modules,home:false}}}));
+  await workspace.getState().newTab(); assert.equal(workspace.getState().tabs.length,2);
+  await workspace.getState().openNote('C',true); assert.equal(workspace.getState().tabs.length,2);
+  await workspace.getState().openView('files'); assert.equal(workspace.getState().tabs.length,2);
+  assert(workspace.getState().tabs.some(tab=>tab.target.kind==='note'&&tab.target.noteId==='A'));
 });

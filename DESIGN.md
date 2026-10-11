@@ -35,13 +35,33 @@ typography:
     letterSpacing: "-0.025em"
   body:
     fontFamily: "Inter, system-ui, sans-serif"
-    fontSize: "14px"
+    fontSize: "15px"
     fontWeight: 400
     lineHeight: 1.5
   label:
     fontFamily: "Inter, system-ui, sans-serif"
     fontSize: "12px"
     fontWeight: 500
+    lineHeight: 1.5
+  note-body:
+    fontFamily: "Inter, system-ui, sans-serif"
+    fontSize: "17px"
+    fontWeight: 400
+    lineHeight: 1.5
+  note-title:
+    fontFamily: "Inter, system-ui, sans-serif"
+    fontSize: "27.506px"
+    fontWeight: 700
+    lineHeight: 1.2
+    letterSpacing: "-0.015em"
+  note-code:
+    fontFamily: "JetBrains Mono, ui-monospace, monospace"
+    fontSize: "14.875px"
+    fontWeight: 400
+    lineHeight: 1.5
+  source-markdown:
+    fontFamily: "JetBrains Mono, ui-monospace, monospace"
+    fontSize: "17px"
     lineHeight: 1.5
   tags-page-title:
     fontSize: "24px"
@@ -153,11 +173,11 @@ typography:
   workspace-tree-label:
     fontSize: "15px"
     fontWeight: 400
-    lineHeight: 1.55
+    lineHeight: 1.5
   workspace-action-label:
-    fontSize: "14px"
+    fontSize: "15px"
     fontWeight: 400
-    lineHeight: 1.55
+    lineHeight: 1.5
   workspace-result-title:
     fontSize: "13px"
     fontWeight: 500
@@ -532,6 +552,25 @@ The source has local light overrides for these accents and native input color-sc
 
 The existing Inter and system fallback stack supplies the interface. Section titles are compact and semibold; controls and note rows use a smaller workhorse scale. Monospace is reserved for source/code values.
 
+### Shared font roles
+
+The user pinned Obsidian's typography. Inter normal and italic variable faces
+are copied unchanged from its packaged resources and loaded locally. They
+replace BlockNote's static Latin-only font imports. Inter uses its normal
+glyphs; the application no longer forces cv02/cv03/cv04/cv11/ss01/ss03. Both
+faces contain the complete Russian and Latin alphabets. The bundled official
+JetBrains Mono 2.304 variable faces supply code and source Markdown, following
+the user's clarification and the Obsidian theme's source-font setting. Font
+notices ship under `/fonts/`.
+
+`src/typography.css` separates interface, text and monospace roles. Ordinary
+interface text is 15px, compact labels retain 13/12px and existing dense
+previews keep their local 13/14px scale. Primary note prose is 17px/1.5 at the
+default editor zoom. H1–H6 use the Obsidian ratios 1.618/1.462/1.318/1.188/1.076/1
+relative to that body. The inline note title uses the H1 ratio and the editor's
+text zoom. Its height follows width, zoom and font loading instead of clipping
+wrapped lines. Code uses 0.875em; raw Markdown keeps the readable 17px base.
+
 ### Tags hierarchy
 
 The scoped title roles distinguish the view, the selected note and the results pane. Result titles are slightly emphasized; tree labels and search fields use the smaller row role. Context labels and mint tag summaries use the two smallest steps. Preview prose has the body size with a more generous reading line height and a maximum measure (72ch). Its Markdown subheadings follow the rendered document hierarchy (23px, 20px and 17px).
@@ -554,9 +593,11 @@ The properties heading becomes (18px) on narrow layouts, while row names become 
 
 ### Workspace hierarchy
 
-The shell inherits the incumbent Inter/system family. The recorded tab-label role also describes the vault name: the rendered browser values are regular (400), with a line height of (1.55). Tree labels and empty-page actions use their own adjacent steps, while result titles, result context and keycaps retain compact roles. Search input and context headings use the existing compact interface scale (13px).
-
-The shell's button font reset wins over the single-class font-size/weight declarations on document tabs and the vault name. The workspace roles record measured browser output at (1280 × 720), rather than treating those overridden declarations as implemented typography. The inherited text stack remains unchanged.
+The shell uses normal Inter. Tabs, vault name, tree labels and empty-page
+actions share the 15px interface role; ordinary labels are regular (400) with
+line height 1.5. Result titles, context, keycaps and the narrow tab adaptation
+retain compact roles. The generic button font reset was removed in the earlier
+workspace pass, so these explicit role sizes now determine the rendered type.
 
 ### Calendar hierarchy
 

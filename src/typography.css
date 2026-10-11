@@ -1,0 +1,70 @@
+/* Local variable Inter from the Obsidian distribution; license: /fonts/OFL-Inter.txt. */
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("./assets/fonts/InterVariable.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Inter";
+  font-style: italic;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("./assets/fonts/InterVariable-Italic.woff2") format("woff2");
+}
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-weight: 100 800;
+  font-display: swap;
+  src: url("./assets/fonts/JetBrainsMonoVariable.ttf") format("truetype");
+}
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: italic;
+  font-weight: 100 800;
+  font-display: swap;
+  src: url("./assets/fonts/JetBrainsMonoVariable-Italic.ttf") format("truetype");
+}
+
+:root {
+  --font-interface: "Inter", ui-sans-serif, -apple-system, BlinkMacSystemFont, system-ui, "Segoe UI", sans-serif;
+  --font-text: var(--font-interface);
+  --font-monospace: "JetBrains Mono", ui-monospace, SFMono-Regular, "Cascadia Mono", "Roboto Mono", "DejaVu Sans Mono", "Liberation Mono", Menlo, Monaco, Consolas, monospace;
+  --font-ui-smaller: 12px;
+  --font-ui-small: 13px;
+  --font-ui-medium: 15px;
+  --font-ui-large: 20px;
+  --font-text-size: 17px;
+  --line-height-normal: 1.5;
+  --line-height-tight: 1.3;
+  --reading-width: 72ch;
+  --h1-size: 1.618em;
+  --h2-size: 1.462em;
+  --h3-size: 1.318em;
+  --h4-size: 1.188em;
+  --h5-size: 1.076em;
+  --h6-size: 1em;
+}
+
+.bn-inline-content code,
+.bn-block-content[data-content-type="codeBlock"] pre,
+.bn-block-content[data-content-type="codeBlock"] code { font-family: var(--font-monospace); }
+.bn-inline-content code,
+.bn-block-content[data-content-type="codeBlock"] pre { font-size: .875em; }
+
+/* BlockNote also carries a previous heading's size into its empty continuation. */
+.e26-zoom-scope .bn-block-content[data-content-type="heading"] { --level: var(--h1-size); --heading-weight: 700; --heading-line-height: 1.2; --heading-spacing: -.015em; }
+.e26-zoom-scope .bn-block-content[data-content-type="heading"][data-level="2"] { --level: var(--h2-size); --heading-weight: 600; --heading-spacing: -.011em; }
+.e26-zoom-scope .bn-block-content[data-content-type="heading"][data-level="3"] { --level: var(--h3-size); --heading-weight: 600; --heading-line-height: 1.3; --heading-spacing: -.008em; }
+.e26-zoom-scope .bn-block-content[data-content-type="heading"][data-level="4"] { --level: var(--h4-size); --heading-weight: 600; --heading-line-height: 1.4; --heading-spacing: -.005em; }
+.e26-zoom-scope .bn-block-content[data-content-type="heading"][data-level="5"] { --level: var(--h5-size); --heading-weight: 600; --heading-line-height: var(--line-height-normal); --heading-spacing: -.002em; }
+.e26-zoom-scope .bn-block-content[data-content-type="heading"][data-level="6"] { --level: var(--h6-size); --heading-weight: 600; --heading-line-height: var(--line-height-normal); --heading-spacing: 0em; }
+.e26-zoom-scope .bn-block-content[data-content-type="heading"] { font-weight: var(--heading-weight) !important; line-height: var(--heading-line-height); letter-spacing: var(--heading-spacing); }
+.e26-zoom-scope .bn-block-outer[data-prev-level="1"] { --prev-level: var(--h1-size); }
+.e26-zoom-scope .bn-block-outer[data-prev-level="2"] { --prev-level: var(--h2-size); }
+.e26-zoom-scope .bn-block-outer[data-prev-level="3"] { --prev-level: var(--h3-size); }
+.e26-zoom-scope .bn-block-outer[data-prev-level="4"] { --prev-level: var(--h4-size); }
+.e26-zoom-scope .bn-block-outer[data-prev-level="5"] { --prev-level: var(--h5-size); }
+.e26-zoom-scope .bn-block-outer[data-prev-level="6"] { --prev-level: var(--h6-size); }

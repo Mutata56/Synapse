@@ -4,7 +4,7 @@ import {useNotesStore} from '../../src/store/notes';
 import {listTree} from '../../src/lib/storage';
 import {LanguageProvider} from '../../src/components/LanguageProvider';
 import {ConfirmDialog} from '../../src/components/ConfirmDialog';
-import '@blocknote/core/fonts/inter.css';import '@blocknote/mantine/style.css';import '../../src/index.css';
+import '@blocknote/mantine/style.css';import '../../src/index.css';
 const real='Работа/LTM/Магнит/Коломна (обучение)/WMS Driver/0. Карта изучения WMS Driver';
 useNotesStore.setState({tree:await listTree(),view:'notes'});
 await useNotesStore.getState().selectNote(new URLSearchParams(location.search).get('data')==='real'?real:'Imported test');

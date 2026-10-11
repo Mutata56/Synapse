@@ -146,6 +146,8 @@ export function Editor2026({ imported }: { imported?: ImportedEditorBridge } = {
   const canGoBack = useNotesStore((s) => s.backStack.length > 0);
   const tree = useNotesStore((s) => s.tree);
   const editorReloadNonce = useNotesStore((s) => s.editorReloadNonce);
+  const modules = useNotesStore(state => state.settings.modules);
+  const localGraphEnabled = useNotesStore(state => state.settings.modules.graph && state.settings.graph.localGraph);
   const wide = useMediaQuery("(min-width: 1600px)");
 
   const editor = useCreateBlockNote({
@@ -476,7 +478,7 @@ export function Editor2026({ imported }: { imported?: ImportedEditorBridge } = {
       // клики ломаются. Сначала все "Блоки", потом все "Медиа".
       const items = [
         ...getDefaultReactSlashMenuItems(editor),
-        ...calloutItems, ...taskItems, dataTableItem, galleryItem, fileItem, whiteboardItem,
+        ...calloutItems, ...taskItems, ...(modules.database ? [dataTableItem] : []), galleryItem, fileItem, ...(modules.canvas ? [whiteboardItem] : []),
         ...getMultiColumnSlashMenuItems(editor),
       ];
       const groups = new Map<string, DefaultReactSuggestionItem[]>();
@@ -488,7 +490,7 @@ export function Editor2026({ imported }: { imported?: ImportedEditorBridge } = {
       }
       return filterSuggestionItems(Array.from(groups.values()).flat(), query);
     },
-    [editor, insertCustomBlock],
+    [editor, insertCustomBlock, modules.database, modules.canvas],
   );
 
   // Открываем блочное меню по клику в ПУСТОЙ параграф, чтобы можно
@@ -603,10 +605,10 @@ export function Editor2026({ imported }: { imported?: ImportedEditorBridge } = {
           className="e26-zoom-scope"
           style={{ "--e26-zoom": zoom } as CSSProperties}
         >
-          <NoteHero key={activeId} />
+          <NoteHero key={activeId} textZoom={zoom} />
           <TemplateChipRow visible={isEmpty} editor={editor} schema={schema} />
           <div className={cn(wide && "flex justify-center items-start gap-6 px-6")}>
-            {wide && (
+            {wide && localGraphEnabled && (
               <aside
                 key="mentions"
                 className="w-64 shrink-0 sticky top-4 self-start max-h-[calc(100vh-2rem)] overflow-y-auto pt-6"
@@ -651,11 +653,11 @@ export function Editor2026({ imported }: { imported?: ImportedEditorBridge } = {
                 <>
                   <Backlinks />
                   <UnlinkedMentions />
-                  <LocalGraph />
+                  {localGraphEnabled ? <LocalGraph /> : null}
                 </>
               )}
             </div>
-            {wide && (
+            {wide && localGraphEnabled && (
               <aside
                 key="graph"
                 className="w-64 shrink-0 sticky top-4 self-start max-h-[calc(100vh-2rem)] overflow-y-auto pt-6"
