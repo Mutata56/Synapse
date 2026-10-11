@@ -9,9 +9,10 @@ export type CalendarNoteIndex = { byDay: Map<string, NoteMeta[]>; journals: Map<
 export type CalendarRange = { days: string[]; from: string; to: string; month: string; monthFrom: string; monthTo: string };
 export type CalendarDay = { key: string; notes: NoteMeta[]; tasks: Task[]; events: CalEvent[]; journal?: NoteMeta };
 
-const noteIndexes = new WeakMap<TreeNode[], CalendarNoteIndex>();
+const noteIndexes = new WeakMap<TreeNode[], { zone: string; index: CalendarNoteIndex }>();
 const taskIndexes = new WeakMap<Task[], Map<string, Map<string, Task[]>>>();
 const eventIndexes = new WeakMap<ParsedEvent[], Map<string, Map<string, CalEvent[]>>>();
+const defaultZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 export const DEFAULT_CALENDAR_FILTERS: CalendarFilters = { tasks: true, events: true, notes: true, completed: true, query: "" };
 
 export function dateFromDay(key: string): Date {
@@ -66,9 +67,9 @@ function append<T>(map: Map<string, T[]>, key: string, value: T) {
 }
 
 /** Tree revisions are immutable in the notes store. Browsing never reads note bodies. */
-export function getCalendarNoteIndex(tree: TreeNode[]): CalendarNoteIndex {
+export function getCalendarNoteIndex(tree: TreeNode[], zone = defaultZone): CalendarNoteIndex {
   const cached = noteIndexes.get(tree);
-  if (cached) return cached;
+  if (cached?.zone === zone) return cached.index;
   const byDay = new Map<string, NoteMeta[]>(), journals = new Map<string, NoteMeta>(), anniversaries = new Map<string, NoteMeta[]>();
   const stack = [...tree];
   while (stack.length) {
@@ -86,7 +87,7 @@ export function getCalendarNoteIndex(tree: TreeNode[]): CalendarNoteIndex {
   for (const notes of byDay.values()) notes.sort((a, b) => a.createdAt - b.createdAt || a.id.localeCompare(b.id));
   for (const notes of anniversaries.values()) notes.sort((a, b) => b.createdAt - a.createdAt || a.id.localeCompare(b.id));
   const result = { byDay, journals, anniversaries };
-  noteIndexes.set(tree, result);
+  noteIndexes.set(tree, { zone, index: result });
   return result;
 }
 
@@ -109,10 +110,10 @@ export function getCalendarTaskDays(tasks: Task[], from: string, to: string): Ma
 }
 
 /** Include every visible day touched by an event; DTEND is exclusive. */
-export function getCalendarEventDays(events: ParsedEvent[], from: string, to: string): Map<string, CalEvent[]> {
+export function getCalendarEventDays(events: ParsedEvent[], from: string, to: string, zone = defaultZone): Map<string, CalEvent[]> {
   let cache = eventIndexes.get(events);
   if (!cache) { cache = new Map(); eventIndexes.set(events, cache); }
-  const key = `${from}/${to}`, cached = cache.get(key);
+  const key = `${zone}/${from}/${to}`, cached = cache.get(key);
   if (cached) return cached;
   const start = dateFromDay(from).getTime(), end = dateFromDay(shiftDay(to, 1)).getTime();
   const days = new Map<string, CalEvent[]>();

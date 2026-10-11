@@ -7,7 +7,8 @@ import { getLanguage, t } from "../lib/i18n";
 import { moodColor, moodFace } from "../lib/mood";
 import { isTaskDoneOn, type Task } from "../lib/tasks";
 import { useCalendarStore } from "../store/calendar";
-import { registerFlusher, useNotesStore } from "../store/notes";
+import { useNotesStore } from "../store/notes";
+import { watchCalendarClock } from "../lib/calendarClock";
 import { useTasksStore } from "../store/tasks";
 import { useToastStore } from "../store/toasts";
 import { ContextMenu, type ContextMenuItem } from "./ContextMenu";
@@ -26,6 +27,7 @@ export function CalendarView() {
   const events = useCalendarStore(state => state.events), syncStatus = useCalendarStore(state => state.status), syncError = useCalendarStore(state => state.error), lastSync = useCalendarStore(state => state.lastSync);
   const tasks = useTasksStore(state => state.tasks), loaded = useTasksStore(state => state.loaded), loadError = useTasksStore(state => state.error);
   const [today, setToday] = useState(() => toISODate(new Date()));
+  const [zone, setZone] = useState(() => Intl.DateTimeFormat().resolvedOptions().timeZone);
   const [anchor, setAnchor] = useState(() => session?.anchor ?? today), [selected, setSelected] = useState(() => session?.selected ?? today);
   const [mode, setMode] = useState<CalendarMode>(() => session?.mode ?? "month");
   const [filters, setFilters] = useState<CalendarFilters>(() => session?.filters ?? { ...DEFAULT_CALENDAR_FILTERS });
@@ -43,10 +45,10 @@ export function CalendarView() {
   const search = useRef<HTMLInputElement>(null), connectionRoot = useRef<HTMLDivElement>(null);
   const locale = getLanguage() === "en" ? "en-GB" : "ru-RU", hasCalendar = Boolean(calendarUrl.trim());
   const deferredQuery = useDeferredValue(filters.query);
-  const index = useMemo(() => getCalendarNoteIndex(tree), [tree]);
+  const index = useMemo(() => getCalendarNoteIndex(tree, zone), [tree, zone]);
   const range = useMemo(() => calendarRange(anchor, mode), [anchor, mode]);
   const taskDays = useMemo(() => getCalendarTaskDays(tasks, range.from, range.to), [tasks, range.from, range.to]);
-  const eventDays = useMemo(() => getCalendarEventDays(hasCalendar ? events : EMPTY_EVENTS, range.from, range.to), [events, hasCalendar, range.from, range.to]);
+  const eventDays = useMemo(() => getCalendarEventDays(hasCalendar ? events : EMPTY_EVENTS, range.from, range.to, zone), [events, hasCalendar, range.from, range.to, zone]);
   const effectiveFilters = useMemo(() => ({ ...filters, query: deferredQuery }), [filters, deferredQuery]);
   const days = useMemo(() => calendarDays(index, taskDays, eventDays, range, effectiveFilters), [index, taskDays, eventDays, range, effectiveFilters]);
   const chosen = days.find(day => day.key === selected) ?? { key: selected, tasks: [], notes: [], events: [], journal: index.journals.get(selected) };
@@ -71,16 +73,9 @@ export function CalendarView() {
 
   useEffect(() => { const observer = new ResizeObserver(entries => setCompact(entries[0].contentRect.width <= 1000)); if (root.current) observer.observe(root.current); return () => observer.disconnect(); }, []);
   useEffect(() => { session = { anchor, selected, mode, filters, pane }; }, [anchor, selected, mode, filters, pane]);
-  useEffect(() => { void useTasksStore.getState().load().catch(() => {}); return registerFlusher(() => useTasksStore.getState().flush()); }, []);
+  useEffect(() => { void useTasksStore.getState().load().catch(() => {}); }, []);
   useEffect(() => { useCalendarStore.getState().syncIfStale(); }, [calendarUrl]);
-  useEffect(() => {
-    const update = () => setToday(toISODate(new Date()));
-    const now = new Date(), midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).getTime();
-    const timer = window.setTimeout(update, midnight - now.getTime() + 50);
-    const onVisible = () => { if (!document.hidden) update(); };
-    document.addEventListener("visibilitychange", onVisible);
-    return () => { window.clearTimeout(timer); document.removeEventListener("visibilitychange", onVisible); };
-  }, [today]);
+  useEffect(() => watchCalendarClock(clock => { setToday(clock.day); setZone(clock.zone); }, () => useCalendarStore.getState().syncIfStale()), []);
   useEffect(() => {
     if (!connections) return;
     const close = (event: MouseEvent) => { if (!connectionRoot.current?.contains(event.target as Node)) setConnections(false); };

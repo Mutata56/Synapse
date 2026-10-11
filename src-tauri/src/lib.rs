@@ -12,11 +12,12 @@ use std::time::Duration;
 
 use std::io::Write;
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use tauri::{
     menu::{Menu, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
-    AppHandle, Manager,
+    AppHandle, Emitter, Manager,
 };
 
 #[cfg(desktop)]
@@ -133,8 +134,12 @@ fn show_main(app: &AppHandle) {
 #[cfg(desktop)]
 #[tauri::command]
 fn exit_application(app: AppHandle) {
+    app.state::<ExitPermit>().0.store(true, Ordering::Release);
     app.exit(0);
 }
+
+#[derive(Default)]
+struct ExitPermit(AtomicBool);
 
 /// Показывает безрамочное окно быстрого захвата поверх остальных.
 #[cfg(desktop)]
@@ -465,7 +470,7 @@ pub fn run() {
         }
     };
 
-    let builder = tauri::Builder::default();
+    let builder = tauri::Builder::default().manage(ExitPermit::default());
 
     #[cfg(target_os = "macos")]
     let builder = builder.manage(instance).plugin(
@@ -593,7 +598,7 @@ pub fn run() {
                         .show_menu_on_left_click(false)
                         .on_menu_event(|app, event| match event.id.as_ref() {
                             "open" => show_main(app),
-                            "quit" => app.exit(0),
+                            "quit" => { let _ = app.emit("workspace-command", "quit-app"); },
                             _ => {}
                         })
                         .on_tray_icon_event(|tray, event| {
@@ -632,7 +637,17 @@ pub fn run() {
                 let _ = window.hide();
             }
         })
-        .run(context);
+        .build(context)
+        .map(|app| app.run(|app, event| {
+            // Dock/system Quit also goes through the durable frontend barrier.
+            // Only exit_application, called after saving, grants the permit.
+            if let tauri::RunEvent::ExitRequested { api, .. } = event {
+                if !app.state::<ExitPermit>().0.load(Ordering::Acquire) {
+                    api.prevent_exit();
+                    let _ = app.emit("workspace-command", "quit-app");
+                }
+            }
+        }));
 
     // Сюда доходим, только если приложение вообще не смогло стартовать (например,
     // под Windows нет рантайма WebView2). Пишем причину в лог и выходим с кодом 1;
