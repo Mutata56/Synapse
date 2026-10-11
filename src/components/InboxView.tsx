@@ -1,4 +1,5 @@
 import { NoteIcon } from "./NoteIcon";
+import { useWorkspaceStore } from "../store/workspace";
 import { FileText, FolderInput, Pencil, Trash2, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { cn } from "../lib/cn";
@@ -35,8 +36,6 @@ function pluralNotes(n: number): string {
 
 export function InboxView() {
   const tree = useNotesStore((s) => s.tree);
-  const selectNote = useNotesStore((s) => s.selectNote);
-  const setView = useNotesStore((s) => s.setView);
   const moveNote = useNotesStore((s) => s.moveNote);
   const renameNote = useNotesStore((s) => s.renameNote);
   const trashNote = useNotesStore((s) => s.trashNote);
@@ -59,9 +58,8 @@ export function InboxView() {
     [tree],
   );
 
-  const open = (id: string) => {
-    setView("notes");
-    void selectNote(id);
+  const open = (id: string, newTab = false) => {
+    void useWorkspaceStore.getState().openNote(id, newTab);
   };
 
   return (
@@ -95,7 +93,7 @@ export function InboxView() {
                   key={note.id}
                   note={note}
                   folders={folders}
-                  onOpen={() => open(note.id)}
+                  onOpen={event => open(note.id, event?.metaKey === true)}
                   onRename={(t) => void renameNote(note.id, t)}
                   onMove={(folder) => void moveNote(note.id, folder)}
                   onTrash={() => void trashNote(note.id)}
@@ -121,7 +119,7 @@ function InboxCard({
 }: {
   note: NoteMeta;
   folders: { path: string; depth: number }[];
-  onOpen: () => void;
+  onOpen: (event?: { metaKey: boolean }) => void;
   onRename: (title: string) => void;
   onMove: (folder: string) => void;
   onTrash: () => void;

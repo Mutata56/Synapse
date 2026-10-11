@@ -84,6 +84,7 @@ https://github.com/user-attachments/assets/9db144f0-f82d-4251-ba05-e5130e225cc1
 
   
 - Командная палитра (Ctrl/Cmd + K) и быстрый поиск.
+- Cmd+клик по статье открывает отдельную вкладку, включая уже открытую статью. Обычный клик использует текущую вкладку; Ctrl+клик оставлен для выделения.
 
 <img width="566" height="569" alt="image" src="https://github.com/user-attachments/assets/3f42fb29-7372-4b34-bf94-d1ccca0c3c04" />
 

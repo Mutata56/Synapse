@@ -139,7 +139,6 @@ export function CommandPalette() {
   const view = useNotesStore((s) => s.view);
   const activeId = useNotesStore((s) => s.activeId);
   const setView = useNotesStore((s) => s.setView);
-  const selectNote = useWorkspaceStore((s) => s.openNote);
   const createNote = useNotesStore((s) => s.createNote);
   const startCreateFolder = useNotesStore((s) => s.startCreateFolder);
   const closeActive = useNotesStore((s) => s.closeActiveNote);
@@ -493,10 +492,9 @@ export function CommandPalette() {
     setOpen(false);
   };
 
-  const runItem = (item: Item) => {
+  const runItem = (item: Item, newTab = false) => {
     if (item.kind === "note") {
-      setView("notes");
-      void selectNote(item.note.id);
+      void useWorkspaceStore.getState().openNote(item.note.id, newTab);
       setOpen(false);
     } else if (item.kind === "action") {
       item.action.run();
@@ -539,7 +537,7 @@ export function CommandPalette() {
     } else if (e.key === "Enter") {
       e.preventDefault();
       const target = items[selected];
-      if (target) runItem(target);
+      if (target) runItem(target, e.metaKey);
     }
   };
 
@@ -641,7 +639,7 @@ export function CommandPalette() {
                     active={i === selected}
                     index={i}
                     onHover={() => setSelected(i)}
-                    onClick={() => runItem(item)}
+                    onClick={event => runItem(item, event.metaKey)}
                   />
                 ))
               )}
@@ -726,7 +724,7 @@ function ResultRow({
   // mouse-enter, а не mouse-move: `move` стреляет на каждый пиксель
   // движения и устраивает поток setState и поток ре-рендеров.
   onHover: () => void;
-  onClick: () => void;
+  onClick: (event: React.MouseEvent<HTMLDivElement>) => void;
 }) {
   return (
     <div

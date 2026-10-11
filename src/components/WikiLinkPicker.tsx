@@ -72,7 +72,7 @@ export function WikiLinkPicker() {
                 <button
                   key={note.id}
                   type="button"
-                  onClick={() => openLinkMatch(note.id)}
+                  onClick={event => openLinkMatch(note.id, linkPicker.newTab || event.metaKey)}
                   className="w-full flex items-center gap-2.5 px-4 py-2 text-left hover:bg-white/[0.05] transition-colors"
                 >
                   <span className="shrink-0 w-5 flex justify-center">

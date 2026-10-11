@@ -19,7 +19,7 @@ export function activeWorkspaceTab(session: WorkspaceSession): WorkspaceTab {
 }
 
 export function openWorkspaceTarget(session: WorkspaceSession, target: WorkspaceTarget, id: string, newTab = false): WorkspaceSession {
-  const existing = target.kind !== "empty" ? session.tabs.find(tab => sameTarget(tab.target, target)) : undefined;
+  const existing = target.kind !== "empty" && (target.kind !== "note" || !newTab) ? session.tabs.find(tab => sameTarget(tab.target, target)) : undefined;
   if (existing) return existing.id === session.activeTabId ? session : { tabs: session.tabs, activeTabId: existing.id };
   const active = activeWorkspaceTab(session);
   if (!newTab || active.target.kind === "empty") {

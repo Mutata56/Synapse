@@ -38,6 +38,7 @@ import type { TreeNode, NoteMeta } from "../lib/storage";
 import { NoteIcon } from "./NoteIcon";
 import { useIconizeStore } from "../store/iconize";
 import { resolveIcon } from "../lib/iconize";
+import { noteClickAction } from "../lib/noteClick";
 import { stableKey } from "../lib/treeKeys";
 import { confirmDialog } from "../store/confirm";
 import { reportError, useNotesStore } from "../store/notes";
@@ -829,12 +830,14 @@ function NoteRow({
 
   const onClick = (e: React.MouseEvent) => {
     if (renaming) return;
-    if (e.ctrlKey || e.metaKey || ctx.selecting) {
+    const action = noteClickAction(e, ctx.selecting);
+    if (action === "select") {
       e.preventDefault();
       ctx.toggleNote(note.id);
       return;
     }
-    void useWorkspaceStore.getState().openNote(note.id);
+    if (action === "new-tab") e.preventDefault();
+    void useWorkspaceStore.getState().openNote(note.id, action === "new-tab");
   };
 
   return (

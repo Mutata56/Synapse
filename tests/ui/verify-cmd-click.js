@@ -1,0 +1,38 @@
+async page => {
+  const check=(ok,message)=>{if(!ok)throw Error(message);};
+  await page.goto('http://127.0.0.1:1489/workspace-bench.html?cmd-click');
+  await page.evaluate(()=>{localStorage.clear();sessionStorage.clear();});
+  await page.reload();
+  const tabs=page.getByRole('tablist',{name:'Открытые вкладки'}).getByRole('tab');
+  await page.getByRole('treeitem',{name:'Инструкция по заметкам',exact:true}).click();
+  await page.getByRole('textbox',{name:'Название заметки',exact:true}).waitFor();
+  await page.getByRole('textbox',{name:'Название заметки',exact:true}).fill('Сохранённый заголовок');
+  await page.getByRole('treeitem',{name:'Заметка',exact:true}).click({modifiers:['Meta']});
+  await page.waitForFunction(()=>document.querySelectorAll('.workspace-tab-select').length===2);
+  check(await tabs.count()===2,'Cmd creates a second article tab');
+  await tabs.first().click();
+  check(await page.getByRole('textbox',{name:'Название заметки',exact:true}).inputValue()==='Сохранённый заголовок','Pending title edit was saved before changing tabs');
+  await page.getByRole('treeitem',{name:'Заметка',exact:true}).click({modifiers:['Meta']});
+  await page.waitForFunction(()=>document.querySelectorAll('.workspace-tab-select').length===3);
+  check(await tabs.count()===3,'Cmd creates a new tab for an already open article');
+  await page.locator('[data-note-id="security"]').click({modifiers:['Control']});
+  check(await tabs.count()===3,'Ctrl selection does not open a tab');
+  await page.keyboard.press('Escape');
+  await page.locator('[data-note-id="security"]').click({modifiers:['Control']});
+  await page.keyboard.press('Escape');
+  await page.locator('[data-note-id="security"]').click();
+  await page.getByRole('textbox',{name:'Название заметки',exact:true}).waitFor();
+  check(await tabs.count()===3,'Plain click reuses current tab');
+  await page.getByRole('button',{name:'Все заметки',exact:true}).click();
+  await page.getByRole('button',{name:'Открыть заметку: Конспект',exact:true}).click({modifiers:['Meta']});
+  await page.waitForFunction(()=>document.querySelectorAll('.workspace-tab-select').length===4);
+  await page.getByRole('button',{name:'Файлы',exact:true}).click();
+  await page.locator('.fs-row').filter({has:page.locator('.fs-entry-name').filter({hasText:/^Заметка$/})}).click({modifiers:['Meta']});
+  await page.waitForFunction(()=>document.querySelectorAll('.workspace-tab-select').length===5);
+  await page.getByRole('button',{name:'Теги',exact:true}).click();
+  await page.locator('.tags-result-row').filter({hasText:'Конспект'}).click({modifiers:['Meta']});
+  await page.waitForFunction(()=>document.querySelectorAll('.workspace-tab-select').length===6);
+  await page.locator('[data-wikilink="Заметка"]').click({modifiers:['Meta']});
+  await page.waitForFunction(()=>document.querySelectorAll('.workspace-tab-select').length===7);
+  return {sidebar:true,sameArticle:true,plainClick:true,ctrlSelection:true,gallery:true,files:true,tags:true,wikiLink:true,savedPendingTitle:true,tabs:await tabs.count()};
+}

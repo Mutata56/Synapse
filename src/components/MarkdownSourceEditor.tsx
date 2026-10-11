@@ -205,17 +205,17 @@ export function MarkdownSourceEditor() {
 
   const deferredText = useDeferredValue(text);
   const preview = useMemo(() => splitMarkdownSource(deferredText).body, [deferredText]);
-  const navigate = useCallback((reference: string, relativeFirst = false) => {
+  const navigate = useCallback((reference: string, relativeFirst = false, newTab = false) => {
     const target = wikiTarget(reference);
     const path = resolveVaultReference(target.path, id, files, { note: true, relativeFirst });
     if (!path) { useToastStore.getState().push(`Ссылка не найдена или неоднозначна: ${reference}`); return; }
     const nextId = path.slice(0, -3);
-    if (nextId === id) {
+    if (nextId === id && !newTab) {
       void (async () => { await blockFlushRef.current?.(); await save(); setMode("preview"); requestAnimationFrame(() => scrollToHeading(target.heading)); })().catch(() => undefined);
       return;
     }
     try { if (target.heading) sessionStorage.setItem(anchorKey(nextId), target.heading); } catch { /* optional scroll hint */ }
-    useNotesStore.getState().openLinkMatch(nextId);
+    useNotesStore.getState().openLinkMatch(nextId, newTab);
   }, [id, files, save]);
 
   const switchMode = async (next: Mode) => {

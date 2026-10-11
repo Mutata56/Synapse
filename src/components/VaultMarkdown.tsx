@@ -10,7 +10,7 @@ import { remarkNoteTags } from "../lib/remarkNoteTags";
 import { useIconizeStore } from "../store/iconize";
 import { InlineIcon, VaultLinkIcon, remarkIconize } from "./IconizeMarkdown";
 
-export const VaultMarkdownContext = createContext<{ files: VaultFileIndex; workspace: string; id: string; navigate: (ref: string, relative?: boolean) => void }>({ files: indexVaultFiles([]), workspace: "", id: "", navigate: () => undefined });
+export const VaultMarkdownContext = createContext<{ files: VaultFileIndex; workspace: string; id: string; navigate: (ref: string, relative?: boolean, newTab?: boolean) => void }>({ files: indexVaultFiles([]), workspace: "", id: "", navigate: () => undefined });
 const urlTransform = (url: string) => /^synapse-(?:note|embed|tag|icon):/.test(url) ? url : defaultUrlTransform(url);
 
 export function scrollToMarkdownHeading(heading: string): void {
@@ -34,11 +34,11 @@ export function VaultMarkdown({ source }: { source: string }) {
       }
       return <a href={href || undefined} onClick={event => {
         event.preventDefault();
-        if (href.startsWith("synapse-note:")) { navigate(decodeURIComponent(href.slice("synapse-note:".length))); return; }
+        if (href.startsWith("synapse-note:")) { navigate(decodeURIComponent(href.slice("synapse-note:".length)), false, event.metaKey); return; }
         if (href.startsWith("#")) { scrollToMarkdownHeading(decodeURIComponent(href.slice(1))); return; }
         if (/^(?:https?:|mailto:)/i.test(href)) { void openUrl(href).catch(e => useToastStore.getState().push(String(e))); return; }
         const target = wikiTarget(href);
-        if (/\.md$/i.test(target.path)) { navigate(href, true); return; }
+        if (/\.md$/i.test(target.path)) { navigate(href, true, event.metaKey); return; }
         const path = resolveVaultReference(target.path, id, files, { relativeFirst: true });
         if (path && workspace) void openPath(`${workspace}/${path}`).catch(e => useToastStore.getState().push(String(e)));
         else useToastStore.getState().push(`Файл не найден: ${href}`);
