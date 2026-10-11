@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "./typography.css";
 
 /* Copied vault Markdown: preview is separate from the original source. */
 .markdown-source-editor { display: flex; flex: 1; flex-direction: column; min-width: 0; min-height: 0; }
@@ -13,11 +14,13 @@
 .markdown-source-location { padding: 7px 24px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-muted); font-size: 11px; flex-shrink: 0; }
 .markdown-source-error { padding: 10px 24px; background: rgba(239, 68, 68, .10); color: #fca5a5; font-size: 13px; }
 .markdown-source-panes { display: flex; flex: 1; min-width: 0; min-height: 0; }
-.markdown-source-input { display: block; flex: 1; width: 100%; min-width: 0; resize: none; padding: 24px; background: transparent; color: var(--text); font: 13px/1.8 ui-monospace, SFMono-Regular, Menlo, monospace; border: 0; outline: none; tab-size: 4; }
+.markdown-source-input { display: block; flex: 1; width: 100%; min-width: 0; resize: none; padding: 24px; background: transparent; color: var(--text); font: var(--font-text-size)/var(--line-height-normal) var(--font-monospace); border: 0; outline: none; tab-size: 4; }
 .markdown-source-preview { flex: 1; min-width: 0; overflow: auto; }
 .markdown-source-split > * { width: 50%; }
 .markdown-source-split .markdown-source-input { border-right: 1px solid var(--border); }
 .markdown-source-body { max-width: 840px; margin: 0 auto; padding: 0 40px 80px; overflow-wrap: anywhere; }
+.markdown-source-body.md-content { max-width: min(840px, var(--reading-width)); font-size: var(--font-text-size); line-height: var(--line-height-normal); }
+.markdown-source-body.md-content code { font-size: .875em; }
 .markdown-source-body img { max-width: 100%; object-fit: contain; }
 .markdown-source-body table { display: block; max-width: 100%; overflow-x: auto; }
 .markdown-source-missing { display: inline-block; padding: 8px 12px; border: 1px dashed var(--border-strong); color: var(--text-muted); font-size: 12px; }
@@ -148,15 +151,11 @@
 
 @theme {
 
-  --font-sans:
-    "Inter", "InterVariable", ui-sans-serif, system-ui, -apple-system,
-    "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif;
+  --font-sans: var(--font-interface);
   --font-emoji:
     "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji",
     "Twemoji Mozilla", sans-serif;
-  --font-mono:
-    "JetBrains Mono", ui-monospace, SFMono-Regular, "SF Mono", Consolas,
-    monospace;
+  --font-mono: var(--font-monospace);
 }
 
 
@@ -169,12 +168,14 @@ body,
 }
 
 body {
-  font-family: var(--font-sans);
+  font-family: var(--font-interface);
+  font-size: var(--font-ui-medium);
+  line-height: var(--line-height-normal);
   background-color: var(--color-bg);
   color: var(--color-text);
   overflow: hidden;
   color-scheme: dark;
-  font-feature-settings: "cv02", "cv03", "cv04", "cv11", "ss01", "ss03";
+  font-feature-settings: normal;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
@@ -251,6 +252,8 @@ body {
 }
 
 .bn-editor {
+  font-family: var(--font-text);
+  line-height: var(--line-height-normal);
   padding: 4rem 5rem 8rem !important;
   max-width: 56rem;
   margin: 0 auto;
@@ -308,10 +311,11 @@ input:focus-visible {
 }
 
 .hero-title {
-  font-size: 3.5rem !important; /* ~56px */
-  font-weight: 800 !important;
-  line-height: 1.15 !important;
-  letter-spacing: -0.02em;
+  font-family: var(--font-text);
+  font-size: calc(var(--font-text-size) * 1.618 * var(--e26-zoom, 1)) !important;
+  font-weight: 700 !important;
+  line-height: 1.2 !important;
+  letter-spacing: -0.015em;
   background: transparent !important;
   resize: none !important;
 }
@@ -376,13 +380,13 @@ input:focus-visible {
 .source-markdown-toggle { display: inline-flex; align-items: center; gap: 5px; padding: 4px 7px; margin-bottom: 6px; border-radius: 5px; font-size: 11px; color: var(--text-secondary); background: var(--surface-2-solid); }
 .source-markdown-toggle:hover { color: var(--text-strong); }
 .source-markdown-toggle:focus-visible, .source-markdown-text:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.source-markdown-text { display: block; width: 100%; min-height: 100px; resize: vertical; padding: 12px; border: 1px solid var(--border); border-radius: 6px; color: var(--text); background: var(--surface-1-solid); font: 13px/1.7 ui-monospace, SFMono-Regular, Menlo, monospace; }
+.source-markdown-text { display: block; width: 100%; min-height: 100px; resize: vertical; padding: 12px; border: 1px solid var(--border); border-radius: 6px; color: var(--text); background: var(--surface-1-solid); font: var(--font-ui-small)/1.7 var(--font-monospace); }
 
 /* ─── Едитор 2026 ──────────────────────────────────────────────────────────
  */
 
 .e26-zoom-scope .bn-default-styles {
-  font-size: calc(16px * var(--e26-zoom, 1));
+  font-size: calc(var(--font-text-size) * var(--e26-zoom, 1));
 }
 
 .e26-zoom-scope .bn-editor {
@@ -1063,21 +1067,27 @@ input:focus-visible {
 
 /* ─── Рендеринг Markdown в режиме «только чтение» (превью в корзине и т. д.) ───────────────── */
 .md-content {
+  font-family: var(--font-text);
   color: var(--color-text-secondary);
   font-size: 14px;
   line-height: 1.7;
 }
-.md-content h1,
-.md-content h2 {
+.md-content h1 {
   font-weight: 700;
   color: var(--color-text-strong);
 }
 .md-content h1 {
-  font-size: 1.7em;
+  font-size: var(--h1-size);
+  line-height: 1.2;
+  letter-spacing: -.015em;
   margin: 1.2em 0 0.5em;
 }
 .md-content h2 {
-  font-size: 1.4em;
+  font-size: var(--h2-size);
+  font-weight: 600;
+  color: var(--color-text-strong);
+  line-height: 1.2;
+  letter-spacing: -.011em;
   margin: 1.1em 0 0.4em;
 }
 .md-content h3,
@@ -1088,7 +1098,9 @@ input:focus-visible {
   color: var(--color-text);
 }
 .md-content h3 {
-  font-size: 1.2em;
+  font-size: var(--h3-size);
+  line-height: 1.3;
+  letter-spacing: -.008em;
   margin: 1em 0 0.3em;
 }
 .md-content h4,
@@ -1096,6 +1108,9 @@ input:focus-visible {
 .md-content h6 {
   margin: 0.9em 0 0.3em;
 }
+.md-content h4 { font-size: var(--h4-size); line-height: 1.4; letter-spacing: -.005em; }
+.md-content h5 { font-size: var(--h5-size); line-height: var(--line-height-normal); letter-spacing: -.002em; }
+.md-content h6 { font-size: var(--h6-size); line-height: var(--line-height-normal); letter-spacing: 0; }
 .md-content p {
   margin: 0.6em 0;
 }
@@ -1443,7 +1458,7 @@ input:focus-visible {
   resize: none;
   overflow: hidden;
   white-space: pre;
-  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-family: var(--font-interface);
   box-shadow: 0 0 0 3px color-mix(in oklab, var(--accent, #6366f1) 22%, transparent);
   caret-color: var(--accent, #6366f1);
 }
@@ -1481,7 +1496,7 @@ input:focus-visible {
   box-shadow:
     0 18px 50px rgba(0, 0, 0, 0.55),
     0 4px 14px rgba(0, 0, 0, 0.45);
-  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-family: var(--font-interface);
   animation: e26-wb-nodeov-in 0.12s ease;
 }
 .e26-wb-sp__row {
@@ -1718,7 +1733,7 @@ button.e26-wb-sp__row:hover {
   border: 1px solid var(--border, rgba(255, 255, 255, 0.12));
   border-radius: 4px;
   background: rgba(255, 255, 255, 0.05);
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-family: var(--font-interface);
   font-size: 11px;
   color: var(--text-strong, #f4f4f5);
   vertical-align: 1px;
@@ -1951,7 +1966,7 @@ button.e26-wb-sp__row:hover {
     0 18px 50px rgba(0, 0, 0, 0.55),
     0 4px 14px rgba(0, 0, 0, 0.45),
     0 0 0 1px color-mix(in oklab, var(--accent, #818cf8) 14%, transparent);
-  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-family: var(--font-interface);
   animation: e26-wb-nodeov-in 0.14s ease;
   overflow: hidden;
 }
@@ -2078,8 +2093,7 @@ button.e26-wb-sp__row:hover {
   margin: 0;
   padding: 11px 12px;
   min-height: 128px;
-  font-family: "JetBrains Mono", "SFMono-Regular", ui-monospace, "Cascadia Code",
-    "Fira Code", Menlo, Consolas, monospace;
+  font-family: var(--font-monospace);
   font-size: 13px;
   line-height: 1.55;
   tab-size: 2;
@@ -2158,3 +2172,16 @@ button.e26-wb-sp__row:hover {
   .e26-wb-nodeov__textarea,
   .e26-wb-nodeov__code { transition: none; }
 }
+
+/* Interface effects can be disabled independently of the OS preference. */
+html[data-interface-motion="off"] *,
+html[data-interface-motion="off"] *::before,
+html[data-interface-motion="off"] *::after {
+  animation: none !important;
+  transition: none !important;
+  scroll-behavior: auto !important;
+}
+.module-disabled-block { display: flex; flex-direction: column; align-items: flex-start; gap: 7px; padding: 16px; border: 1px solid var(--color-border-strong); border-radius: 6px; background: var(--surface-1); color: var(--color-text); font: inherit; font-size: 13px; }
+.module-disabled-block small { color: var(--text-secondary); }
+.module-disabled-block button { background: transparent; border: 0; color: var(--color-link); cursor: pointer; padding: 4px 0; }
+.module-disabled-block button:focus-visible { outline: 2px solid var(--color-link); outline-offset: 3px; }

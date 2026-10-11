@@ -535,6 +535,46 @@
       "calendar-primary-label": {
         "displayName": "Calendar primary label",
         "purpose": "Primary task/save actions retain their scoped 550 weight; the base font size remains inherited."
+      },
+      "note-body": {
+        "displayName": "Primary note prose",
+        "purpose": "Inter17px/1.5 at default zoom; reader and block editor share the base."
+      },
+      "note-title": {
+        "displayName": "Inline note title",
+        "purpose": "Inter H1 ratio1.618 at700; responds to body zoom, available width and font loading."
+      },
+      "note-code": {
+        "displayName": "Note code",
+        "purpose": "Local JetBrains Mono at0.875em, preserving fixed-width source and genuine italic."
+      },
+      "source-markdown": {
+        "displayName": "Source Markdown",
+        "purpose": "Local JetBrains Mono17px/1.5."
+      }
+    },
+    "fontAssets": {
+      "interface": {
+        "family": "Inter",
+        "normal": "src/assets/fonts/InterVariable.woff2",
+        "italic": "src/assets/fonts/InterVariable-Italic.woff2",
+        "weightRange": [
+          100,
+          900
+        ],
+        "license": "public/fonts/OFL-Inter.txt",
+        "glyphs": "normal"
+      },
+      "code": {
+        "family": "JetBrains Mono",
+        "normal": "src/assets/fonts/JetBrainsMonoVariable.ttf",
+        "italic": "src/assets/fonts/JetBrainsMonoVariable-Italic.ttf",
+        "weightRange": [
+          100,
+          800
+        ],
+        "version": "2.304",
+        "license": "public/fonts/OFL-JetBrainsMono.txt"
       }
     }
   },

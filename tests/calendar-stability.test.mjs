@@ -95,7 +95,7 @@ test("the midnight clock owns one timer, recovers on focus without visibility ch
 const deferred = () => { let resolve, reject; const promise = new Promise((yes, no) => { resolve = yes; reject = no; }); return { promise, resolve, reject }; };
 const mocks = { name: "stability-mocks", setup(builder) {
   builder.onResolve({ filter: /(^@tauri-apps\/api\/core$|\/lib\/storage$|\/store\/notes$|\/store\/tasks$|^\.\/notes$)/ }, args => ({ path: args.path, namespace: "fixture" }));
-  builder.onLoad({ filter: /.*/, namespace: "fixture" }, args => ({ contents: args.path.includes("storage") ? "export const readTasks=()=>globalThis.stability.read(); export const writeTasks=value=>globalThis.stability.write(value);" : args.path.endsWith("tasks") ? "export const useTasksStore=globalThis.stability.tasks;" : args.path.includes("notes") ? "export const flushAllPending=()=>globalThis.stability.flushNotes(); export const useNotesStore={getState:()=>({settings:{calendarIcsUrl:globalThis.stability.url}})};" : "export const invoke=(name,args)=>globalThis.stability.invoke(name,args);" }));
+  builder.onLoad({ filter: /.*/, namespace: "fixture" }, args => ({ contents: args.path.includes("storage") ? "export const readTasks=()=>globalThis.stability.read(); export const writeTasks=value=>globalThis.stability.write(value);" : args.path.endsWith("tasks") ? "export const useTasksStore=globalThis.stability.tasks;" : args.path.includes("notes") ? "export const flushAllPending=()=>globalThis.stability.flushNotes(); export const useNotesStore={getState:()=>({settings:{calendarIcsUrl:globalThis.stability.url,modules:{calendar:globalThis.stability.calendarEnabled ?? true}}})};" : "export const invoke=(name,args)=>globalThis.stability.invoke(name,args);" }));
 } };
 test("exit drains edits accepted while waiting, survives Calendar unmount, and coalesces repeated Quit", async () => {
   const gate = deferred(), order = [], file = path.join(temporary, "durable-tasks.json");
@@ -139,3 +139,25 @@ test("an unsupported updated feed reports its error while retaining the last suc
   assert.equal(store.getState().status, "error"); assert.match(store.getState().error, /часовой пояс/); assert.equal(store.getState().events, events); assert.equal(store.getState().lastSync, lastSync);
 });
 after(() => fs.rm(temporary, { recursive: true, force: true }));
+
+test("disabled calendar cannot start feed requests and discards an in-flight completion", async () => {
+  const gate = deferred(); let requests = 0;
+  globalThis.stability = { url: "fixture", calendarEnabled: false, invoke: async () => { requests++; return gate.promise; } };
+  const { useCalendarStore: store } = await compiled("src/store/calendar.ts", [mocks]);
+  await store.getState().syncNow(); store.getState().syncIfStale(); assert.equal(requests, 0);
+  globalThis.stability.calendarEnabled = true;
+  const pending = store.getState().syncNow(); assert.equal(requests, 1);
+  globalThis.stability.calendarEnabled = false;
+  gate.resolve(feed("DTSTART:20261010T090000Z")); await pending;
+  assert.equal(store.getState().status, "idle"); assert.equal(store.getState().events.length, 0); assert.equal(store.getState().lastSync, null);
+  store.getState().syncIfStale(); assert.equal(requests, 1);
+});
+
+test("disabled calendar cannot publish an in-flight feed failure", async () => {
+  const gate = deferred();
+  globalThis.stability = { url: "fixture", calendarEnabled: true, invoke: () => gate.promise };
+  const { useCalendarStore: store } = await compiled("src/store/calendar.ts", [mocks]);
+  const pending = store.getState().syncNow();
+  globalThis.stability.calendarEnabled = false; gate.reject(new Error("Fixture: offline")); await pending;
+  assert.equal(store.getState().status, "idle"); assert.equal(store.getState().error, null);
+});

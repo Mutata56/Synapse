@@ -4,6 +4,7 @@ import { flattenNotes } from "../lib/treeUtils";
 import { activeWorkspaceTab, closeWorkspaceTab, emptySession, openWorkspaceTarget, parseWorkspaceSession, reorderWorkspaceTabs, serializeWorkspaceSession, type WorkspaceSession, type WorkspaceTarget } from "../lib/workspaceTabs";
 import { flushAllPending, useNotesStore, type View } from "./notes";
 import { useToastStore } from "./toasts";
+import { isViewEnabled } from "../lib/modules";
 
 const SESSION_KEY = "synapse-workspace-session-v1";
 const UI_KEY = "synapse-workspace-ui-v1";
@@ -49,6 +50,7 @@ let queue: Promise<void> = Promise.resolve();
 
 async function applyTarget(target: WorkspaceTarget) {
   const notes = useNotesStore.getState();
+  if (target.kind === "view" && !isViewEnabled(notes.settings, target.view)) throw new Error(t("Модуль отключён в настройках"));
   await flushAllPending();
   if (target.kind === "note") {
     await notes.selectNote(target.noteId);
@@ -67,11 +69,14 @@ function navigate(next: WorkspaceSession): Promise<void> {
   useWorkspaceStore.setState({ pending: true });
   queue = queue.catch(() => {}).then(async () => {
     if (mine !== intent) return;
+    next = filterDisabledTabs(next);
     bridgePaused = true;
     const previous = activeWorkspaceTab(useWorkspaceStore.getState()).target;
     try {
       await applyTarget(activeWorkspaceTab(next).target);
-      if (mine === intent) useWorkspaceStore.setState(next);
+      const safe = filterDisabledTabs(next);
+      if (safe !== next) await applyTarget(activeWorkspaceTab(safe).target);
+      if (mine === intent) useWorkspaceStore.setState(safe);
     } catch (error) {
       useToastStore.getState().push(error instanceof Error ? error.message : t("Не удалось открыть заметку"), "error");
       await applyTarget(previous).catch(() => {});
@@ -93,9 +98,10 @@ export const useWorkspaceStore = create<State>((set, get) => ({
   fileSort: ["name", "modified", "created"].includes(ui.fileSort) ? ui.fileSort : "name",
   vaultLabel: typeof ui.vaultLabel === "string" && ui.vaultLabel.trim() ? ui.vaultLabel.slice(0, 80) : "Synapse Vault",
   helpVisible: false,
-  openNote: (noteId, newTab = false) => navigate(openWorkspaceTarget(get(), { kind: "note", noteId }, id(), newTab)),
-  openView: (view) => navigate(openWorkspaceTarget(get(), { kind: "view", view }, id(), true)),
+  openNote: (noteId, newTab = false) => navigate(openWorkspaceTarget(get(), { kind: "note", noteId }, id(), newTab && useNotesStore.getState().settings.modules.home)),
+  openView: (view) => isViewEnabled(useNotesStore.getState().settings, view) ? navigate(openWorkspaceTarget(get(), { kind: "view", view }, id(), useNotesStore.getState().settings.modules.home)) : Promise.resolve(),
   newTab: () => {
+    if (!useNotesStore.getState().settings.modules.home) return Promise.resolve();
     const tab = { id: id(), target: { kind: "empty" as const } };
     return navigate({ tabs: [...get().tabs, tab].slice(-40), activeTabId: tab.id });
   },
@@ -107,18 +113,18 @@ export const useWorkspaceStore = create<State>((set, get) => ({
   },
   closeOtherTabs: () => set(state => ({ tabs: [activeWorkspaceTab(state)] })),
   reorder: (source, before) => set(reorderWorkspaceTabs(get(), source, before)),
-  toggleSidebar: () => set(state => ({ sidebarVisible: !state.sidebarVisible })),
-  showSidebar: (pane = "files") => set({ sidebarVisible: true, sidebarPane: pane }),
+  toggleSidebar: () => { const modules = useNotesStore.getState().settings.modules; if (modules.files || modules.search || modules.bookmarks) set(state => ({ sidebarVisible: !state.sidebarVisible })); },
+  showSidebar: (pane = "files") => { if (useNotesStore.getState().settings.modules[pane]) set({ sidebarVisible: true, sidebarPane: pane }); },
   setSidebarWidth: width => set({ sidebarWidth: clampSidebarWidth(width) }),
-  toggleRight: () => set(state => ({ rightVisible: !state.rightVisible })),
+  toggleRight: () => { if (useNotesStore.getState().settings.modules.context) set(state => ({ rightVisible: !state.rightVisible })); },
   setFileSort: fileSort => set({ fileSort }),
   setVaultLabel: vaultLabel => set({ vaultLabel: vaultLabel.trim().slice(0, 80) || "Synapse Vault" }),
-  showHelp: helpVisible => set({ helpVisible }),
+  showHelp: helpVisible => { if (!helpVisible || useNotesStore.getState().settings.modules.help) set({ helpVisible }); },
   restore: async () => {
     const state = get();
     const available = new Set(flattenNotes(useNotesStore.getState().tree).map(note => note.id));
     const tabs = state.tabs.map(tab => tab.target.kind === "note" && !available.has(tab.target.noteId) ? { ...tab, target: { kind: "empty" as const } } : tab);
-    await navigate({ tabs, activeTabId: state.activeTabId });
+    await navigate(filterDisabledTabs({ tabs, activeTabId: state.activeTabId }));
   },
 }));
 
@@ -135,8 +141,32 @@ useWorkspaceStore.subscribe((state, previous) => {
 /** Other screens keep using the note store; their navigation enters the active tab. */
 export function connectWorkspaceNavigation(): () => void {
   return useNotesStore.subscribe((state, previous) => {
+    if (state.settings.modules !== previous.settings.modules) {
+      const workspace = useWorkspaceStore.getState();
+      const filtered = filterDisabledTabs(workspace);
+      const pane = ["files", "search", "bookmarks"].find(key => state.settings.modules[key as "files" | "search" | "bookmarks"]) as SidePane | undefined;
+      useWorkspaceStore.setState({
+        sidebarPane: state.settings.modules[workspace.sidebarPane] ? workspace.sidebarPane : pane ?? "files",
+        helpVisible: workspace.helpVisible && state.settings.modules.help,
+        rightVisible: workspace.rightVisible && state.settings.modules.context,
+      });
+      if (filtered !== workspace) void navigate(filtered);
+    }
     if (bridgePaused || (state.view === previous.view && state.activeId === previous.activeId)) return;
     const target: WorkspaceTarget = state.view === "notes" && state.activeId ? { kind: "note", noteId: state.activeId } : { kind: "view", view: state.view };
     useWorkspaceStore.setState(openWorkspaceTarget(useWorkspaceStore.getState(), target, id()));
   });
+}
+
+/** Disabled view tabs are removed, but note tabs and unsaved content survive. */
+function filterDisabledTabs(session: WorkspaceSession): WorkspaceSession {
+  const settings = useNotesStore.getState().settings;
+  const tabs = session.tabs.filter(tab => tab.target.kind !== "view" || isViewEnabled(settings, tab.target.view));
+  if (tabs.length === session.tabs.length) return session;
+  if (!tabs.length) return settingsSession();
+  return { tabs, activeTabId: tabs.some(tab => tab.id === session.activeTabId) ? session.activeTabId : tabs[tabs.length - 1].id };
+}
+function settingsSession(): WorkspaceSession {
+  const tabId = id();
+  return { tabs: [{ id: tabId, target: { kind: "view", view: "settings" } }], activeTabId: tabId };
 }

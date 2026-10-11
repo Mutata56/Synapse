@@ -22,6 +22,7 @@ type Props = { mode: "files" | "trash"; readBody?: (id: string) => Promise<strin
 /** One browser and gesture model; only the source and available operations differ. */
 export function FileBrowser({ mode, readBody, initialSelected = [] }: Props) {
   const { t, lang } = useI18n();
+  const newNoteEnabled = useNotesStore(state => state.settings.modules.newNote);
   const tree = useNotesStore(state => mode === "files" ? state.tree : state.trashTree);
   const folder = useNotesStore(state => mode === "files" ? state.currentFolder : state.currentTrashFolder);
   const colors = useNotesStore(state => state.folderColors);
@@ -188,7 +189,7 @@ export function FileBrowser({ mode, readBody, initialSelected = [] }: Props) {
   return <section ref={host} className="fs-browser" aria-label={mode === "files" ? t("Файлы") : t("Корзина")} data-mode={mode}>
     <header className="fs-header"><h1>{mode === "files" ? t("Файлы") : t("Корзина")}</h1>
       <div className="fs-search"><Search size={17} /><input ref={search} value={query} onChange={event => setQuery(event.target.value)} placeholder={t("Поиск в папке…")} aria-label={t("Поиск в папке")} disabled={blocked} />{query && <button type="button" className="fs-icon-button" onClick={() => setQuery("")} aria-label={t("Очистить поиск")}><X size={14} /></button>}<button type="button" className={`fs-search-scope${deep ? " is-active" : ""}`} aria-pressed={deep} aria-label={t("Искать во вложенных папках")} title={t("Искать во вложенных папках")} onClick={() => setDeep(value => !value)} disabled={blocked}><Folder size={14} /></button></div>
-      {mode === "files" ? <><button type="button" className="fs-button fs-new-folder" title={t("Новая папка")} disabled={blocked} onClick={() => setDialog({ mode: "createFolder" })}><FolderPlus size={16} />{t("Новая папка")}</button><button type="button" className="fs-button fs-primary fs-new-note" title={t("Новая заметка")} disabled={blocked} onClick={() => setDialog({ mode: "createNote" })}><FilePlus size={16} />{t("Новая заметка")}</button></> : <button type="button" className="fs-button fs-danger" disabled={blocked || !index.entries.length} onClick={() => void clearTrash()}><Trash2 size={16} />{t("Очистить корзину")}</button>}
+      {mode === "files" ? <><button type="button" className="fs-button fs-new-folder" title={t("Новая папка")} disabled={blocked} onClick={() => setDialog({ mode: "createFolder" })}><FolderPlus size={16} />{t("Новая папка")}</button>{newNoteEnabled ? <button type="button" className="fs-button fs-primary fs-new-note" title={t("Новая заметка")} disabled={blocked} onClick={() => setDialog({ mode: "createNote" })}><FilePlus size={16} />{t("Новая заметка")}</button> : null}</> : <button type="button" className="fs-button fs-danger" disabled={blocked || !index.entries.length} onClick={() => void clearTrash()}><Trash2 size={16} />{t("Очистить корзину")}</button>}
     </header>
     <div className={`fs-layout${details ? " has-properties" : ""}`}>
       <div className="fs-work">

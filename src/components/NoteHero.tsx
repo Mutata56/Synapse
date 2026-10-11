@@ -9,7 +9,7 @@ import {
   Star,
   type LucideIcon,
 } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { cn } from "../lib/cn";
 import { t } from "../lib/i18n";
 import { gradientClassName, parseCover } from "../lib/covers";
@@ -39,7 +39,7 @@ const SPRING_ICON = { type: "spring", stiffness: 380, damping: 25 } as const;
 
 // ─── Компонент ─────────────────────────────────────────────────────────────
 
-export function NoteHero() {
+export function NoteHero({ textZoom = 1 }: { textZoom?: number }) {
   const activeNote = useNotesStore((s) => s.activeNote);
   const saveNote = useNotesStore((s) => s.saveNote);
   const toggleFavorite = useNotesStore((s) => s.toggleFavorite);
@@ -139,16 +139,44 @@ export function NoteHero() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeNote?.title]);
 
-  // Авторост textarea заголовка, чтобы длинный заголовок ПЕРЕНОСИЛСЯ на
-  // несколько строк, а не вылезал по горизонтали (обычный <input> переносить
-  // не умеет, <textarea> умеет). Бежит на каждую смену заголовка: ввод,
-  // переключение заметки, переименование.
-  useEffect(() => {
+  // Refit when the title, reading width, zoom or loaded font metrics change.
+  const resizeTitle = useCallback(() => {
     const el = titleInputRef.current;
     if (!el) return;
     el.style.height = "auto";
     el.style.height = `${el.scrollHeight}px`;
-  }, [title]);
+  }, []);
+  useLayoutEffect(resizeTitle, [title, textZoom, activeNote?.id, resizeTitle]);
+  useEffect(() => {
+    const el = titleInputRef.current;
+    if (!el) return;
+    let alive = true;
+    let frame: number | null = null;
+    let width = -1;
+    const schedule = () => {
+      if (!alive || frame !== null) return;
+      frame = requestAnimationFrame(() => {
+        frame = null;
+        if (alive) resizeTitle();
+      });
+    };
+    const observer = new ResizeObserver(entries => {
+      const nextWidth = entries[0]?.contentRect.width;
+      // Height changes from autosizing must not schedule another resize.
+      if (nextWidth === undefined || nextWidth === width) return;
+      width = nextWidth;
+      schedule();
+    });
+    observer.observe(el);
+    document.fonts.addEventListener("loadingdone", schedule);
+    void document.fonts.ready.then(schedule);
+    return () => {
+      alive = false;
+      observer.disconnect();
+      document.fonts.removeEventListener("loadingdone", schedule);
+      if (frame !== null) cancelAnimationFrame(frame);
+    };
+  }, [activeNote?.id, resizeTitle]);
 
   // ─── Резолвим обложки `file:*` в URL ассета Tauri ───────────────────────
   // Градиентным и внешним URL-обложкам резолв не нужен: ставим `coverUrl =

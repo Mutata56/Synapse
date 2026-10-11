@@ -9,7 +9,7 @@ import { build } from "esbuild";
 test("the active tab renders its own screen while a previously edited note remains cached", async t => {
   const directory = await mkdtemp(join(tmpdir(), "synapse-panel-test-"));
   t.after(() => rm(directory, { recursive: true, force: true }));
-  const state = { notes: { view: "notes", activeId: "cached", activeNote: { id: "cached", markdownSource: false }, editorReloadNonce: 0 }, workspace: {
+  const state = { notes: { settings: {animations:false,modules:{notes:true,files:true,graph:true,search:true}}, view: "notes", activeId: "cached", activeNote: { id: "cached", markdownSource: false }, editorReloadNonce: 0 }, workspace: {
     tabs: [{ id: "note", target: { kind: "note", noteId: "cached" } }, { id: "settings", target: { kind: "view", view: "settings" } }, { id: "graph", target: { kind: "view", view: "graph" } }], activeTabId: "note",
   } };
   globalThis.__workspacePanelFixture = state;
@@ -18,7 +18,7 @@ test("the active tab renders its own screen while a previously edited note remai
   await build({ bundle: true, platform: "node", format: "cjs", outfile: output,
     stdin: { contents: "import React from 'react'; import {renderToStaticMarkup} from 'react-dom/server'; import App from './src/App'; export const render = () => renderToStaticMarkup(React.createElement(App,{bootstrap:false}));", resolveDir: process.cwd(), loader: "tsx" },
     plugins: [{ name: "panel-isolation", setup(builder) {
-      builder.onResolve({ filter: /^\.\/components\// }, args => ({ path: args.path.split("/").at(-1), namespace: "panel-component" }));
+      builder.onResolve({ filter: /^\.\/components\// }, args => args.importer.endsWith("/src/App.tsx") ? ({ path: args.path.split("/").at(-1), namespace: "panel-component" }) : undefined);
       builder.onResolve({ filter: /^\.\/editor2026\/Editor2026$/ }, () => ({ path: "Editor2026", namespace: "panel-component" }));
       builder.onLoad({ filter: /.*/, namespace: "panel-component" }, args => ({ contents: args.path === "WorkspaceChrome"
         ? "import React from 'react'; export const WorkspaceChrome=({children})=>React.createElement('main',null,children);"

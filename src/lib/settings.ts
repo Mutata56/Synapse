@@ -10,7 +10,12 @@
  * и coerceSettings.
  */
 
+import { coerceGraphFeatures, coerceModules, DEFAULT_GRAPH_FEATURES, MINIMAL_MODULES, type GraphFeatures, type ModuleSettings } from "./modules";
+
 export type AppSettings = {
+  modules: ModuleSettings;
+  graph: GraphFeatures;
+  animations: boolean;
   /** Цвет-акцент как hex `#rrggbb`. Управляет переменными `--color-accent*`. */
   accentColor: string;
   /** Tauri-аксельератор для глобального окна быстрой заметки, например
@@ -37,6 +42,9 @@ export type AppSettings = {
  *  повторяет нативную регистрацию в `lib.rs` (CONTROL|SHIFT + KeyN), на
  *  Windows/Linux `CommandOrControl` это Ctrl. */
 export const DEFAULT_SETTINGS: AppSettings = {
+  modules: { ...MINIMAL_MODULES },
+  graph: { ...DEFAULT_GRAPH_FEATURES },
+  animations: false,
   accentColor: "#6366f1",
   captureShortcut: "CommandOrControl+Shift+N",
   openDailyOnStartup: false,
@@ -80,6 +88,9 @@ export function coerceSettings(raw: unknown): AppSettings {
   }
   const r = raw as Record<string, unknown>;
   return {
+    modules: coerceModules(r.modules),
+    graph: coerceGraphFeatures(r.graph),
+    animations: typeof r.animations === "boolean" ? r.animations : DEFAULT_SETTINGS.animations,
     accentColor: isValidHex(r.accentColor)
       ? normalizeHex(r.accentColor)
       : DEFAULT_SETTINGS.accentColor,
