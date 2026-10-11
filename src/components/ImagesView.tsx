@@ -2,7 +2,7 @@ import { ArrowDownWideNarrow, Check, ChevronLeft, ChevronRight, Expand, FileImag
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { lazy, memo, Suspense, useCallback, useDeferredValue, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { formatBytes, pluralRu } from "../lib/format";
-import { buildImageIndex, imageFormat, isImageNote, queryImageIndex, type ImageLibrary, type ImageScope, type ImageSort, type LibraryImage } from "../lib/imageLibrary";
+import { getImageIndex, imageFormat, isImageNote, queryImageIndex, type ImageLibrary, type ImageScope, type ImageSort, type LibraryImage } from "../lib/imageLibrary";
 import { loadImagePreview, prioritizeImagePreview, subscribeImagePreview, type ImagePreview, type PreviewLoader } from "../lib/imagePreviews";
 import { deleteUnusedLibraryImages, imageFilePath, listImageLibrary } from "../lib/storage";
 import { confirmDialog } from "../store/confirm";
@@ -41,7 +41,7 @@ export function ImagesView({ loadLibrary = listImageLibrary, previewLoader = loa
   const navigation = useRef(0);
   const galleryId = useId();
   const deferredQuery = useDeferredValue(filter.query);
-  const index = useMemo(() => buildImageIndex(library?.images ?? EMPTY), [library?.images]);
+  const index = useMemo(() => getImageIndex(library?.images ?? EMPTY), [library?.images]);
   const results = useMemo(() => queryImageIndex(index, { ...filter, query: deferredQuery }), [index, deferredQuery, filter.scope, filter.folder, filter.format, filter.sort]);
   const positions = useMemo(() => new Map(results.map((image, i) => [image.id, i])), [results]);
   const position = focusedId ? positions.get(focusedId) ?? 0 : 0;
