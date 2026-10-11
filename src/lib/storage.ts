@@ -723,32 +723,40 @@ function applyObsidianMetadata(meta: NoteMeta, id = meta.id): NoteMeta {
 }
 
 /** Serialize sidecar transactions; commit in memory only after a successful disk write. */
-function updateObsidianState(update: (notes: ObsidianState["notes"]) => boolean): Promise<void> {
+function updateObsidianState(update: (notes: ObsidianState["notes"]) => string[]): Promise<void> {
   const next = obsidianWriteChain.then(async () => {
     await loadObsidianState();
     const notes = Object.assign(Object.create(null), obsidianState!.notes);
-    if (!update(notes)) return;
+    const changed = update(notes);
+    if (!changed.length) return;
     await ensureDir(`${ROOT}/.synapse`);
     await atomicWriteTextFile(OBSIDIAN_METADATA, JSON.stringify({ version: 1, notes }, null, 2));
     obsidianState = { version: 1, notes };
-    metaCache.clear();
-    metaCacheDirty = true;
+    // Only the changed overlays can invalidate cached metadata. Load persisted
+    // entries too when an edit precedes the first listTree in this window.
+    await loadMetaCache();
+    for (const id of changed) {
+      if (metaCache.delete(idToFilePath(id))) metaCacheDirty = true;
+    }
   });
   obsidianWriteChain = next.catch(() => undefined);
   return next;
 }
 
+function sourceRecordsFor(notes: ObsidianState["notes"], from: string, folder: boolean): [string, ObsidianOverrides][] {
+  if (!folder) return notes[from]?.markdownSource ? [[from, notes[from]]] : [];
+  return Object.entries(notes).filter(([id, data]) => data.markdownSource && id.startsWith(`${from}/`));
+}
+
 /** Called after an on-disk move, including folder moves and collisions in trash. */
 async function rebaseObsidianMetadata(from: string, to: string, folder = false): Promise<void> {
   await updateObsidianState((notes) => {
-    const moved = Object.entries(notes).filter(([id, data]) =>
-      data.markdownSource && (folder ? id.startsWith(`${from}/`) : id === from),
-    );
+    const moved = sourceRecordsFor(notes, from, folder);
     for (const [id, data] of moved) {
       notes[id] = { markdownSource: false }; // shadows the immutable import manifest
       notes[to + id.slice(from.length)] = data;
     }
-    return moved.length > 0;
+    return moved.flatMap(([id]) => [id, to + id.slice(from.length)]);
   });
 }
 
@@ -758,19 +766,23 @@ async function relocateWithObsidianMetadata(
   folder: boolean,
   move: () => Promise<void>,
 ): Promise<void> {
+  await loadMetaCache();
+  const sourcePath = folder ? `${ROOT}/${from}` : idToFilePath(from);
+  const single = metaCache.get(sourcePath);
+  const cached: [string, MetaCacheEntry][] = folder
+    ? [...metaCache].filter(([path]) => path.startsWith(`${sourcePath}/`))
+    : single ? [[sourcePath, single]] : [];
   // Stage both markers before the filesystem move. If the app stops between
   // these steps, either possible on-disk location still opens as source.
   const destinations = new Map<string, ObsidianOverrides | undefined>();
   await updateObsidianState((notes) => {
-    const moved = Object.entries(notes).filter(([id, data]) =>
-      data.markdownSource && (folder ? id.startsWith(`${from}/`) : id === from),
-    );
+    const moved = sourceRecordsFor(notes, from, folder);
     for (const [id, data] of moved) {
       const destination = to + id.slice(from.length);
       destinations.set(destination, notes[destination]);
       notes[destination] = data;
     }
-    return moved.length > 0;
+    return moved.map(([id]) => to + id.slice(from.length));
   });
   try { await move(); } catch (e) {
     await updateObsidianState((notes) => {
@@ -778,20 +790,32 @@ async function relocateWithObsidianMetadata(
         if (previous) notes[id] = previous;
         else delete notes[id];
       }
-      return destinations.size > 0;
+      return [...destinations.keys()];
     });
     throw e;
   }
   await rebaseObsidianMetadata(from, to, folder);
+  // Directory renames keep their files unchanged. Source-note moves preserve
+  // bytes too. Native individual moves rewrite frontmatter afterward, and a
+  // collision can change a filename-derived title: keep both on cache misses.
+  for (const [path, entry] of cached) {
+    const target = folder ? `${ROOT}/${to}${path.slice(sourcePath.length)}` : idToFilePath(to);
+    const sidecarId = target.slice(ROOT.length + 1, -NOTE_EXT.length);
+    if (!folder && (!obsidianState?.notes[sidecarId]?.markdownSource || basenameOf(from) !== basenameOf(to))) continue;
+    const id = sidecarId.startsWith(".trash/") ? sidecarId.slice(".trash/".length) : sidecarId;
+    metaCache.delete(path);
+    metaCache.set(target, { ...entry, meta: { ...entry.meta, id, folder: parentOf(id) } });
+    metaCacheDirty = true;
+  }
 }
 
 async function forgetObsidianMetadata(path: string, folder = false): Promise<void> {
   await updateObsidianState((notes) => {
-    let changed = false;
+    const changed: string[] = [];
     for (const id of Object.keys(notes)) {
       if (folder ? id.startsWith(`${path}/`) : id === path) {
         notes[id] = { markdownSource: false };
-        changed = true;
+        changed.push(id);
       }
     }
     return changed;
@@ -839,7 +863,7 @@ async function writeObsidianNote(note: Note): Promise<void> {
       changed = true;
     }
     if (changed) notes[note.id] = entry;
-    return changed;
+    return changed ? [note.id] : [];
   });
   metaCache.delete(path);
   metaCacheDirty = true;

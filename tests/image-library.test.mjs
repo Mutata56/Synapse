@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import { build } from 'esbuild';
 
 const compiled = await build({ stdin: { contents: "export * from './src/lib/imageLibrary.ts'; export { windowRange } from './src/lib/tagExplorer.ts';", resolveDir: new URL('../',import.meta.url).pathname }, bundle: true, write: false, platform: 'node', format: 'esm' });
-const { extractImageReferences, createImageFilesIndex, resolveImageReferences, buildImageIndex, queryImageIndex, windowRange, imageFormat } = await import('data:text/javascript;base64,' + Buffer.from(compiled.outputFiles[0].text).toString('base64'));
+const { extractImageReferences, createImageFilesIndex, resolveImageReferences, buildImageIndex, getImageIndex, queryImageIndex, windowRange, imageFormat } = await import('data:text/javascript;base64,' + Buffer.from(compiled.outputFiles[0].text).toString('base64'));
 const sha = 'a'.repeat(64) + '.png';
 
 test('vault images resolve wiki, relative, encoded and HTML references without treating code as a rendered attachment', () => {
@@ -37,4 +37,20 @@ test('50,000 image results require only visible rows and overscan, including a p
   assert((range.end-range.start)*4<=52); assert(range.start>0);
   const tail=windowRange(Math.ceil(7/3),220,400,220);
   assert.equal(Math.min(7,tail.end*3),7); assert.equal(tail.total,660);
+});
+
+
+test('returning to the library reuses its index while a new vault revision refreshes names, sizes and associations', () => {
+  const image={id:'photo.png',name:'photo.png',folder:'',modifiedAt:1,sizeBytes:100,managed:false,url:'photo.png',usedBy:[]};
+  const images=Object.freeze([Object.freeze(image)]);
+  const before=getImageIndex(images);
+  assert.equal(getImageIndex(images),before);
+  const all={query:'',scope:'all',folder:null,format:'',sort:'modified'};
+  assert.equal(queryImageIndex(before,all),before.sorted.modified);
+  const after=getImageIndex([{...image,name:'renamed.png',sizeBytes:200,usedBy:[{id:'note',title:'Fresh context',folder:'Work'}]}]);
+  assert.notEqual(after,before);
+  assert.equal(after.totalBytes,200);
+  assert.deepEqual(queryImageIndex(after,{...all,query:'fresh',scope:'used'}).map(i=>i.id),['photo.png']);
+  assert.deepEqual(queryImageIndex(before,{...all,query:'fresh'}),[]);
+  assert.deepEqual(queryImageIndex(after,{...all,scope:'unused'}),[]);
 });

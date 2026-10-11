@@ -46,3 +46,16 @@ The finish reviewer scored its three material fixes resolved (`ship`): contained
 Run `node --test tests/*.test.mjs`. For the complete source-preservation test, set `SYNAPSE_IMPORT_NOTES_DIR` to a disposable copy of the notes directory. Run `cargo test --offline --release --manifest-path src-tauri/Cargo.toml image_previews --lib`; setting `SYNAPSE_IMAGES_REVIEW_ROOT` to the local review copy also runs the real-image benchmark.
 
 `node tests/ui/prepare-images-review.mjs` creates the local copy if absent and builds the filesystem fixture from current production storage code. Its report records whether a reference cache already existed. After generating native previews with the benchmark, start `npx vite --config .impeccable/preview/images.config.mjs` and inspect `/.impeccable/preview/images.html`. Query modes `stress`, `managed`, `error`, `broken`, `empty` and `partial` exercise bounded rendering and recovery. Managed deletion in this fixture changes only its in-memory collection.
+
+
+## Second performance pass
+
+The shared image index is now cached by the immutable image-array revision in a WeakMap. Returning to Images no longer normalizes and sorts the same inventory again. Superseded revisions remain collectible; changed filenames, sizes and note associations build a fresh index. Unfiltered results reuse the pre-sorted array through a readonly API. The original viewer also reuses its image-position lookup while zoom changes.
+
+A 50,000-record metadata helper benchmark measured approximately 60 ms for rebuilding on every return and below 1 ms for retrieving the unchanged index. The first build remains approximately 75 ms. This measures Node CPU work in the indexing helper, not total native tab-open latency. Reproduce with `node tests/ui/benchmark-image-index.mjs /path/to/library.json` after preparing the review fixture.
+
+The browser fixture passed 20 open/zoom/close cycles and associated-note return. At its 1280 × 720 viewport it retained 21 grid tiles or 12 list rows; closed viewers left no viewer node. The browser-reported JavaScript heap estimates were about 42–49 MB after warm-up, with observed collection between samples. This fixture shares 39 actual source images across synthetic metadata and uses a preview adapter: it is neither a WKWebView memory measurement nor proof that all native leaks are excluded.
+
+The second pass's full regression suite passed 82 tests with zero skips, including the 530-note copy and changed-revision index invalidation. No source files were modified by the copy-based checks. TypeScript passed. The UI design and native preview pipeline are unchanged.
+
+Native CPU/RAM/navigation and minimize comparisons remain pending: native computer use reported the Mac locked, while the initial live-app samples overlapped user navigation. Those recordings are excluded from before/after conclusions. No battery-savings figure or WKWebView leak verdict is claimed. Browser interaction checks and pure helper measurements continued independently.
