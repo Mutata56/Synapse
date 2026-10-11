@@ -2,6 +2,7 @@
 use std::sync::Mutex;
 #[cfg(target_os = "macos")]
 mod single_instance_macos;
+mod image_previews;
 #[cfg(desktop)]
 use std::time::Duration;
 
@@ -498,7 +499,9 @@ pub fn run() {
     #[cfg(desktop)]
     let builder = builder
         .manage(CaptureShortcut::default())
+        .manage(image_previews::PreviewJobs::default())
         .invoke_handler(tauri::generate_handler![
+            image_previews::image_preview,
             set_capture_shortcut,
             fetch_ics,
             caldav_discover,

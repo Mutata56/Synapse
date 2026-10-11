@@ -20,6 +20,8 @@ tauri-plugin-dialog = "2"
 tauri-plugin-global-shortcut = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+image = { version = "0.25.8", default-features = false, features = ["png", "jpeg", "webp", "gif", "bmp", "tiff", "ico"] }
+tokio = { version = "1", features = ["sync"] }
 # Read-only iCalendar (.ics) fetch for calendar sync. Done in Rust so the
 # request isn't subject to the webview's CORS policy. native-tls uses schannel
 # on Windows (no OpenSSL); gzip handles compressed ICS exports.
