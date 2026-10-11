@@ -96,6 +96,7 @@ export type SaveNotePatch = {
   /** Imported notes accept full Markdown, checked against the loaded disk revision. */
   sourceText?: string;
   sourceRevision?: string;
+  sourceMap?: string | null;
   icon?: string | null;
   cover?: string | null;
   favorite?: boolean;

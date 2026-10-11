@@ -62,6 +62,7 @@ import {
   parseNoteToBlocks,
 } from "./loadDocument";
 import { getNotesSchema } from "./schema";
+import { bindImportedMap, loadImportedMarkdown, saveImportedMarkdown, type ImportedBlock, type ImportedSourceMap } from "./importedMarkdown";
 import { TemplateChipRow } from "./TemplateChipRow";
 import { buildWikiLinkItems } from "./wikiLink2026";
 import { tryHandleImagePaste } from "./lib/pasteImages";
@@ -128,7 +129,14 @@ function useMediaQuery(query: string): boolean {
   return matches;
 }
 
-export function Editor2026() {
+export type ImportedEditorBridge = {
+  dirty?: boolean; source: string; blocknote?: string | null; sourceMap?: string | null;
+  onDraft: (blocks: ImportedBlock[], map: ImportedSourceMap) => void;
+  onSave: (source: string, blocknote: string, sourceMap: string) => Promise<void>;
+  onReady: (flush: (() => Promise<void>) | null) => void;
+};
+
+export function Editor2026({ imported }: { imported?: ImportedEditorBridge } = {}) {
   const activeNote = useNotesStore((s) => s.activeNote);
   const activeId = useNotesStore((s) => s.activeId);
   const saveNote = useNotesStore((s) => s.saveNote);
@@ -186,6 +194,13 @@ export function Editor2026() {
   const loadedIdRef = useRef<string | null>(null);
   const loadedNonceRef = useRef(-1);
   const saveTimerRef = useRef<number | null>(null);
+  const importedRef = useRef(imported);
+  importedRef.current = imported;
+  const importedMapRef = useRef<ImportedSourceMap | null>(null);
+  const importedFlightRef = useRef<Promise<void> | null>(null);
+  const importedDirtyRef = useRef(false);
+  const [readyId, setReadyId] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   // Текущий документ пуст (один пустой параграф) или нет. Управляет
   // видимостью TemplateChipRow. Обновляется при загрузке документа и
@@ -209,29 +224,59 @@ export function Editor2026() {
       return;
 
     let cancelled = false;
+    setReadyId(null);
     (async () => {
-      const blocks = await parseNoteToBlocks(editor, activeNote);
+      const bridge = importedRef.current;
+      const parsed = bridge ? await loadImportedMarkdown(editor, bridge.source, bridge.blocknote, bridge.sourceMap) : null;
+      const blocks = parsed ? parsed.blocks : await parseNoteToBlocks(editor, activeNote);
       if (cancelled) return;
-      await applyDocument(editor, schema, blocks, activeNote.content);
+      if (parsed) editor.replaceBlocks(editor.document, blocks as never);
+      else await applyDocument(editor, schema, blocks, activeNote.content);
+      if (parsed) {
+        importedMapRef.current = parsed.cached ? parsed.map : bindImportedMap(parsed.map, editor.document as unknown as ImportedBlock[]);
+        importedDirtyRef.current = Boolean(bridge?.dirty);
+      }
       if (cancelled) return;
       loadedIdRef.current = activeId;
       loadedNonceRef.current = editorReloadNonce;
       // Отражаем форму загруженного документа, чтобы строка шаблонов
       // появлялась на пустой новой заметке и скрывалась на заполненной.
       setEmptyIfChanged(isEmptyDoc(editor.document));
-    })();
+      setLoadError(null);
+      setReadyId(activeId);
+    })().catch((error) => { if (!cancelled) setLoadError(String(error)); });
 
     return () => {
       cancelled = true;
     };
   }, [activeId, activeNote, editor, editorReloadNonce, setEmptyIfChanged]);
 
+  const persistImported = useCallback(async () => {
+    if (importedFlightRef.current) await importedFlightRef.current;
+    const bridge = importedRef.current;
+    const map = importedMapRef.current;
+    if (!bridge || !map || !importedDirtyRef.current || loadedIdRef.current !== activeId) return;
+    const blocks = portablizeBlocks(editor.document) as ImportedBlock[];
+    const run = (async () => {
+      const next = await saveImportedMarkdown(editor, map, blocks);
+      await bridge.onSave(next.source, JSON.stringify(blocks), JSON.stringify(next.map));
+      importedMapRef.current = next.map;
+      importedDirtyRef.current = JSON.stringify(portablizeBlocks(editor.document)) !== JSON.stringify(blocks);
+    })();
+    importedFlightRef.current = run;
+    try { await run; } finally { importedFlightRef.current = null; }
+  }, [activeId, editor]);
+
   // Регистрируем flush-колбэк для пути сохранения-при-переключении.
   // См. Editor.tsx для аналогичного паттерна. Без этого Ctrl+K
   // в течение ~400ms после последнего нажатия молча теряет отложенное сохранение.
   useEffect(() => {
     const flush = async () => {
-      if (saveTimerRef.current === null) return;
+      if (saveTimerRef.current === null) {
+        if (importedFlightRef.current) await importedFlightRef.current;
+        if (importedRef.current && importedMapRef.current) await persistImported();
+        return;
+      }
       window.clearTimeout(saveTimerRef.current);
       saveTimerRef.current = null;
       if (loadedIdRef.current !== activeId) return;
@@ -239,6 +284,7 @@ export function Editor2026() {
         // Сворачиваем ссылки на ассеты к портабельной форме ПЕРЕД сохранением,
         // из тех же блоков делаем и markdown, иначе в заметку утечёт абсолютный
         // путь и бэкап не переедет на другую ОС.
+        if (importedRef.current) { await persistImported(); return; }
         const blocks = portablizeBlocks(editor.document);
         const md = await editor.blocksToMarkdownLossy(blocks as never);
         if (loadedIdRef.current !== activeId) return;
@@ -249,19 +295,22 @@ export function Editor2026() {
         });
       } catch (e) {
         console.error("Editor2026: flush save failed:", e);
+        if (importedRef.current) throw e;
       }
     };
+    importedRef.current?.onReady(flush);
     const unregister = registerFlusher(flush);
     return () => {
       // Immediate view changes must not discard a pending editor debounce.
-      void flush();
+      void flush().catch(() => undefined);
+      importedRef.current?.onReady(null);
       unregister();
       if (saveTimerRef.current !== null) {
         window.clearTimeout(saveTimerRef.current);
         saveTimerRef.current = null;
       }
     };
-  }, [activeId, editor, saveNote]);
+  }, [activeId, editor, saveNote, persistImported]);
 
   const handleChange = useCallback(
     (
@@ -279,6 +328,10 @@ export function Editor2026() {
       // при удалении всего). Guarded setter пропускает React-работу
       // если буль не изменился.
       setEmptyIfChanged(isEmptyDoc(editor.document));
+      if (importedMapRef.current) {
+        importedDirtyRef.current = true;
+        importedRef.current?.onDraft(editor.document as unknown as ImportedBlock[], importedMapRef.current);
+      }
 
       if (saveTimerRef.current !== null) {
         window.clearTimeout(saveTimerRef.current);
@@ -288,6 +341,7 @@ export function Editor2026() {
         if (loadedIdRef.current !== editingId) return;
         try {
           // См. flush выше: портабилизируем ссылки на ассеты до сохранения.
+          if (importedRef.current) { await persistImported(); return; }
           const blocks = portablizeBlocks(editor.document);
           const md = await editor.blocksToMarkdownLossy(blocks as never);
           if (loadedIdRef.current !== editingId) return;
@@ -301,7 +355,7 @@ export function Editor2026() {
         }
       }, CONTENT_SAVE_DEBOUNCE_MS);
     },
-    [activeId, editor, saveNote, setEmptyIfChanged],
+    [activeId, editor, saveNote, setEmptyIfChanged, persistImported],
   );
 
   const insertWikiLink = useCallback(
@@ -415,18 +469,19 @@ export function Editor2026() {
       // ВАЖНО: пункты с одинаковым `group` должны идти подряд, иначе
       // дублируются заголовки групп (React предупреждение "same key") и
       // клики ломаются. Сначала все "Блоки", потом все "Медиа".
-      return filterSuggestionItems(
-        [
-          ...getDefaultReactSlashMenuItems(editor),
-          calloutItem,
-          dataTableItem,
-          galleryItem,
-          fileItem,
-          whiteboardItem,
-          ...getMultiColumnSlashMenuItems(editor),
-        ],
-        query,
-      );
+      const items = [
+        ...getDefaultReactSlashMenuItems(editor),
+        calloutItem, dataTableItem, galleryItem, fileItem, whiteboardItem,
+        ...getMultiColumnSlashMenuItems(editor),
+      ];
+      const groups = new Map<string, DefaultReactSuggestionItem[]>();
+      for (const item of items) {
+        const group = item.group ?? "";
+        const members = groups.get(group) ?? [];
+        members.push(item);
+        groups.set(group, members);
+      }
+      return filterSuggestionItems(Array.from(groups.values()).flat(), query);
     },
     [editor, insertCustomBlock],
   );
@@ -511,8 +566,9 @@ export function Editor2026() {
 
   return (
     <div className="relative flex-1 flex flex-col min-w-0 min-h-0">
+      {loadError ? <div className="markdown-source-error" role="alert">Не удалось открыть блоки. Ваш Markdown сохранён. {loadError}</div> : null}
       <AnimatePresence>
-        {canGoBack && (
+        {canGoBack && !imported && (
           <motion.button
             type="button"
             initial={{ opacity: 0, x: -6 }}
@@ -562,6 +618,7 @@ export function Editor2026() {
                 editor={editor}
                 onChange={handleChange}
                 theme="dark"
+                editable={readyId === activeId && !loadError}
                 slashMenu={false}
                 formattingToolbar={false}
                 onClick={openBlockMenuIfEmpty}

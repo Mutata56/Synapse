@@ -352,18 +352,31 @@ input:focus-visible {
 }
 
 
-.bn-tag {
-  color: #5fb89a;
-  background-color: rgba(95, 184, 154, 0.13);
-  border-radius: 3px;
-  padding: 0 3px;
+.bn-tag,
+.md-content .note-inline-tag {
+  display: inline;
+  color: var(--tag-accent);
+  background: color-mix(in srgb, var(--tag-accent) 12%, transparent);
+  border-radius: 5px;
+  padding: 2px 6px;
+  font-size: .85em;
   font-weight: 500;
+  line-height: inherit;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
   cursor: pointer;
-  transition: background-color 0.12s ease;
+  vertical-align: baseline;
 }
-.bn-tag:hover {
-  background-color: rgba(95, 184, 154, 0.22);
-}
+.bn-tag:hover,
+.md-content .note-inline-tag:hover { background: color-mix(in srgb, var(--tag-accent) 22%, transparent); }
+.md-content .note-inline-tag:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.source-markdown-block { position: relative; width: 100%; min-width: 0; padding-block: 8px; overflow-wrap: anywhere; }
+.source-markdown-block .md-content { font-size: inherit; }
+.source-markdown-block .md-content pre, .source-markdown-block .md-content table { max-width: 100%; overflow-x: auto; }
+.source-markdown-toggle { display: inline-flex; align-items: center; gap: 5px; padding: 4px 7px; margin-bottom: 6px; border-radius: 5px; font-size: 11px; color: var(--text-secondary); background: var(--surface-2-solid); }
+.source-markdown-toggle:hover { color: var(--text-strong); }
+.source-markdown-toggle:focus-visible, .source-markdown-text:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.source-markdown-text { display: block; width: 100%; min-height: 100px; resize: vertical; padding: 12px; border: 1px solid var(--border); border-radius: 6px; color: var(--text); background: var(--surface-1-solid); font: 13px/1.7 ui-monospace, SFMono-Regular, Menlo, monospace; }
 
 /* ─── Едитор 2026 ──────────────────────────────────────────────────────────
  */

@@ -1,13 +1,8 @@
-import { ArrowLeft, Columns2, FileCode2, History, RefreshCw, Save } from "lucide-react";
-import { convertFileSrc } from "@tauri-apps/api/core";
-import { openPath, openUrl } from "@tauri-apps/plugin-opener";
+import { ArrowLeft, Blocks, Columns2, FileCode2, History, RefreshCw, Save } from "lucide-react";
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
-import ReactMarkdown, { defaultUrlTransform } from "react-markdown";
-import remarkGfm from "remark-gfm";
 import {
   indexVaultFiles,
   normalizeSourceEdit,
-  obsidianMarkdownPreview,
   resolveVaultReference,
   splitMarkdownSource,
   wikiTarget,
@@ -18,9 +13,11 @@ import { confirmDialog } from "../store/confirm";
 import { registerFlusher, useNotesStore } from "../store/notes";
 import { useToastStore } from "../store/toasts";
 import { NoteHero } from "./NoteHero";
+import { Editor2026 } from "../editor2026/Editor2026";
+import { decodeImportedMap, type ImportedBlock, type ImportedSourceMap } from "../editor2026/importedMarkdown";
+import { VaultMarkdown, VaultMarkdownContext, scrollToMarkdownHeading as scrollToHeading } from "./VaultMarkdown";
 
-type Mode = "preview" | "source" | "split";
-const REMARK_PLUGINS = [remarkGfm];
+type Mode = "blocks" | "preview" | "source" | "split";
 const EMPTY_INDEX = indexVaultFiles([]);
 const draftKey = (id: string) => `synapse:markdown-draft:${id}`;
 const anchorKey = (id: string) => `synapse:markdown-anchor:${id}`;
@@ -38,18 +35,7 @@ function persistDraft(id: string, text: string, revision: string): void {
   else localStorage.setItem(draftKey(id), JSON.stringify({ text, revision }));
 }
 
-function scrollToHeading(heading: string): void {
-  if (!heading) return;
-  const wanted = heading.replace(/^#/, "").trim().toLowerCase();
-  const elements = document.querySelectorAll<HTMLElement>(".markdown-source-preview h1,.markdown-source-preview h2,.markdown-source-preview h3,.markdown-source-preview h4,.markdown-source-preview h5,.markdown-source-preview h6");
-  Array.from(elements).find((element) => element.textContent?.trim().toLowerCase() === wanted)?.scrollIntoView({ block: "start" });
-}
-
-function previewUrl(url: string): string {
-  return /^synapse-(?:note|embed):/.test(url) ? url : defaultUrlTransform(url);
-}
-
-/** The imported source is never parsed and then serialized by BlockNote. */
+/** Block edits retain unchanged source chunks; Markdown remains directly editable. */
 export function MarkdownSourceEditor() {
   const note = useNotesStore((s) => s.activeNote)!;
   const saveNote = useNotesStore((s) => s.saveNote);
@@ -57,16 +43,29 @@ export function MarkdownSourceEditor() {
   const canGoBack = useNotesStore((s) => s.backStack.length > 0);
   const openVersionHistory = useNotesStore((s) => s.openVersionHistory);
   const initial = useMemo(() => loadDraft(note.id, note.sourceRevision ?? ""), [note.id]);
-  const [text, setText] = useState(initial.text);
-  const [mode, setMode] = useState<Mode>(initial.text === initial.revision ? "preview" : "source");
+  const blockDraft = useMemo(() => {
+    try { const value = JSON.parse(localStorage.getItem(`synapse:block-draft:${note.id}`) ?? "null");
+      if (decodeImportedMap(value?.sourceMap) && typeof value.blocknote === "string") return value as { sourceMap: string; blocknote: string };
+    } catch { /* The file and its persisted rich state remain available. */ }
+    return null;
+  }, [note.id]);
+  const startingSource = blockDraft ? decodeImportedMap(blockDraft.sourceMap)!.source : initial.text;
+  const [text, setText] = useState(startingSource);
+  const [mode, setMode] = useState<Mode>("blocks");
+  const [blockGeneration, setBlockGeneration] = useState(0);
+  const blockFlushRef = useRef<(() => Promise<void>) | null>(null);
+  const blockCacheRef = useRef<{ blocknote: string; sourceMap: string } | null>(blockDraft ?? (note.blocknote && note.sourceMap ? { blocknote: note.blocknote, sourceMap: note.sourceMap } : null));
+  const blocksDirtyRef = useRef(Boolean(blockDraft));
+  const blockOutputReadyRef = useRef(false);
+  const latestBlockJson = useRef(blockDraft?.blocknote ?? "");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const [dirty, setDirty] = useState(initial.text !== initial.revision);
+  const [dirty, setDirty] = useState(initial.text !== initial.revision || Boolean(blockDraft));
   const [files, setFiles] = useState<VaultFileIndex>(EMPTY_INDEX);
   const [workspace, setWorkspace] = useState("");
-  const textRef = useRef(initial.text);
-  const revisionRef = useRef(initial.revision);
-  const editedRef = useRef(false);
+  const textRef = useRef(startingSource);
+  const revisionRef = useRef(blockDraft ? startingSource : initial.revision);
+  const editedRef = useRef(Boolean(blockDraft));
   const errorRef = useRef<string | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const flightRef = useRef<Promise<void> | null>(null);
@@ -98,7 +97,7 @@ export function MarkdownSourceEditor() {
   // draft retains its baseline so a later save will detect the external change.
   useEffect(() => {
     const incoming = note.sourceRevision;
-    if (incoming === undefined || textRef.current !== revisionRef.current) return;
+    if (incoming === undefined || blocksDirtyRef.current || textRef.current !== revisionRef.current) return;
     textRef.current = incoming;
     revisionRef.current = incoming;
     setText(incoming);
@@ -106,22 +105,33 @@ export function MarkdownSourceEditor() {
 
   const save = useCallback(async (explicit = false): Promise<void> => {
     if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null; }
-    if (flightRef.current) return flightRef.current;
-    if (textRef.current === revisionRef.current || (!explicit && !editedRef.current) || (!explicit && errorRef.current)) return;
+    if (flightRef.current) { await flightRef.current; return save(explicit); }
+    if ((textRef.current === revisionRef.current && !blocksDirtyRef.current) || (!explicit && !editedRef.current) || (!explicit && errorRef.current)) return;
+    if (blocksDirtyRef.current && !blockOutputReadyRef.current) return;
     const output = textRef.current;
     const revision = revisionRef.current;
+    const cache = blockCacheRef.current;
     const run = (async () => {
       if (aliveRef.current) { setSaving(true); setError(null); }
       try {
         if (useNotesStore.getState().activeId !== id) throw new Error("Заметка закрыта. Черновик сохранён для следующего открытия.");
-        await saveNote({ sourceText: output, sourceRevision: revision });
+        await saveNote({ sourceText: output, sourceRevision: revision, blocknote: cache?.blocknote ?? null, sourceMap: cache?.sourceMap ?? null });
         const current = useNotesStore.getState().activeNote;
         const saved = current?.id === id ? current : await readNote(id);
         if (saved?.sourceRevision !== output) throw new Error("Не удалось проверить сохранение. Черновик сохранён.");
         revisionRef.current = output;
         errorRef.current = null;
         persistDraft(id, textRef.current, output);
-        if (aliveRef.current) setDirty(textRef.current !== output);
+        if (cache && latestBlockJson.current === cache.blocknote) {
+          blocksDirtyRef.current = false;
+          localStorage.removeItem(`synapse:block-draft:${id}`);
+        } else if (blocksDirtyRef.current && cache) {
+          // Keystrokes made while saving keep the fresh baseline and their own document.
+          const pending = { blocknote: latestBlockJson.current, sourceMap: cache.sourceMap };
+          blockCacheRef.current = pending;
+          localStorage.setItem(`synapse:block-draft:${id}`, JSON.stringify(pending));
+        }
+        if (aliveRef.current) setDirty(textRef.current !== output || blocksDirtyRef.current);
       } catch (e) {
         const message = e instanceof Error ? e.message : String(e);
         errorRef.current = message;
@@ -153,7 +163,13 @@ export function MarkdownSourceEditor() {
     };
   }, [save]);
 
-  const changeSource = (value: string) => {
+  const changeSource = (value: string, cache?: { blocknote: string; sourceMap: string }) => {
+    if (cache) blockCacheRef.current = cache;
+    else {
+      blockCacheRef.current = null;
+      blocksDirtyRef.current = false;
+      localStorage.removeItem(`synapse:block-draft:${id}`);
+    }
     const next = normalizeSourceEdit(value, revisionRef.current);
     textRef.current = next;
     editedRef.current = true;
@@ -168,7 +184,7 @@ export function MarkdownSourceEditor() {
   };
 
   const reload = async () => {
-    if (textRef.current !== revisionRef.current && !(await confirmDialog(
+    if ((textRef.current !== revisionRef.current || blocksDirtyRef.current) && !(await confirmDialog(
       "Перечитать файл? Текущий черновик будет заменён Markdown с диска. Скопируйте нужные правки перед этим действием.",
       { confirmLabel: "Перечитать" },
     ))) return;
@@ -180,82 +196,84 @@ export function MarkdownSourceEditor() {
     errorRef.current = null;
     persistDraft(id, fresh.sourceRevision, fresh.sourceRevision);
     setText(fresh.sourceRevision); setDirty(false); setError(null);
+      blockCacheRef.current = fresh.blocknote && fresh.sourceMap ? { blocknote: fresh.blocknote, sourceMap: fresh.sourceMap } : null;
+      blocksDirtyRef.current = false;
+      localStorage.removeItem(`synapse:block-draft:${id}`);
+      setBlockGeneration(value => value + 1);
     useNotesStore.setState({ activeNote: fresh });
   };
 
   const deferredText = useDeferredValue(text);
-  const preview = useMemo(() => obsidianMarkdownPreview(splitMarkdownSource(deferredText).body), [deferredText]);
+  const preview = useMemo(() => splitMarkdownSource(deferredText).body, [deferredText]);
   const navigate = useCallback((reference: string, relativeFirst = false) => {
     const target = wikiTarget(reference);
     const path = resolveVaultReference(target.path, id, files, { note: true, relativeFirst });
     if (!path) { useToastStore.getState().push(`Ссылка не найдена или неоднозначна: ${reference}`); return; }
     const nextId = path.slice(0, -3);
-    if (nextId === id) { setMode("preview"); requestAnimationFrame(() => scrollToHeading(target.heading)); return; }
+    if (nextId === id) {
+      void (async () => { await blockFlushRef.current?.(); await save(); setMode("preview"); requestAnimationFrame(() => scrollToHeading(target.heading)); })().catch(() => undefined);
+      return;
+    }
     try { if (target.heading) sessionStorage.setItem(anchorKey(nextId), target.heading); } catch { /* optional scroll hint */ }
     useNotesStore.getState().openLinkMatch(nextId);
-  }, [id, files]);
+  }, [id, files, save]);
 
-  const components = useMemo(() => ({
-    a: ({ href = "", children }: { href?: string; children?: React.ReactNode }) => {
-      const wiki = href.startsWith("synapse-note:");
-      const external = /^(?:https?:|mailto:)/i.test(href);
-      return <a href={href || undefined} onClick={(event) => {
-        event.preventDefault();
-        if (wiki) { navigate(decodeURIComponent(href.slice("synapse-note:".length))); return; }
-        if (href.startsWith("#")) { scrollToHeading(decodeURIComponent(href.slice(1))); return; }
-        if (external) { void openUrl(href).catch((e) => useToastStore.getState().push(String(e))); return; }
-        const target = wikiTarget(href);
-        if (/\.md$/i.test(target.path)) { navigate(href, true); return; }
-        const path = resolveVaultReference(target.path, id, files, { relativeFirst: true });
-        if (path && workspace) void openPath(`${workspace}/${path}`).catch((e) => useToastStore.getState().push(String(e)));
-        else useToastStore.getState().push(`Файл не найден: ${href}`);
-      }}>{children}</a>;
+  const switchMode = async (next: Mode) => {
+    try { await blockFlushRef.current?.(); await save(); setMode(next); } catch { /* Keep the draft and visible recovery actions. */ }
+  };
+  const bridge = {
+    dirty: blocksDirtyRef.current,
+    source: textRef.current,
+    blocknote: blockCacheRef.current?.blocknote,
+    sourceMap: blockCacheRef.current?.sourceMap,
+    onReady: (flush: (() => Promise<void>) | null) => { blockFlushRef.current = flush; },
+    onDraft: (blocks: ImportedBlock[], map: ImportedSourceMap) => {
+      const cache = { blocknote: JSON.stringify(blocks), sourceMap: JSON.stringify(map) };
+      latestBlockJson.current = cache.blocknote;
+      blockCacheRef.current = cache;
+      blocksDirtyRef.current = true;
+      blockOutputReadyRef.current = false;
+      setDirty(true);
+      try { localStorage.setItem(`synapse:block-draft:${id}`, JSON.stringify(cache)); } catch {
+        setError("Не удалось сохранить черновик блоков. Нажмите «Сохранить».");
+      }
     },
-    img: ({ src = "", alt = "", title }: { src?: string; alt?: string; title?: string }) => <VaultPreviewImage source={src} alt={alt} title={title} files={files} noteId={id} workspace={workspace} navigate={navigate} />,
-  }), [files, id, workspace, navigate]);
+    onSave: async (source: string, blocknote: string, sourceMap: string) => {
+      blockOutputReadyRef.current = true;
+      changeSource(source, { blocknote, sourceMap });
+      await save(true);
+    },
+  };
 
-  return <div className="markdown-source-editor">
+  return <VaultMarkdownContext.Provider value={{ files, workspace, id, navigate }}><div className="markdown-source-editor" onKeyDownCapture={event => {
+    if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "s") {
+      event.preventDefault(); void (async () => { await blockFlushRef.current?.(); await save(true); })().catch(() => undefined);
+    }
+  }}>
     <div className="markdown-source-toolbar">
       {canGoBack ? <button type="button" onClick={goBack} title="Назад" aria-label="Назад"><ArrowLeft size={16} /></button> : null}
       <div className="markdown-source-modes" aria-label="Режим просмотра">
-        <button type="button" aria-pressed={mode === "preview"} onClick={() => setMode("preview")}>Чтение</button>
-        <button type="button" aria-pressed={mode === "source"} onClick={() => setMode("source")}><FileCode2 size={14} /> Markdown</button>
-        <button type="button" aria-pressed={mode === "split"} onClick={() => setMode("split")}><Columns2 size={14} /> Рядом</button>
+        <button type="button" aria-pressed={mode === "blocks"} onClick={() => { void switchMode("blocks"); }}><Blocks size={14} /> Блоки</button>
+        <button type="button" aria-pressed={mode === "preview"} onClick={() => { void switchMode("preview"); }}>Чтение</button>
+        <button type="button" aria-pressed={mode === "source"} onClick={() => { void switchMode("source"); }}><FileCode2 size={14} /> Markdown</button>
+        <button type="button" aria-pressed={mode === "split"} onClick={() => { void switchMode("split"); }}><Columns2 size={14} /> Рядом</button>
       </div>
-      <span className="markdown-source-status" role="status">{saving ? "Сохраняю…" : dirty ? "Черновик" : "Markdown сохранён"}</span>
+      <span className="markdown-source-status" role="status">{saving ? "Сохраняю…" : dirty ? "Черновик" : "Сохранено"}</span>
       <button type="button" onClick={() => openVersionHistory(id)} title="История версий" aria-label="История версий"><History size={16} /></button>
       <button type="button" disabled={saving} onClick={() => { void reload().catch((e) => setError(String(e))); }} title="Перечитать файл" aria-label="Перечитать файл"><RefreshCw size={16} /></button>
-      <button type="button" onClick={() => { void save(true).catch(() => undefined); }} disabled={!dirty || saving}><Save size={14} /> Сохранить</button>
+      <button type="button" onClick={() => { void (async () => { await blockFlushRef.current?.(); await save(true); })().catch(() => undefined); }} disabled={!dirty || saving}><Save size={14} /> Сохранить</button>
     </div>
     {error ? <div className="markdown-source-error" role="alert">{error}</div> : null}
     <div className="markdown-source-location" title={id}>{id}.md</div>
     <div className={`markdown-source-panes markdown-source-${mode}`}>
-      {mode !== "preview" ? <textarea className="markdown-source-input" aria-label="Исходный Markdown включая свойства YAML" spellCheck={false} value={text} onChange={(event) => changeSource(event.target.value)} onKeyDown={(event) => {
+      {mode === "blocks" ? <Editor2026 key={`${id}:${blockGeneration}`} imported={bridge} /> : null}
+      {mode === "source" || mode === "split" ? <textarea className="markdown-source-input" aria-label="Исходный Markdown включая свойства YAML" spellCheck={false} value={text} onChange={(event) => changeSource(event.target.value)} onKeyDown={(event) => {
         if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "s") { event.preventDefault(); void save(true).catch(() => undefined); }
       }} /> : null}
-      {mode !== "source" ? <div className="markdown-source-preview group/hero" data-editor-scroll>
+      {mode === "preview" || mode === "split" ? <div className="markdown-source-preview group/hero" data-editor-scroll>
         <NoteHero key={id} />
-        <div className="md-content markdown-source-body"><ReactMarkdown remarkPlugins={REMARK_PLUGINS} components={components} urlTransform={previewUrl}>{preview}</ReactMarkdown></div>
+        <div className="md-content markdown-source-body"><VaultMarkdown source={preview} /></div>
       </div> : null}
     </div>
-  </div>;
-}
-
-function VaultPreviewImage({ source, alt, title, files, noteId, workspace, navigate }: {
-  source: string; alt: string; title?: string; files: VaultFileIndex; noteId: string;
-  workspace: string; navigate: (reference: string, relativeFirst?: boolean) => void;
-}) {
-  const embed = source.startsWith("synapse-embed:");
-  const reference = embed ? decodeURIComponent(source.slice("synapse-embed:".length)) : source;
-  const remote = /^(?:https?:|data:image\/(?:png|jpe?g|gif|webp);)/i.test(source);
-  const path = remote ? null : resolveVaultReference(reference, noteId, files, { relativeFirst: !embed });
-  if (!remote && (!path || !workspace)) return <span className="markdown-source-missing">Вложение: {reference || alt}</span>;
-  if (path && !/\.(?:png|jpe?g|gif|webp|svg|bmp|avif|ico)$/i.test(path)) {
-    return <button type="button" className="markdown-source-attachment" onClick={() => {
-      if (/\.md$/i.test(path)) navigate(path);
-      else void openPath(`${workspace}/${path}`).catch((e) => useToastStore.getState().push(String(e)));
-    }}>{alt || path}</button>;
-  }
-  const size = title && /^(\d+)(?:x(\d+))?$/.exec(title);
-  return <img src={remote ? source : convertFileSrc(`${workspace}/${path}`)} alt={alt || reference} title={size ? undefined : title} loading="lazy" width={size ? Math.min(Number(size[1]), 4096) : undefined} height={size?.[2] ? Math.min(Number(size[2]), 4096) : undefined} />;
+  </div></VaultMarkdownContext.Provider>;
 }
