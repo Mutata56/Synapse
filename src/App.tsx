@@ -19,6 +19,7 @@ const MarkdownSourceEditor = lazy(() => import("./components/MarkdownSourceEdito
 const SettingsView = lazy(() => import("./components/SettingsView").then(module => ({ default: module.SettingsView })));
 import { WorkspaceChrome } from "./components/WorkspaceChrome";
 import { useWorkspaceStore } from "./store/workspace";
+import { activeWorkspaceTab } from "./lib/workspaceTabs";
 import { TagsView } from "./components/TagsView";
 import { Toaster } from "./components/Toaster";
 import { TrashView } from "./components/TrashView";
@@ -55,8 +56,9 @@ export default function App({ bootstrap = true }: { bootstrap?: boolean } = {}) 
   const refreshTree = useNotesStore((s) => s.refreshTree);
   const loadFolderColors = useNotesStore((s) => s.loadFolderColors);
   const loadSettings = useNotesStore((s) => s.loadSettings);
-  const view = useNotesStore((s) => s.view);
-  const activeId = useNotesStore((s) => s.activeId);
+  const target = useWorkspaceStore(state => activeWorkspaceTab(state).target);
+  const view: View = target.kind === "view" ? target.view : "notes";
+  const activeId = target.kind === "note" ? target.noteId : null;
   const undo = useNotesStore((s) => s.undo);
   const redo = useNotesStore((s) => s.redo);
 
