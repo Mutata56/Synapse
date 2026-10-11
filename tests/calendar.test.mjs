@@ -26,6 +26,13 @@ test("month and week share a Monday-based range, including leap dates and year b
   assert.equal(model.shiftPeriod("2024-01-31", 1, "month"), "2024-02-29");
   assert.equal(model.shiftPeriod("2024-02-29", 1, "week"), "2024-03-07");
 });
+test("period arrows follow the visible month even when keyboard selection is in an adjacent month", () => {
+  assert.equal(model.moveCalendarPeriod("2026-10-11", "2026-11-01", 1, "month"), "2026-11-01");
+  assert.equal(model.moveCalendarPeriod("2026-10-11", "2026-11-01", -1, "month"), "2026-09-01");
+  assert.equal(model.moveCalendarPeriod("2026-10-11", "2026-09-30", 1, "agenda"), "2026-11-30");
+  assert.equal(model.moveCalendarPeriod("2024-01-31", "2024-01-31", 1, "month"), "2024-02-29");
+  assert.equal(model.moveCalendarPeriod("2026-01-01", "2025-12-31", 1, "week"), "2026-01-07");
+});
 test("note dates are indexed once per immutable tree; a backdated daily note belongs to its named day", () => {
   const journal = note("Дневник/2020/2020-01-03", "2026-10-11", { mood: 4 });
   const tree = [{ kind: "folder", children: [{ kind: "note", note: journal }, { kind: "note", note: note("Работа/пример", "2026-10-11") }] }];

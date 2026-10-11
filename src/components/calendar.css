@@ -86,7 +86,7 @@
 .calendar-cell-more { color: var(--cal-muted); font-size: 9px; line-height: 12px; }
 .calendar-cell-notes { display: flex; align-items: center; gap: 4px; margin-top: auto; min-height: 14px; color: var(--cal-muted); font-size: 10px; }
 .calendar-cell-notes > svg:nth-last-child(1) { color: var(--cal-note); }
-.calendar-mood-face { font-family: "Apple Color Emoji", "Segoe UI Emoji", sans-serif; font-size: 14px; }
+.calendar-mood-face { font-family: var(--font-emoji); font-size: 14px; }
 .calendar-footer { display: flex; flex: 0 0 auto; align-items: center; justify-content: space-between; gap: 12px; min-height: 43px; padding: 11px 17px; border-top: 1px solid var(--color-border); color: var(--cal-muted); font-size: 10px; }
 .calendar-footer > span:last-child { text-align: right; }
 .calendar-moods { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; max-width: 160px; }
@@ -202,7 +202,7 @@
 .calendar-week-slot.is-today { background: color-mix(in srgb, var(--color-accent) 3%, var(--color-bg)); }
 .calendar-week-slot-hit { position: absolute; inset: 0; border: 0; background: transparent; }
 .calendar-week-slot-hit:hover { background: var(--color-bg-elevated); }
-.calendar-week-slot-items { position: relative; display: flex; flex-direction: column; gap: 2px; margin: 3px; pointer-events: none; }
+.calendar-week-slot-items { position: relative; display: flex; flex-direction: column; gap: 2px; margin: 3px; max-height: 57px; overflow: hidden; pointer-events: none; }
 .calendar-week-slot-items button { pointer-events: auto; }
 .calendar-week-chip { display: flex; align-items: center; gap: 4px; max-width: 100%; min-width: 0; padding: 4px; border: 0; border-radius: 3px; text-align: left; font-size: 10px; line-height: 1.15; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; background: color-mix(in srgb, currentColor 9%, transparent); }
 .calendar-week-chip > span { flex: 0 0 auto; font-size: 9px; }
@@ -270,3 +270,6 @@
 @container calendar (max-width: 720px) { .calendar-date-popover { left: auto; right: 0; } }
 
 .calendar-moods > span { color: var(--cal-muted); font-size: 10px; white-space: nowrap; margin-right: 4px; }
+
+.calendar-week-slot-items .calendar-week-chip { flex: 0 0 auto; height: 18px; padding: 3px 4px; }
+.calendar-week-slot-items .calendar-more { flex: 0 0 auto; line-height: 12px; padding: 1px 4px; }

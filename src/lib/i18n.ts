@@ -22,6 +22,8 @@ const en: Record<string, string> = {
   "Перейти": "Go to",
   "Настроение за неделю": "Mood this week",
   "Среднее настроение": "Average mood",
+  "Записей: {n}": "Notes: {n}",
+  "Дневник: {n} {word} подряд": "Journal: {n} consecutive {word}",
   // Calendar workspace
   "iCal показывает внешние события. CalDAV отправляет локальные задачи только по кнопке в подключениях.": "iCal shows external events. CalDAV sends local tasks only when you use the button in Connections.",
   "В этом периоде ничего не найдено": "Nothing found in this period",

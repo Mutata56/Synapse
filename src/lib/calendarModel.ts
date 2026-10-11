@@ -37,6 +37,18 @@ export function shiftPeriod(key: string, delta: number, mode: CalendarMode): str
   return toISODate(date);
 }
 
+/** Period arrows follow the displayed period, retaining a useful selected day. */
+export function moveCalendarPeriod(anchor: string, selected: string, delta: number, mode: CalendarMode): string {
+  if (mode === "week") {
+    const range = calendarRange(anchor, mode);
+    return shiftPeriod(selected >= range.from && selected <= range.to ? selected : anchor, delta, mode);
+  }
+  const target = dateFromDay(shiftPeriod(anchor, delta, mode));
+  const last = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate();
+  target.setDate(Math.min(dateFromDay(selected).getDate(), last));
+  return toISODate(target);
+}
+
 export function calendarRange(anchor: string, mode: CalendarMode): CalendarRange {
   const date = dateFromDay(anchor);
   const monthFirst = new Date(date.getFullYear(), date.getMonth(), 1);

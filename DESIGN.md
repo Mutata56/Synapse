@@ -21,6 +21,11 @@ colors:
   files-tag: "#74b39a"
   files-danger: "#e87983"
   files-dialog-scrim: "rgba(0,0,0,.5)"
+  calendar-muted: "color-mix(in srgb, var(--color-text) 70%, var(--color-bg))"
+  calendar-task: "#e0af64"
+  calendar-event: "#86b6f6"
+  calendar-note: "#aba8ee"
+  calendar-danger: "#f08e98"
 typography:
   headline:
     fontFamily: "Inter, system-ui, sans-serif"
@@ -161,6 +166,40 @@ typography:
   workspace-result-context:
     fontSize: "11px"
     lineHeight: 1.5
+  calendar-page-title:
+    fontSize: "26px"
+    fontWeight: 650
+    lineHeight: 1.2
+    letterSpacing: "-0.025em"
+  calendar-period-title:
+    fontSize: "19px"
+    fontWeight: 600
+    lineHeight: 1.5
+    letterSpacing: "-0.018em"
+  calendar-day-title:
+    fontSize: "23px"
+    fontWeight: 600
+    lineHeight: 1.3
+    letterSpacing: "-0.02em"
+  calendar-workspace-text:
+    fontSize: "13px"
+  calendar-primary-label:
+    fontSize: "13px"
+    fontWeight: 550
+  calendar-control-label:
+    fontSize: "12px"
+  calendar-context:
+    fontSize: "11px"
+  calendar-cell-preview:
+    fontSize: "10px"
+    lineHeight: 1.1
+  calendar-cell-overflow:
+    fontSize: "9px"
+    lineHeight: "12px"
+  calendar-time-label:
+    fontSize: "9px"
+  calendar-narrow-hour:
+    fontSize: "8px"
 rounded:
   control: "6px"
   card: "12px"
@@ -182,6 +221,10 @@ rounded:
   workspace-control: "5px"
   workspace-detail: "4px"
   workspace-menu: "7px"
+  calendar-detail: "4px"
+  calendar-week-chip: "3px"
+  calendar-popover: "7px"
+  calendar-menu: "8px"
 spacing:
   tight: "6px"
   control: "12px"
@@ -195,6 +238,12 @@ spacing:
   files-inset-narrow: "14px"
   workspace-action-gap: "9px"
   workspace-chrome-gap: "7px"
+  calendar-inset: "26px"
+  calendar-inset-compact: "18px"
+  calendar-inset-narrow: "14px"
+  calendar-day-inset: "18px"
+  calendar-day-inset-full: "24px"
+  calendar-day-inset-narrow: "17px"
 components:
   button-primary:
     backgroundColor: "{colors.primary}"
@@ -360,6 +409,61 @@ components:
     textColor: "{colors.foreground-strong}"
     rounded: "{rounded.workspace-control}"
     padding: "7px 9px"
+  calendar-button:
+    backgroundColor: "transparent"
+    textColor: "{colors.foreground}"
+    typography: "{typography.calendar-workspace-text}"
+    rounded: "{rounded.control}"
+    padding: "7px 11px"
+  calendar-button-primary:
+    backgroundColor: "{colors.primary}"
+    textColor: "#ffffff"
+    typography: "{typography.calendar-primary-label}"
+    rounded: "{rounded.control}"
+    padding: "7px 11px"
+  calendar-mode:
+    backgroundColor: "var(--color-bg-elevated)"
+    rounded: "{rounded.calendar-popover}"
+    padding: "3px"
+  calendar-mode-active:
+    backgroundColor: "var(--color-bg-overlay)"
+    textColor: "{colors.foreground}"
+    typography: "{typography.calendar-control-label}"
+    rounded: "{rounded.calendar-detail}"
+    padding: "5px 11px"
+  calendar-search:
+    backgroundColor: "transparent"
+    textColor: "{colors.foreground}"
+    typography: "{typography.calendar-control-label}"
+    height: "29px"
+    width: "208px"
+  calendar-composer:
+    backgroundColor: "{colors.neutral-bg}"
+    rounded: "{rounded.calendar-popover}"
+    padding: "7px 8px"
+  calendar-day-plan:
+    backgroundColor: "{colors.surface-low}"
+    width: "310px"
+  calendar-task-check:
+    backgroundColor: "transparent"
+    rounded: "{rounded.calendar-detail}"
+    height: "16px"
+    width: "16px"
+  calendar-task-check-done:
+    backgroundColor: "{colors.primary}"
+    textColor: "#ffffff"
+    rounded: "{rounded.calendar-detail}"
+    height: "16px"
+    width: "16px"
+  calendar-hour-row:
+    height: "63px"
+  calendar-hour-task-preview:
+    backgroundColor: "color-mix(in srgb, currentColor 9%, transparent)"
+    textColor: "{colors.calendar-task}"
+    typography: "{typography.calendar-workspace-text}"
+    rounded: "{rounded.calendar-week-chip}"
+    padding: "3px 4px"
+    height: "18px"
 ---
 
 # Design System: Synapse
@@ -377,6 +481,8 @@ The implemented All Notes library supplies a second scoped extension, evidenced 
 The implemented Files and Trash workspace supplies a scoped extension, evidenced by `src/components/fileBrowser.css`, the shared `FileBrowser` and the finished dark desktop, narrow and Trash captures. Its `files-` entries record a dense work table, a current-folder route, selection actions and a collapsible properties region. It inherits the same Inter family, dark surfaces and violet interaction states. Surface direction and delegated-choice provenance stay in `.impeccable/surfaces/src-components-filesview-tsx.md`; operation details stay in `docs/FILES_BROWSER.md`.
 
 The implemented workspace shell supplies an approved shell extension, evidenced by `src/components/workspace.css`, `WorkspaceChrome`, `Sidebar`, and the finished desktop and narrow captures. It keeps the incumbent palette while adding docked utility chrome, document tabs and a bounded active work region. The `workspace-` entries describe the shell itself; the specific Obsidian reference, pinned composition and quality bar stay in `.impeccable/surfaces/src-app-tsx.md`. Existing local views retain their own scoped systems inside the work region.
+
+The implemented Calendar workspace supplies a scoped extension, evidenced by src/components/calendar.css, CalendarView, CalendarTaskRow, CalendarWeek and the finished synthetic review captures. Its calendar- entries retain the incumbent Inter family, dark semantic surfaces and violet interaction states while recording local source colors, compact date context and bounded planning controls. Direction, composition, benchmark limits and review acceptance stay in .impeccable/surfaces/src-components-calendarview-tsx.md. Local light overrides were tested with synthetic semantic tokens; the application still ships the established dark palette.
 
 **Key Characteristics:**
 
@@ -413,6 +519,14 @@ The shell uses existing semantic colors. Active document-tab text, selected sear
 
 **The Workspace Active Label Rule.** In the shell, use the existing link role for small active text and the secondary foreground for context. Keep accent fill and focus distinct from text contrast.
 
+### Calendar extension
+
+The local calendar-muted role derives readable secondary context from the existing text/background tokens. Amber calendar-task identifies local plans; blue calendar-event identifies external events; lavender calendar-note identifies writing and journal marks; calendar-danger carries save/load failures and task removal. Task-specific colors remain a separate metadata dot in the day plan. These values are local to Calendar and preserve the global palette.
+
+**The Calendar Source Rule.** Within Calendar, violet marks the selected date, today, completion, focus and primary actions; amber identifies local task previews, blue identifies external events and lavender identifies notes and journal marks. Preserve user task colors as task metadata, and pair source color with text or outline icons.
+
+The source has local light overrides for these accents and native input color-scheme. Their compatibility capture uses synthetic semantic tokens; it is evidence of local compatibility, not an added global light theme.
+
 ## Typography
 
 The existing Inter and system fallback stack supplies the interface. Section titles are compact and semibold; controls and note rows use a smaller workhorse scale. Monospace is reserved for source/code values.
@@ -442,6 +556,16 @@ The properties heading becomes (18px) on narrow layouts, while row names become 
 The shell inherits the incumbent Inter/system family. The recorded tab-label role also describes the vault name: the rendered browser values are regular (400), with a line height of (1.55). Tree labels and empty-page actions use their own adjacent steps, while result titles, result context and keycaps retain compact roles. Search input and context headings use the existing compact interface scale (13px).
 
 The shell's button font reset wins over the single-class font-size/weight declarations on document tabs and the vault name. The workspace roles record measured browser output at (1280 × 720), rather than treating those overridden declarations as implemented typography. The inherited text stack remains unchanged.
+
+### Calendar hierarchy
+
+The calendar- roles distinguish the page, visible period and selected-day heading. Dates use tabular figures. The page title becomes (24px) at the compact toolbar threshold; the period title becomes (17px) at the smallest Calendar container threshold. Day numbers use (14px), reducing to (12px) in that smallest layout; weekly date numbers use (16px), while monthly-list dates use (24px).
+
+The workspace text role is inherited by single-class button styles because the Calendar button/input/select font reset is more specific than those declarations. It therefore describes ordinary actions, task-title buttons and week-chip text without canonizing their overridden font-size declarations. Primary task/save actions retain their slightly emphasized weight through the more-specific primary variant. More-specific segmented controls, search and composer fields use the compact control role; task-editor inputs use the context role. Inline task times/tags and most note/event context use (10px). Mood faces use the existing emoji stack as journal data.
+
+The detector's page/period title sizes are hierarchy choices. Its small cell time/count and narrow hour-label sizes are ancillary, scoped to a constrained grid. In particular, the narrow-hour role describes hour labels; it does not establish an application body size or promise that overridden week-chip declarations render at that size.
+
+**The Calendar Detail Rule.** Within Calendar, the smallest type carries cell times, counts and narrow hour context. Task titles, editable fields and the selected-day plan remain stronger; a full accessible date label and reachable day plan provide the detailed reading path.
 
 ## Layout
 
@@ -481,6 +605,16 @@ Files container queries respect the actual work-area width. At (1160px) and belo
 
 **The Files Row Rule.** Keep Files and Trash rows at their fixed height while windowing the list. Long names truncate with their full title available; narrow layouts remove secondary columns instead of turning rows into variable-height cards.
 
+### Calendar workspace
+
+A fixed header, period toolbar and source/search strip precede one seven-column canvas and a selected-day plan of the recorded width. The two content regions scroll independently. Month always renders six rows and 42 date cells; the month region has a minimum height of (613px), each row a minimum of (96px), and weekday labels occupy (37px). Each cell shows at most two combined task/event previews, a remainder count and bounded note/journal context. The monthly list keeps only occupied dates in the anchored month, with two task previews, one external-event preview and a note count/title before overflow.
+
+The hourly week uses an hour column (48px) and seven equal date columns. Its 24 rows retain the hour-row height; each timed-preview chip uses the recorded height and the preview stack clips at (57px). The all-day band separately previews up to two tasks and one event, with overflow and an explicit add action. Each selected-day task/event/note section pages at (20 entries); task tags show three summaries plus an overflow count, and earlier same-date history is bounded to six notes.
+
+Calendar responds to its own container, including shell panel resizing. At (1100px) and below, month-preview times are hidden. At (1000px) and below, the day plan is full width and replaces the canvas when opened; its header/body insets increase for readable task work. At (720px) and below, period/view controls and search wrap into separate rows and the page uses the compact inset. At (450px) and below, the page uses its narrow inset, subtitle/help chrome is reduced, day numbers tighten and the week hour column becomes (33px). Closing the pane restores the canvas; it remains deliberately collapsible on wide layouts too.
+
+**The Calendar Hour Bounds Rule.** Within the hourly week, keep the combined task/event previews at two inside the fixed hour row and retain a reachable overflow action. The day plan exposes the complete paged lists instead of increasing slot height.
+
 ## Elevation & Depth
 
 Tonal surfaces and thin low-contrast borders establish depth. Floating menus use the existing `--shadow-float` token; ordinary work regions need no additional decorative elevation.
@@ -495,6 +629,8 @@ Workspace work regions and rows are flat at rest, using tonal fills and thin bor
 
 The application shell and top-level workspace content remain visible from their first render. Route changes do not wait for an exit animation or background RAF; the editor key stays stable across note selections. Loading uses the existing readable secondary text token.
 
+Calendar canvas and day-plan rows are flat at rest, with thin semantic rules and the existing low surface for the day plan. Selection uses a faint violet mix and an inset accent stroke; today uses a solid violet date marker. Date and connection popovers reuse the full existing --shadow-float value. Only the selected month-cell background has a transition (120ms, existing exponential ease), enabled when reduced motion is not requested. There is no idle animation loop.
+
 ## Shapes
 
 Controls are gently rounded, note cards have the existing card radius, and the recorded pill primitive remains available to incumbent surfaces. Lucide outline icons carry a consistent stroke.
@@ -506,6 +642,8 @@ All Notes reuses the established card radius. Its search, filters and primary ac
 Files reuses the control radius for search, named actions, route buttons and the selection strip, and the card radius for dialogs. The local `files-detail` step bounds checks, tag summaries and small scope controls; `files-icon` bounds icon actions, folder-picker rows and quick-look code blocks; `files-menu` bounds the floating action menu. Table rows keep square aligned edges. Lucide outline folder/note icons remain visible even when secondary columns are hidden.
 
 The workspace has a deliberate nested silhouette: the large working-region radius, its narrow adaptation and the action-pill radius belong to the shell extension. Keycaps use `workspace-keycap`; compact icon/search/result controls use `workspace-control`; tab-close, menu rows and outline rows use `workspace-detail`; the tab-list menu uses `workspace-menu`. Document tabs retain the incumbent control radius, and the help dialog retains the card radius. These shape roles do not enlarge the corners of Tags, Files/Trash or library controls.
+
+Calendar reuses the incumbent control radius for named actions, date markers and selected agenda dates. Its scoped detail step bounds checks, editor fields and segmented buttons; the week-chip step bounds compact previews; the popover step bounds the composer, grouped mode control and date popover; the menu step bounds connections. Grid and day-plan edges stay square and aligned behind fine rules. Lucide outlines identify actions and sources; journal mood emoji represent data rather than navigation icons.
 
 ## Components
 
@@ -565,6 +703,22 @@ The outline reflects actual Markdown headings, including formatting and repeated
 
 Tab navigation flushes pending saves before changing active content or closing the active tab. Session persistence contains tab IDs and destinations plus separate shell preferences, never document bodies. Preserve translated labels, independent pane scrolling and the existing note/editor routes.
 
+### Calendar dates, filters and day plan
+
+Period arrows, Today and the labeled date jump share the visible navigation anchor. Month/week/list controls have a tonal pressed state. The source controls expose translated labels and pressed state; inactive sources gain reduced opacity and a strike-through. Metadata search matches task titles/tags, event summaries/locations and note titles/folders/tags without reading bodies. Filtering changes displayed entries rather than stored data. The selected journal and earlier same-date history retain their date context separately from the period query.
+
+Month date buttons expose date, counts, selected state and today's semantic current-date marker. Arrow keys and Home/End move the roving date focus; weekly arrow keys move through the bounded hour/date grid. Selecting a date opens its plan. In a compact container, the visible day heading receives focus, or the composer input receives it for a planning intent. Closing or Escape restores the visible selected date control, falling back to the pane toggle. Focus outlines use the existing accent (2px with a 3px offset).
+
+**The Calendar Date Context Rule.** Within Calendar, period arrows follow the displayed anchor while preserving a useful selected day. Changing month/week/list retains the chosen date; opening a compact day plan transfers focus after commit, and closing it restores a visible date target or pane toggle.
+
+### Calendar tasks, writing and connections
+
+The inline composer belongs to the selected day and supports all-day or timed creation. New task and hour-slot actions reveal and focus it. Clicking a task title or its separate settings action opens explicit inline editing of title, date, time, recurrence interval/end, tags and color. Completion applies to the selected occurrence. Completed rows pair a violet checked box with strike-through text; the removal notice offers recovery of the last removed task. Pending/save-error states remain visible and offer a retryable task surface.
+
+The journal action opens or creates the selected day's daily note through the existing route, showing a bounded cached preview and mood when present. Dated-note and history actions use the existing editor. The calendar footer carries the writing streak and mood summary, not a decorative chart. Task-load and external-sync notices use labeled status/error text and retry actions; filtered-empty lists offer a filter reset.
+
+The connection menu exposes deliberate iCal refresh, configured CalDAV sending, settings and the last-sync time. It keeps external reading and task sending distinct. No demonstration entries or raster artwork are added to the user's content. The snippets in the sidecar use illustrative labels solely to show implemented controls.
+
 ## Do's and Don'ts
 
 - Do use the semantic CSS variables and the existing icon family.
@@ -584,7 +738,11 @@ Tab navigation flushes pending saves before changing active content or closing t
 - Do keep workspace geometry and shape roles scoped to the shell while retaining each local view's container behavior.
 - Do use the existing link and secondary foreground roles for workspace text states.
 - Do keep shell controls reachable when panels collapse and preserve save-before-navigation behavior.
+- Do keep Calendar source, context, type and corner roles scoped to the calendar workspace.
+- Do preserve the displayed date anchor, bounded previews, complete paged day lists and focus restoration when changing visible Calendar regions.
+- Do pair Calendar source color with labels or icons and keep task editing, journal opening and external sending explicit.
 - Don't let a local feature silently change the global palette or typography.
 - Don't impose decorative image covers or motion on dense note indexes.
 - Don't turn preview tag actions into note edits or load image covers while filtering Tags.
 - Don't invent file sizes or deletion timestamps in Files and Trash.
+- Don't treat Calendar's synthetic light-token capture as a shipped global application light theme.
