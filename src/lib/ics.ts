@@ -165,7 +165,7 @@ export function expandEvents(
 
     // `idx` это настоящая 0-based позиция повтора в серии, так что COUNT остаётся
     // верным, даже когда генератор перематывает вперёд к `rangeStart`.
-    for (const { ms: s, idx } of occurrences(rule, ev.start, rangeStart)) {
+    for (const { ms: s, idx } of occurrences(rule, ev.start, rangeStart - dur)) {
       if (++guard > MAX_OCCURRENCES) break;
       if (rule.until != null && s > rule.until) break;
       if (rule.count != null && idx >= rule.count) break;

@@ -1844,7 +1844,9 @@ export async function readTasks(): Promise<Task[]> {
     return coerceTasks(JSON.parse(await readTextFile(TASKS_FILE, APP_DATA)));
   } catch (e) {
     console.error("readTasks failed:", e);
-    return [];
+    // A damaged/unreadable file is not an empty task list: prevent an edit
+    // from silently overwriting the user's existing tasks.
+    throw e;
   }
 }
 

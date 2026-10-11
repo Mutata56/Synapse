@@ -1,7 +1,6 @@
 import { listen } from "@tauri-apps/api/event";
 import { isTauri } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { AnimatePresence, motion } from "framer-motion";
 import { lazy, Suspense, useEffect, type ReactNode } from "react";
 import { t } from "./lib/i18n";
 const CalendarView = lazy(() => import("./components/CalendarView").then(module => ({ default: module.CalendarView })));
@@ -34,11 +33,6 @@ import { flushAllPending, useNotesStore, type View } from "./store/notes";
 import { useTemplatesStore } from "./store/templates";
 
 // ─── Константы ─────────────────────────────────────────────────────────────
-
-const VIEW_TRANSITION = {
-  duration: 0.18,
-  ease: [0.16, 1, 0.3, 1] as const,
-};
 
 const BN_EDITOR_SELECTOR = ".bn-editor";
 
@@ -200,38 +194,17 @@ export default function App({ bootstrap = true }: { bootstrap?: boolean } = {}) 
       <TemplatePicker />
       <ImageLightbox />
       <WorkspaceChrome>
-        <AnimatePresence mode="wait">
-          {/* IMPORTANT: the screen key intentionally does NOT include
-              activeId. Switching between two notes inside the "notes"
-              view would otherwise unmount + remount the Editor (and
-              therefore BlockNote) on every selection , defeating
-              Editor's own optimisation of swapping content via
-              `replaceBlocks` while the editor instance stays alive.
-              NoteHero handles the per-note visual swap via its own
-              `key={activeId}`. */}
-          {/* initial={false}: skip the enter animation. Previously this was
-              { opacity: 0, y: 4 } , on a rapid double key-flip (e.g. clicking
-              a usage chip in ImagesView fires setView("notes") and selectNote
-              in the same tick, producing "images" , "gallery" , "editor"),
-              AnimatePresence mode="wait" + interrupted enter could leave the
-              NEW wrapper stuck at its initial opacity:0. The mid-mount DOM
-              still hit-tested (cursor changed on hover) but everything was
-              invisible , the reported "захожу опять и пусто" bug. With no
-              enter animation, an interrupted enter cannot leave the wrapper
-              hidden. Exit cross-fade still works. */}
-          <motion.div
-            key={screenKeyFor(view, activeId)}
-            initial={false}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -4 }}
-            transition={VIEW_TRANSITION}
-            id="workspace-active-content"
-            role="tabpanel"
-            className="workspace-view flex-1 flex flex-col min-w-0 min-h-0 overflow-hidden"
-          >
-            <Suspense fallback={<div role="status" className="p-6 text-sm text-neutral-400">{t("Загрузка…")}</div>}>{renderView(view, activeId)}</Suspense>
-          </motion.div>
-        </AnimatePresence>
+        {/* Keep the editor mounted when only activeId changes. Replace routes
+            immediately: a background WebView must not finish an exit animation
+            before the selected workspace tab can display its content. */}
+        <div
+          key={screenKeyFor(view, activeId)}
+          id="workspace-active-content"
+          role="tabpanel"
+          className="workspace-view flex-1 flex flex-col min-w-0 min-h-0 overflow-hidden"
+        >
+          <Suspense fallback={<div role="status" className="p-6 text-sm text-neutral-400">{t("Загрузка…")}</div>}>{renderView(view, activeId)}</Suspense>
+        </div>
       </WorkspaceChrome>
     </div>
   );
@@ -240,8 +213,7 @@ export default function App({ bootstrap = true }: { bootstrap?: boolean } = {}) 
 // ─── Хелперы ─────────────────────────────────────────────────────────────
 
 /**
- * (view, activeId) - стабильный ключ анимации. Ключ управляет какими
- * mount/unmount циклами запускаются внутри <AnimatePresence>. Удержание
+ * (view, activeId) - стабильный ключ экрана. Удержание
  * ключа для "notes" свёрнутого в "editor" или "gallery" означает, что
  * переключение между двумя заметками НЕ размонтирует редактор.
  */
