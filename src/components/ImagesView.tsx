@@ -1,462 +1,205 @@
-import { AnimatePresence, motion } from "framer-motion";
-import { Check, ExternalLink, FileText, Trash2 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
-import { useSelection } from "../hooks/useSelection";
-import { cn } from "../lib/cn";
-import { DEFAULT_NOTE_TITLE, formatBytes, pluralRu } from "../lib/format";
-import { t } from "../lib/i18n";
-import type { AssetInfo } from "../lib/storage";
+import { ArrowDownWideNarrow, Check, ChevronLeft, ChevronRight, Expand, FileImage, Folder, Grid2X2, ImageOff, Link2, List, RefreshCw, Search, Trash2, X } from "lucide-react";
+import { revealItemInDir } from "@tauri-apps/plugin-opener";
+import { lazy, memo, Suspense, useCallback, useDeferredValue, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
+import { formatBytes, pluralRu } from "../lib/format";
+import { buildImageIndex, imageFormat, isImageNote, queryImageIndex, type ImageLibrary, type ImageScope, type ImageSort, type LibraryImage } from "../lib/imageLibrary";
+import { loadImagePreview, prioritizeImagePreview, subscribeImagePreview, type ImagePreview, type PreviewLoader } from "../lib/imagePreviews";
+import { deleteUnusedLibraryImages, imageFilePath, listImageLibrary } from "../lib/storage";
 import { confirmDialog } from "../store/confirm";
+import { useImageLibraryStore } from "../store/imageLibrary";
 import { useNotesStore } from "../store/notes";
 import { useToastStore } from "../store/toasts";
-import { BulkActionBar } from "./BulkActionBar";
+import { useI18n } from "./LanguageProvider";
+import { useWindowedRows } from "./useWindowedRows";
+import "./ImagesView.css";
 
-const HASH_PREVIEW_CHARS = 8;
-const USAGE_CHIP_MAX_WIDTH_PX = 140;
-const THUMB_FALLBACK_ICON_PX = 28;
-const SKELETON_CARDS = 6;
+const ImageViewer = lazy(() => import("./LibraryImageViewer"));
+const EMPTY: LibraryImage[] = [];
+type Props = { loadLibrary?: () => Promise<ImageLibrary>; previewLoader?: PreviewLoader; revealImage?: (image: LibraryImage) => Promise<void>; deleteImages?: (ids: readonly string[]) => Promise<void> };
+const revealImageFile = async (image: LibraryImage) => revealItemInDir(await imageFilePath(image.id));
 
-/** Синтетические id использования, которые отдаёт listAssets(), чтобы ссылки
- *  из корзины и снапшотов версий нельзя было молча удалить. Реальным заметкам
- *  они не соответствуют, так что клик по чипу не должен слать их в selectNote
- *  (тот закоммитил бы activeId на несуществующую заметку и увёл AnimatePresence
- *  в сломанный экран редактора). */
-const SYNTHETIC_USAGE_IDS: ReadonlySet<string> = new Set([
-  "__trash__",
-  "__versions__",
-]);
-
-const CARD_ANIM = {
-  initial: { opacity: 0, y: 8, scale: 0.96 },
-  animate: { opacity: 1, y: 0, scale: 1 },
-  exit: {
-    opacity: 0,
-    scale: 0.88,
-    y: -4,
-    transition: { duration: 0.18 },
-  },
-  // Без `layout`: карточки на стабильных именах SHA-256 и никогда не
-  // переставляются, так что механика FLIP только мерила бы относительно
-  // y-трансформа обёртки App в полёте и добавляла бы каждой карточке фантомные
-  // сдвиги.
-  transition: {
-    opacity: { duration: 0.22 },
-    scale: { duration: 0.22 },
-    y: { duration: 0.22 },
-  },
-};
-
-// ─── Компонент ─────────────────────────────────────────────────────────────
-
-export function ImagesView() {
-  const assets = useNotesStore((s) => s.assets);
-  const assetsLoaded = useNotesStore((s) => s.assetsLoaded);
-  const refreshAssets = useNotesStore((s) => s.refreshAssets);
-  const deleteAsset = useNotesStore((s) => s.deleteAsset);
-  const batchDeleteAssets = useNotesStore((s) => s.batchDeleteAssets);
-  const setView = useNotesStore((s) => s.setView);
-  const selectNote = useNotesStore((s) => s.selectNote);
-
-  // Один рефреш при монтировании. Tauri IPC может отвалиться ещё до создания
-  // `.assets/` (права, нет папки на первом запуске), так что показываем это
-  // явно, а не отпускаем как unhandledrejection.
-  useEffect(() => {
-    let cancelled = false;
-    refreshAssets().catch((err) => {
-      if (!cancelled) console.error("ImagesView: refreshAssets failed:", err);
+export function ImagesView({ loadLibrary = listImageLibrary, previewLoader = loadImagePreview, revealImage = revealImageFile, deleteImages = deleteUnusedLibraryImages }: Props = {}) {
+  const { t, lang } = useI18n();
+  const library = useImageLibraryStore((s) => s.library);
+  const loading = useImageLibraryStore((s) => s.loading);
+  const error = useImageLibraryStore((s) => s.error);
+  const refresh = useImageLibraryStore((s) => s.refresh);
+  const filter = useImageLibraryStore((s) => s.filter);
+  const setFilter = useImageLibraryStore((s) => s.setFilter);
+  const mode = useImageLibraryStore((s) => s.mode);
+  const setMode = useImageLibraryStore((s) => s.setMode);
+  const focusedId = useImageLibraryStore((s) => s.focusedId);
+  const focus = useImageLibraryStore((s) => s.focus);
+  const [checked, setChecked] = useState<Set<string>>(() => new Set());
+  const [deleting, setDeleting] = useState(false);
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [viewerId, setViewerId] = useState<string | null>(null);
+  const [size, setSize] = useState({ width: 0, gallery: 700 });
+  const root = useRef<HTMLElement>(null);
+  const details = useRef<HTMLElement>(null);
+  const wasOpen = useRef(false);
+  const navigation = useRef(0);
+  const galleryId = useId();
+  const deferredQuery = useDeferredValue(filter.query);
+  const index = useMemo(() => buildImageIndex(library?.images ?? EMPTY), [library?.images]);
+  const results = useMemo(() => queryImageIndex(index, { ...filter, query: deferredQuery }), [index, deferredQuery, filter.scope, filter.folder, filter.format, filter.sort]);
+  const positions = useMemo(() => new Map(results.map((image, i) => [image.id, i])), [results]);
+  const position = focusedId ? positions.get(focusedId) ?? 0 : 0;
+  const selected = results[position] ?? null;
+  const compact = size.width <= 950;
+  const columns = mode === "list" ? 1 : Math.max(1, Math.floor((size.gallery - 18) / 204));
+  const tileWidth = Math.max(150, (size.gallery - 32 - (columns - 1) * 14) / columns);
+  const rowHeight = mode === "list" ? 76 : Math.ceil(tileWidth * .7) + 66;
+  const resetKey = `${deferredQuery}|${filter.scope}|${filter.folder}|${filter.format}|${filter.sort}|${mode}|${columns}|${results.length}`;
+  const windowed = useWindowedRows(Math.ceil(results.length / columns), rowHeight, resetKey);
+  const lastLayout = useRef({ columns, mode, rowHeight });
+  useLayoutEffect(() => {
+    const before = lastLayout.current; lastLayout.current = { columns, mode, rowHeight };
+    if (before.columns !== columns || before.mode !== mode || before.rowHeight !== rowHeight) windowed.reveal(Math.floor(position / columns));
+  }, [columns, mode, rowHeight, position, windowed.reveal]);
+  const first = windowed.start * columns; const last = Math.min(results.length, windowed.end * columns);
+  const eligible = useMemo(() => results.filter((image) => image.managed && !image.usedBy.length), [results]);
+  const eligibleIds = useMemo(() => new Set(index.images.filter((image) => image.managed && !image.usedBy.length).map((image) => image.id)), [index]);
+  const selectedForDelete = [...checked].filter((id) => eligibleIds.has(id));
+  const activeFilters = !!filter.query || filter.scope !== "all" || filter.folder !== null || !!filter.format;
+  const countLabel = lang === "ru" ? `${index.images.length} ${pluralRu(index.images.length, "файл", "файла", "файлов")}` : t("{n} файлов", { n: index.images.length });
+  useEffect(() => { void refresh(loadLibrary); }, [refresh, loadLibrary]);
+  useLayoutEffect(() => {
+    const element = root.current; const gallery = windowed.ref.current;
+    if (!element || !gallery) return;
+    const measure = () => setSize((before) => {
+      const width = element.clientWidth; const galleryWidth = gallery.clientWidth;
+      return before.width === width && before.gallery === galleryWidth ? before : { width, gallery: galleryWidth };
     });
-    return () => {
-      cancelled = true;
-    };
-  }, [refreshAssets]);
-
-  const sel = useSelection<string>();
-
-  const { totalBytes, unused, unusedNames } = useMemo(() => {
-    let bytes = 0;
-    const unusedList: AssetInfo[] = [];
-    for (const a of assets) {
-      bytes += a.sizeBytes;
-      if (a.usedBy.length === 0) unusedList.push(a);
+    measure(); const observer = new ResizeObserver(measure); observer.observe(element); observer.observe(gallery);
+    return () => observer.disconnect();
+  }, [windowed.ref]);
+  useLayoutEffect(() => {
+    const before = wasOpen.current; wasOpen.current = detailsOpen;
+    if (before === detailsOpen) return;
+    if (detailsOpen && !windowed.ref.current?.getClientRects().length) details.current?.focus({ preventScroll: true });
+    else if (!detailsOpen && !details.current?.getClientRects().length) {
+      const element = windowed.ref.current;
+      if (element) {
+        const cols = mode === "list" ? 1 : Math.max(1, Math.floor((element.clientWidth - 18) / 204));
+        const height = mode === "list" ? 76 : Math.ceil(Math.max(150, (element.clientWidth - 32 - (cols - 1) * 14) / cols) * .7) + 66;
+        element.scrollTop = Math.floor(position / cols) * height; element.focus({ preventScroll: true });
+      }
     }
-    return {
-      totalBytes: bytes,
-      unused: unusedList,
-      // Поиск по Set это O(1) против прежнего O(N) `Array.includes` на элемент.
-      unusedNames: new Set(unusedList.map((a) => a.name)),
-    };
-  }, [assets]);
-
-  const selectedUnused = useMemo(
-    () => Array.from(sel.selection).filter((n) => unusedNames.has(n)),
-    [sel.selection, unusedNames],
-  );
-  const hasSelectedUsed = sel.size > selectedUnused.length;
-
-  const headerSummary = !assetsLoaded
-    ? t("Загрузка…")
-    : assets.length === 0
-      ? "Загруженных изображений пока нет"
-      : `${assets.length} ${pluralRu(assets.length, "файл", "файла", "файлов")} · ${formatBytes(totalBytes)}${
-          unused.length > 0 ? ` · ${unused.length} не используются` : ""
-        }`;
-
-  const handleSingleDelete = async (asset: AssetInfo) => {
-    if (asset.usedBy.length > 0) return;
-    if (await confirmDialog(t("Удалить {name}? Файл нигде не используется.", { name: asset.name }))) {
-      void deleteAsset(asset.name);
-    }
-  };
-
-  // try/finally гарантирует, что выделение очистится, даже если пакетная
-  // операция упадёт, иначе у юзера останется устаревший чип "выделено N" со
-  // ссылками на имена, которых на диске может уже не быть.
-  const handleBulkDelete = async () => {
-    if (selectedUnused.length === 0) return;
-    const word = pluralRu(selectedUnused.length, "файл", "файла", "файлов");
-    if (!(await confirmDialog(t("Удалить {count} {word}?", { count: selectedUnused.length, word })))) return;
+  }, [detailsOpen, windowed.ref]);
+  const choose = useCallback((id: string) => { focus(id); setDetailsOpen(true); }, [focus]);
+  const openViewer = useCallback((id: string) => setViewerId(id), []);
+  const toggleChecked = useCallback((id: string) => setChecked((previous) => {
+    const next = new Set(previous); if (next.has(id)) next.delete(id); else next.add(id); return next;
+  }), []);
+  const openUsage = useCallback(async (id: string) => {
+    if (id === "__trash__") { useNotesStore.getState().setView("trash"); return; }
+    if (id === "__versions__" || id.startsWith("__unindexed__:")) return;
+    const sequence = ++navigation.current;
     try {
-      await batchDeleteAssets(selectedUnused);
-      useToastStore
-        .getState()
-        .push(`Удалено: ${selectedUnused.length} ${word}`, "success");
-    } catch (err) {
-      console.error("ImagesView: bulk delete failed:", err);
-      useToastStore
-        .getState()
-        .push(t("Не удалось удалить некоторые файлы"), "error");
-    } finally {
-      sel.clear();
-    }
+      await useNotesStore.getState().selectNote(id);
+      if (sequence === navigation.current && useNotesStore.getState().activeId === id) useNotesStore.getState().setView("notes");
+    } catch { useToastStore.getState().push(t("Не удалось открыть заметку")); }
+  }, [t]);
+  const reset = () => { setFilter({ query: "", scope: "all", folder: null, format: "" }); setChecked(new Set()); };
+  const remove = async () => {
+    if (!selectedForDelete.length || deleting || loading || !library?.complete) return;
+    if (!await confirmDialog(t("Удалить {n} неиспользуемых изображений?", { n: selectedForDelete.length }))) return;
+    setDeleting(true);
+    try { await deleteImages(selectedForDelete); setChecked(new Set()); }
+    catch { useToastStore.getState().push(t("Не удалось удалить изображения. Обнови список и проверь связи.")); }
+    finally { await refresh(loadLibrary); setDeleting(false); }
   };
-
-  const handleOpenUsage = async (noteId: string) => {
-    // Синтетические id из listAssets() это не настоящие заметки. Прогон их
-    // через selectNote закоммитил бы activeId в пустоту и увёл AnimatePresence
-    // в сломанный экран редактора. У корзины свой вью, а чип снапшота версий
-    // чисто информационный (глобального UI версий нет).
-    if (SYNTHETIC_USAGE_IDS.has(noteId)) {
-      if (noteId === "__trash__") setView("trash");
-      return;
-    }
-
-    // ВАЖЕН ПОРЯДОК: ждём selectNote ДО setView. Раньше handleOpenUsage пулял
-    // setView("notes") и selectNote(id) в одном тике, и получались ДВА
-    // ключевых перехода подряд (images, gallery, editor) внутри
-    // <AnimatePresence mode="wait">. Юзер мог вернуться во вью изображений,
-    // пока второй exit ещё летел, и новая обёртка монтировалась залипшей на
-    // стартовой opacity (карточки есть, DOM ловит клики, но не видно ничего).
-    // Если ждать сначала, activeId коммитится, и setView даёт ОДИН переход
-    // прямиком из изображений в редактор.
-    await selectNote(noteId);
-    setView("notes");
+  const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (!results.length) return;
+    let next = position;
+    if (event.key === "ArrowRight") next++;
+    else if (event.key === "ArrowLeft") next--;
+    else if (event.key === "ArrowDown") next += columns;
+    else if (event.key === "ArrowUp") next -= columns;
+    else if (event.key === "Home") next = 0;
+    else if (event.key === "End") next = results.length - 1;
+    else if (event.key === "PageDown") next += Math.max(1, Math.floor(windowed.height / rowHeight)) * columns;
+    else if (event.key === "PageUp") next -= Math.max(1, Math.floor(windowed.height / rowHeight)) * columns;
+    else if (event.key === "Enter") { event.preventDefault(); openViewer(results[position].id); return; }
+    else if (event.key === " " && eligibleIds.has(results[position].id) && library?.complete) { event.preventDefault(); toggleChecked(results[position].id); return; }
+    else return;
+    event.preventDefault(); next = Math.min(results.length - 1, Math.max(0, next));
+    focus(results[next].id); windowed.reveal(Math.floor(next / columns));
   };
-
-  return (
-    <div className="flex-1 flex flex-col overflow-hidden">
-      <header className="px-10 py-6 flex items-end justify-between border-b border-[var(--color-border)] shrink-0">
-        <div>
-          <h2 className="text-2xl font-semibold tracking-tight text-zinc-100">
-            Изображения
-          </h2>
-          <p className="text-[13px] text-zinc-500 mt-1">{headerSummary}</p>
-        </div>
-        {unused.length > 0 && (
-          <button
-            type="button"
-            onClick={() => sel.selectAll(unused.map((a) => a.name))}
-            className="text-[13px] text-zinc-400 hover:text-zinc-100 px-3 py-1.5 rounded-md hover:bg-white/[0.04] transition-colors font-medium"
-          >
-            Выбрать неиспользуемые
-          </button>
-        )}
-      </header>
-
-      <div className="flex-1 overflow-y-auto px-10 py-6">
-        <div className="max-w-7xl mx-auto">
-        {!assetsLoaded ? (
-          // Скелетон на время первого холодного скана (на воркспейсах с кучей
-          // снапшотов .versions/ может занять пару секунд). Без него юзер на миг
-          // видит <EmptyState/> ("пусто"), который потом сменяется реальной
-          // сеткой, и это выглядело как баг.
-          <AssetGridSkeleton />
-        ) : assets.length === 0 ? (
-          <EmptyState />
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            <AnimatePresence initial={false}>
-              {assets.map((asset) => (
-                <AssetCard
-                  key={asset.name}
-                  asset={asset}
-                  selected={sel.has(asset.name)}
-                  selecting={sel.isSelecting}
-                  onToggleSelect={() => sel.toggle(asset.name)}
-                  onDelete={() => handleSingleDelete(asset)}
-                  onOpenUsage={handleOpenUsage}
-                />
-              ))}
-            </AnimatePresence>
-          </div>
-        )}
-        </div>
+  return <section ref={root} className="images-view" aria-label={t("Изображения")}>
+    <header className="images-header">
+      <div className="images-heading"><div><h1>{t("Изображения")}</h1><span>{library ? `${countLabel} · ${formatBytes(index.totalBytes)}` : t("Загрузка…")}</span></div><button type="button" className="images-icon-button" disabled={loading} onClick={() => void refresh(loadLibrary)} aria-label={t("Обновить изображения")} title={t("Обновить изображения")}><RefreshCw size={16} className={loading ? "images-refreshing" : ""} /></button></div>
+      <div className="images-toolbar">
+        <label className="images-search"><Search size={16} aria-hidden="true" /><input type="search" aria-label={t("Поиск изображений")} placeholder={t("Поиск по имени, папке или заметке…")} value={filter.query} onChange={(event) => setFilter({ query: event.target.value })} />{filter.query && <button type="button" aria-label={t("Очистить поиск")} onClick={() => setFilter({ query: "" })}><X size={14} /></button>}</label>
+        <label className="images-select"><Folder size={14} aria-hidden="true" /><select aria-label={t("Папка изображений")} value={filter.folder === null ? "@all" : `folder:${filter.folder}`} onChange={(event) => setFilter({ folder: event.target.value === "@all" ? null : event.target.value.slice(7) })}><option value="@all">{t("Все папки")}</option>{index.folders.map(([folder, count]) => <option key={folder} value={`folder:${folder}`}>{folder === ".assets" ? t("Загруженные") : folder || t("Корень хранилища")} ({count})</option>)}</select></label>
+        <label className="images-select images-format"><select aria-label={t("Формат изображения")} value={filter.format} onChange={(event) => setFilter({ format: event.target.value })}><option value="">{t("Все форматы")}</option>{index.formats.map(([format, count]) => <option key={format} value={format}>{format.toUpperCase()} ({count})</option>)}</select></label>
+        <label className="images-select images-sort"><ArrowDownWideNarrow size={14} aria-hidden="true" /><select aria-label={t("Сортировка изображений")} value={filter.sort} onChange={(event) => setFilter({ sort: event.target.value as ImageSort })}><option value="modified">{t("По изменению")}</option><option value="name">{t("По имени")}</option><option value="size">{t("Сначала крупные")}</option></select></label>
+        <div className="images-layout" role="group" aria-label={t("Вид изображений")}><button type="button" aria-label={t("Сетка")} aria-pressed={mode === "grid"} onClick={() => setMode("grid")}><Grid2X2 size={16} /></button><button type="button" aria-label={t("Список")} aria-pressed={mode === "list"} onClick={() => setMode("list")}><List size={17} /></button></div>
       </div>
-
-      <BulkActionBar
-        count={sel.size}
-        total={unused.length}
-        onClear={sel.clear}
-        onSelectAll={() => sel.selectAll(unused.map((a) => a.name))}
-        actions={[
-          {
-            id: "delete",
-            label: hasSelectedUsed
-              ? t("Удалить ({count})", { count: selectedUnused.length })
-              : t("Удалить"),
-            icon: Trash2,
-            variant: "danger",
-            disabled: selectedUnused.length === 0,
-            onClick: handleBulkDelete,
-          },
-        ]}
-      />
-    </div>
-  );
-}
-
-// ─── Карточка ассета ────────────────────────────────────────────────────────────
-
-type AssetCardProps = {
-  asset: AssetInfo;
-  selected: boolean;
-  selecting: boolean;
-  onToggleSelect: () => void;
-  onDelete: () => void;
-  onOpenUsage: (noteId: string) => void;
-};
-
-function AssetCard({
-  asset,
-  selected,
-  selecting,
-  onToggleSelect,
-  onDelete,
-  onOpenUsage,
-}: AssetCardProps) {
-  const canSelect = asset.usedBy.length === 0;
-  const isUsed = !canSelect;
-
-  return (
-    <motion.div
-      initial={CARD_ANIM.initial}
-      animate={CARD_ANIM.animate}
-      exit={CARD_ANIM.exit}
-      transition={CARD_ANIM.transition}
-      onClick={() => {
-        if (selecting && canSelect) onToggleSelect();
-      }}
-      className={cn(
-        "group rounded-xl border overflow-hidden flex flex-col transition-colors",
-        selected
-          ? "border-[var(--color-accent)] bg-[var(--color-accent-bg)] ring-1 ring-[var(--color-accent-border)]"
-          : "border-[var(--color-border)] bg-[var(--color-bg-elevated)] hover:border-[var(--color-border-strong)]",
-        selecting && canSelect && "cursor-pointer",
-      )}
-    >
-      <AssetThumb
-        asset={asset}
-        canSelect={canSelect}
-        selected={selected}
-        selecting={selecting}
-        onToggleSelect={onToggleSelect}
-      />
-
-      <div className="p-3 flex-1 flex flex-col gap-2 min-h-0">
-        <div className="flex items-center justify-between gap-2">
-          <div className="min-w-0 flex-1">
-            <div
-              className="text-[12px] text-zinc-400 font-mono truncate"
-              title={asset.name}
-            >
-              {previewAssetName(asset.name)}
-            </div>
-            <div className="text-[11px] text-zinc-600 mt-0.5">
-              {formatBytes(asset.sizeBytes)}
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onDelete();
-            }}
-            disabled={isUsed}
-            title={isUsed ? t("Используется , удалить нельзя") : t("Удалить файл")}
-            aria-label={isUsed ? t("Используется , удалить нельзя") : t("Удалить файл")}
-            className={cn(
-              "p-1.5 rounded-md transition-colors",
-              isUsed
-                ? "text-zinc-800 cursor-not-allowed"
-                : "text-zinc-500 hover:text-red-300 hover:bg-red-500/10",
-            )}
-          >
-            <Trash2 size={13} strokeWidth={2} />
-          </button>
+      <div className="images-scopes"><div role="group" aria-label={t("Связи изображений")}>{([["all", "Все", index.images.length], ["used", "Со связями", index.used], ["unused", "Без связей", index.unused]] as const).map(([scope, label, count]) => <button type="button" key={scope} aria-pressed={filter.scope === scope} onClick={() => setFilter({ scope: scope as ImageScope })}>{t(label)}<span>{count}</span></button>)}</div><span className="images-result-count" role="status" aria-live="polite">{t("Показано {n} из {total}", { n: results.length, total: index.images.length })}</span>{activeFilters && <button type="button" className="images-text-button" onClick={reset}>{t("Сбросить")}</button>}{eligible.length > 0 && library?.complete && <button type="button" className="images-text-button" onClick={() => setChecked(new Set(eligible.map((image) => image.id)))}>{t("Выбрать неиспользуемые")}</button>}</div>
+    </header>
+    {(error || library?.complete === false) && <div className="images-error" role="alert"><span>{t(error ? "Не удалось загрузить изображения" : "Часть файлов недоступна")}</span><button type="button" onClick={() => void refresh(loadLibrary)} disabled={loading}>{t("Повторить")}</button></div>}
+    <div className="images-workspace" data-detail={detailsOpen}>
+      <div className="images-gallery-panel">
+        <div ref={windowed.ref} className="images-gallery images-scroll" onScroll={windowed.onScroll} onKeyDown={onKeyDown} tabIndex={0} role="listbox" aria-label={t("Библиотека изображений")} aria-busy={loading || deferredQuery !== filter.query} aria-activedescendant={selected && position >= first && position < last ? `${galleryId}-${position}` : undefined}>
+          {!library && loading ? <div className="images-skeleton" aria-hidden="true">{Array.from({ length: 6 }, (_, i) => <div key={i} />)}</div> : !results.length ? <div className="images-empty"><FileImage size={32} strokeWidth={1.3} /><h2>{t(index.images.length ? "Изображения не найдены" : error ? "Не удалось загрузить изображения" : "Изображений пока нет")}</h2><p>{t(index.images.length ? "Попробуй другое название или измени фильтры." : "Здесь будут картинки из заметок и вложения хранилища.")}</p>{activeFilters && <button type="button" className="images-button" onClick={reset}>{t("Сбросить фильтр")}</button>}</div> : <div className="images-window" style={{ height: windowed.total }}><div className={`images-window-slice images-${mode}`} style={{ transform: `translateY(${windowed.offset}px)`, gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`, gridAutoRows: rowHeight - 14 }}>{results.slice(first, last).map((image, offset) => <ImageTile key={image.id} id={`${galleryId}-${first + offset}`} image={image} selected={selected?.id === image.id} checked={checked.has(image.id)} canDelete={!loading && !!library?.complete && eligibleIds.has(image.id)} onChoose={choose} onOpen={openViewer} onCheck={toggleChecked} previewLoader={previewLoader} active={!viewerId && (!compact || !detailsOpen)} />)}</div></div>}
         </div>
-
-        <div className="flex flex-wrap gap-1 pt-2 border-t border-[var(--color-border)] min-h-[2rem]">
-          {asset.usedBy.length === 0 ? (
-            <span className="text-[11px] text-zinc-600 italic">
-              Не привязан к заметкам
-            </span>
-          ) : (
-            asset.usedBy.map((u) => (
-              <button
-                key={u.id}
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onOpenUsage(u.id);
-                }}
-                title={u.folder ? `${u.folder} / ${u.title}` : u.title}
-                className="flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded bg-[var(--color-accent-bg)] text-zinc-200 hover:text-white hover:bg-[var(--color-accent-bg-hover)] transition-colors max-w-full"
-              >
-                <ExternalLink size={9} strokeWidth={2.4} />
-                <span
-                  className="truncate"
-                  style={{ maxWidth: USAGE_CHIP_MAX_WIDTH_PX }}
-                >
-                  {u.title || DEFAULT_NOTE_TITLE}
-                </span>
-              </button>
-            ))
-          )}
-        </div>
+        {selectedForDelete.length > 0 && <div className="images-selection"><span role="status">{t("Выбрано: {n}", { n: selectedForDelete.length })}</span><button type="button" onClick={() => setChecked(new Set())}>{t("Отменить")}</button><button type="button" className="images-delete" disabled={deleting || loading || !library?.complete} onClick={() => void remove()}><Trash2 size={14} />{t(deleting ? "Удаление…" : "Удалить")}</button></div>}
       </div>
-    </motion.div>
-  );
-}
-
-function AssetThumb({
-  asset,
-  canSelect,
-  selected,
-  selecting,
-  onToggleSelect,
-}: {
-  asset: AssetInfo;
-  canSelect: boolean;
-  selected: boolean;
-  selecting: boolean;
-  onToggleSelect: () => void;
-}) {
-  // Состояние ошибки держим в React, а не дёргаем `style.visibility` на DOM
-  // напрямую: так виртуальный и реальный DOM не расходятся, и есть удобное
-  // место нарисовать заглушку-иконку.
-  const [imgFailed, setImgFailed] = useState(false);
-
-  return (
-    // `data-lightbox-target` это явный хук, на который слушает ImageLightbox
-    // (его CONTENT_SELECTOR включает `[data-lightbox-target]`). Ставим его
-    // только ВНЕ режима выделения, иначе один клик и открыл бы лайтбокс, и
-    // переключил бы выделение ассета на родительской AssetCard.
-    <div
-      data-lightbox-target={selecting ? undefined : true}
-      className="aspect-video bg-[var(--color-pre-bg)] relative overflow-hidden"
-    >
-      {!imgFailed && (
-        /* alt="" потому что картинка декоративная, имя файла показано в теле
-           карточки. Не даём скринридерам зачитывать хеш SHA-256. */
-        <img
-          src={asset.url}
-          alt=""
-          loading="lazy"
-          className="absolute inset-0 w-full h-full object-cover"
-          onError={() => setImgFailed(true)}
-        />
-      )}
-      {imgFailed && (
-        <div className="absolute inset-0 flex items-center justify-center text-zinc-700">
-          <FileText size={THUMB_FALLBACK_ICON_PX} strokeWidth={1.2} />
-        </div>
-      )}
-      {canSelect && (
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            onToggleSelect();
-          }}
-          aria-label={selected ? "Снять выделение" : "Выделить"}
-          aria-pressed={selected}
-          className={cn(
-            "absolute top-2 left-2 w-5 h-5 rounded-md flex items-center justify-center transition-all",
-            selected
-              ? "bg-[var(--color-accent)] text-white opacity-100"
-              : "bg-black/40 backdrop-blur text-transparent border border-white/20 opacity-0 group-hover:opacity-100",
-            selecting && !selected && "opacity-100",
-          )}
-        >
-          {selected && <Check size={12} strokeWidth={3} />}
-        </button>
-      )}
-      {asset.usedBy.length === 0 && (
-        <div className="absolute top-2 right-2 px-2 py-0.5 rounded-full bg-red-500/20 text-red-300 text-[10px] uppercase tracking-wider font-semibold border border-red-500/30 backdrop-blur-sm">
-          Не используется
-        </div>
-      )}
+      <aside ref={details} className="images-detail" tabIndex={-1} aria-label={t("Сведения об изображении")}>
+        {selected && (!compact || detailsOpen) ? <ImageDetails key={selected.id} image={selected} previewLoader={previewLoader} onOpen={openViewer} onUsage={openUsage} onBack={() => setDetailsOpen(false)} onReveal={() => void revealImage(selected).catch(() => useToastStore.getState().push(t("Не удалось показать файл")))} active={!viewerId} /> : <div className="images-empty"><FileImage size={28} /><p>{t("Выбери изображение")}</p></div>}
+      </aside>
     </div>
-  );
+    {viewerId && positions.has(viewerId) && <Suspense fallback={null}><ImageViewer images={results} activeId={viewerId} onChoose={(id) => { focus(id); setViewerId(id); windowed.reveal(Math.floor((positions.get(id) ?? 0) / columns)); }} onClose={() => { setViewerId(null); if (windowed.ref.current?.getClientRects().length) windowed.ref.current.focus({ preventScroll: true }); else details.current?.focus({ preventScroll: true }); }} onUsage={openUsage} /></Suspense>}
+  </section>;
 }
 
-function AssetGridSkeleton() {
-  // Статичная сетка-заглушка под брейкпоинты реальной сетки, чтобы не было
-  // скачка вёрстки, когда придут данные. animate-pulse даёт мягкое мерцание,
-  // framer-motion тут нет, чтобы не лезть в монтажные переходы AnimatePresence
-  // у настоящих карточек.
-  return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-      {Array.from({ length: SKELETON_CARDS }).map((_, i) => (
-        <div
-          key={i}
-          className="rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-elevated)] overflow-hidden animate-pulse"
-        >
-          <div className="aspect-video bg-[var(--color-pre-bg)]" />
-          <div className="p-3 space-y-2">
-            <div className="h-3 w-2/3 rounded bg-white/[0.04]" />
-            <div className="h-2 w-1/3 rounded bg-white/[0.03]" />
-            <div className="pt-2 border-t border-[var(--color-border)]">
-              <div className="h-3 w-24 rounded bg-white/[0.04]" />
-            </div>
-          </div>
-        </div>
-      ))}
+function usePreview(image: LibraryImage, loader: PreviewLoader, retry = 0, active = true, priority = false) {
+  const key = `${image.id}:${image.modifiedAt}:${image.sizeBytes}:${retry}`;
+  const [state, setState] = useState<{ key: string; preview: ImagePreview | null; error: boolean } | null>(null);
+  useEffect(() => {
+    if (!active) return;
+    const controller = new AbortController();
+    const unsubscribe = loader === loadImagePreview ? subscribeImagePreview(image, (preview) => { if (!controller.signal.aborted) setState({ key, preview, error: false }); }) : () => {};
+    void loader(image, controller.signal, retry > 0).then((preview) => {
+      if (!controller.signal.aborted) setState({ key, preview, error: false });
+    }).catch(() => { if (!controller.signal.aborted) setState({ key, preview: null, error: true }); });
+    if (priority && loader === loadImagePreview) prioritizeImagePreview(image);
+    return () => { unsubscribe(); controller.abort(); };
+  }, [image.id, image.modifiedAt, image.sizeBytes, loader, retry, key, active, priority]);
+  return { preview: state?.key === key ? state.preview : null, error: state?.key === key && state.error, fail: () => setState({ key, preview: null, error: true }) };
+}
+
+const ImageTile = memo(function ImageTile({ image, selected, checked, canDelete, id, onChoose, onOpen, onCheck, previewLoader, active }: { image: LibraryImage; selected: boolean; checked: boolean; canDelete: boolean; id: string; onChoose: (id: string) => void; onOpen: (id: string) => void; onCheck: (id: string) => void; previewLoader: PreviewLoader; active: boolean }) {
+  const { t } = useI18n();
+  const preview = usePreview(image, previewLoader, 0, active);
+  const label = /^[0-9a-f]{64}\./i.test(image.name) ? image.usedBy.find(isImageNote)?.title || `${image.name.slice(0, 8)}…${image.name.slice(image.name.lastIndexOf("."))}` : image.name;
+  return <div id={id} className="images-tile" role="option" aria-selected={selected} data-checked={checked}>
+    <button type="button" tabIndex={-1} className="images-tile-open" aria-label={t("Просмотр: {name}", { name: image.name })} onClick={(event) => { onChoose(image.id); event.currentTarget.closest<HTMLElement>("[role=listbox]")?.focus({ preventScroll: true }); }} onDoubleClick={() => onOpen(image.id)}>
+      <div className="images-thumbnail">{preview.preview ? <img src={preview.preview.url} alt="" decoding="async" draggable={false} onError={preview.fail} /> : preview.error ? <ImageOff size={24} strokeWidth={1.3} /> : <span className="images-thumb-placeholder" />}<span className="images-image-type">{imageFormat(image.name).toUpperCase()}</span></div>
+      <div className="images-tile-caption"><strong title={image.name}>{label}</strong><div><span>{formatBytes(image.sizeBytes)}</span><span className="images-usage-count" title={t("Связей с заметками: {n}", { n: image.usedBy.length })}><Link2 size={12} aria-hidden="true" />{image.usedBy.length}</span></div></div>
+    </button>
+    {canDelete && <button type="button" tabIndex={-1} className="images-check" aria-label={t(checked ? "Снять выделение {name}" : "Выделить {name}", { name: image.name })} aria-pressed={checked} onClick={() => onCheck(image.id)}>{checked && <Check size={12} />}</button>}
+  </div>;
+});
+
+function ImageDetails({ image, previewLoader, onOpen, onUsage, onBack, onReveal, active }: { image: LibraryImage; previewLoader: PreviewLoader; onOpen: (id: string) => void; onUsage: (id: string) => void; onBack: () => void; onReveal: () => void; active: boolean }) {
+  const { t, lang } = useI18n();
+  const [retry, setRetry] = useState(0);
+  const preview = usePreview(image, previewLoader, retry, active, true);
+  const usages = useWindowedRows(image.usedBy.length, 56, image.id);
+  const date = image.modifiedAt ? new Intl.DateTimeFormat(lang === "ru" ? "ru-RU" : "en-GB", { day: "numeric", month: "long", year: "numeric" }).format(image.modifiedAt) : "—";
+  return <>
+    <div className="images-detail-toolbar"><button type="button" className="images-back images-text-button" onClick={onBack}><ChevronLeft size={15} />{t("Изображения")}</button><span>{t("Сведения")}</span><button type="button" className="images-icon-button" onClick={() => onOpen(image.id)} aria-label={t("Открыть оригинал")} title={t("Открыть оригинал")}><Expand size={16} /></button></div>
+    <div className="images-detail-scroll images-scroll">
+      <button type="button" className="images-detail-preview" aria-label={t("Открыть оригинал")} onClick={() => onOpen(image.id)}>{preview.preview ? <img src={preview.preview.url} alt={image.name} decoding="async" onError={preview.fail} /> : <ImageOff size={30} strokeWidth={1.2} />}<span><Expand size={14} />{t("Оригинал")}</span></button>
+      {preview.error && <div className="images-preview-error"><span>{t("Превью недоступно")}</span><button type="button" onClick={() => setRetry((value) => value + 1)}>{t("Повторить")}</button></div>}
+      <h2>{image.name}</h2>
+      <dl className="images-properties"><div><dt>{t("Размер")}</dt><dd>{formatBytes(image.sizeBytes)}</dd></div><div><dt>{t("Формат")}</dt><dd>{imageFormat(image.name).toUpperCase()}</dd></div>{preview.preview && preview.preview.width > 0 && <div><dt>{t("Разрешение")}</dt><dd>{preview.preview.width} × {preview.preview.height}</dd></div>}<div><dt>{t("Изменено")}</dt><dd>{date}</dd></div></dl>
+      <div className="images-location"><Folder size={14} aria-hidden="true" /><span title={image.folder}>{image.folder === ".assets" ? t("Загруженные") : image.folder || t("Корень хранилища")}</span><button type="button" onClick={onReveal}>{t("Показать файл")}</button></div>
+      <div className="images-note-heading"><h3>{t("Связанные заметки")}</h3><span>{image.usedBy.length}</span></div>
+      {image.usedBy.length ? <div ref={usages.ref} onScroll={usages.onScroll} className="images-note-links images-scroll"><div className="images-window" style={{ height: usages.total }}><div className="images-window-slice" style={{ transform: `translateY(${usages.offset}px)` }}>{image.usedBy.slice(usages.start, usages.end).map((usage) => usage.id === "__trash__" || isImageNote(usage) ? <button type="button" key={usage.id} onClick={() => onUsage(usage.id)}><Link2 size={14} /><div><strong>{usage.id === "__trash__" ? t("В корзине") : usage.title}</strong><span>{usage.folder || (usage.id === "__trash__" ? t("Корзина") : t("Корень хранилища"))}</span></div><ChevronRight size={13} /></button> : <div key={usage.id} className="images-protected-usage"><Link2 size={14} /><span>{usage.id === "__versions__" ? t("История версий") : usage.title}</span></div>)}</div></div></div> : <p className="images-no-links">{t("В заметках не найдено ссылок на этот файл.")}</p>}
     </div>
-  );
-}
-
-function EmptyState() {
-  return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      className="text-zinc-600 text-sm text-center py-24"
-    >
-      Загруженные обложки появятся здесь. Одинаковые файлы хранятся один раз ,
-      дедупликация по содержимому (SHA-256).
-    </motion.div>
-  );
-}
-
-/**
- * Короткое представление имени файла ассета:
- *   `abcdef12.png` для SHA-имени, просто `abcdef12`, если расширения нет.
- * Надёжнее, чем `slice(name.lastIndexOf("."))`, который возвращает не тот срез
- * (и, возможно, последний символ), когда в имени нет точки.
- */
-function previewAssetName(name: string): string {
-  const dot = name.lastIndexOf(".");
-  const prefix = name.slice(0, HASH_PREVIEW_CHARS);
-  const ext = dot === -1 ? "" : name.slice(dot);
-  return `${prefix}…${ext}`;
+  </>;
 }

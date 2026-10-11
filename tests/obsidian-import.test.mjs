@@ -62,6 +62,7 @@ async function fixture(t, sources = {}, existingVault, withStore = false) {
     }));
   }
   const mutations = [];
+  const reads = [];
   const pending = new Set();
   let beforeWrite;
   const bounded = (relative) => {
@@ -80,9 +81,9 @@ async function fixture(t, sources = {}, existingVault, withStore = false) {
     exists: async (name) => { try { await fs.access(bounded(name)); return true; } catch { return false; } },
     mkdir: (name, opts) => track(fs.mkdir(bounded(name), { recursive: opts?.recursive })),
     readDir: async (name) => (await fs.readdir(bounded(name), { withFileTypes: true })).map((entry) => ({ name: entry.name, isDirectory: entry.isDirectory(), isFile: entry.isFile(), isSymlink: entry.isSymbolicLink() })),
-    readFile: async (name) => new Uint8Array(await fs.readFile(bounded(name))),
+    readFile: async (name) => { reads.push(name); return new Uint8Array(await fs.readFile(bounded(name))); },
     // Match plugin-fs: its default TextDecoder strips the UTF-8 BOM.
-    readTextFile: async (name) => new TextDecoder().decode(await fs.readFile(bounded(name))),
+    readTextFile: async (name) => { reads.push(name); return new TextDecoder().decode(await fs.readFile(bounded(name))); },
     remove: (name, opts) => track(fs.rm(bounded(name), { recursive: Boolean(opts?.recursive) })),
     rename: (from, to) => { mutations.push(["rename", from, to]); return track(fs.rename(bounded(from), bounded(to))); },
     stat: (name) => fs.stat(bounded(name)),
@@ -105,9 +106,44 @@ async function fixture(t, sources = {}, existingVault, withStore = false) {
     while (pending.size) await Promise.allSettled([...pending]);
     await fs.rm(root, { recursive: true, force: true });
   });
-  return { storage, notes, mutations, read: (name) => fs.readFile(path.join(notes, name), "utf8"),
+  return { storage, notes, mutations, reads, read: (name) => fs.readFile(path.join(notes, name), "utf8"),
     interceptWrite: (callback) => { beforeWrite = callback; } };
 }
+
+test("image library includes vault attachments, protects history and caches unchanged note references without modifying originals", async (t) => {
+  const name = 'b'.repeat(64) + '.png';
+  const sources = {
+    'Work/note.md': '![[Images/схема.png|300]]\n![local](local.jpg)\n',
+    'Images/схема.png': Buffer.from('original png bytes'),
+    'Work/local.jpg': Buffer.from('original jpg bytes'),
+    ['.assets/'+name]: Buffer.from('managed png bytes'),
+    ['.versions/Work/note/1.md']: `![old](.assets/${name})`,
+  };
+  const f = await fixture(t, sources);
+  const before = new Map(await Promise.all(Object.keys(sources).map(async name => [name, sha(await fs.readFile(path.join(f.notes,name)))])));
+  const first = await f.storage.listImageLibrary();
+  assert.equal(first.complete,true); assert.equal(first.images.length,3);
+  assert.deepEqual(first.images.find(image=>image.id==='Images/схема.png').usedBy.map(usage=>usage.id),['Work/note']);
+  assert.equal(first.images.find(image=>image.id==='Work/local.jpg').managed,false);
+  assert.equal(first.images.find(image=>image.id==='.assets/'+name).usedBy[0].id,'__versions__');
+  await assert.rejects(f.storage.deleteUnusedLibraryImages(['Images/схема.png']));
+  await assert.rejects(f.storage.deleteUnusedLibraryImages(['.assets/'+name]));
+  f.reads.length = 0;
+  await f.storage.listImageLibrary();
+  assert.equal(f.reads.filter(file=>file.endsWith('.md')).length,0,'a warm scan must not reread unchanged note bodies or immutable versions');
+  for(const [file,hash] of before) assert.equal(sha(await fs.readFile(path.join(f.notes,file))),hash);
+  await fs.writeFile(path.join(f.notes,'Work/note.md'),'# updated without image references\n');
+  f.reads.length = 0;
+  const changed = await f.storage.listImageLibrary();
+  assert.equal(changed.images.find(image=>image.id==='Images/схема.png').usedBy.length,0);
+  assert.deepEqual([...new Set(f.reads.filter(file=>file.endsWith('.md')))],['notes/Work/note.md'],'only the modified note should be read');
+});
+
+test("an empty managed asset collection skips all note-body scanning", async (t) => {
+  const f = await fixture(t, {'note.md':'# text\n![[file.png]]','file.png':Buffer.from('image')});
+  f.reads.length=0;
+  assert.deepEqual(await f.storage.listAssets(),[]); assert.equal(f.reads.filter(file=>file.endsWith('.md')).length,0);
+});
 
 test("frontmatter bytes survive a body edit, including BOM, CRLF, comments and nested YAML", () => {
   const yaml = '\uFEFF---\r\n# keep this comment\r\ncustom:\r\n  nested: "a: b"\r\naliases:\r\n  - old\r\n---\r\n';
