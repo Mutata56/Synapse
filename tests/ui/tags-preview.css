@@ -1,0 +1,8 @@
+.tags-qa-shell { display: flex; height: 100%; width: 100%; }
+.tags-qa-shell > aside { width: 202px !important; }
+.tags-qa-shell > main { display: flex; flex: 1; min-width: 0; min-height: 0; }
+.tags-qa-opened { padding: 40px; }
+.tags-qa-opened button { margin-top: 20px; color: var(--link); }
+@media (max-width: 640px) { .tags-qa-shell > aside { display: none; } }
+/* Match the user's installed mono face in isolated review captures. */
+@font-face { font-family: 'JetBrains Mono'; font-style: normal; font-weight: 400; font-display: swap; src: url('../../.impeccable/preview/JetBrainsMono-Regular.ttf') format('truetype'); }

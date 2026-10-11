@@ -27,6 +27,7 @@ import { DEFAULT_NOTE_TITLE, EMOJI_FONT_STACK } from "../lib/format";
 import { requestGraphFocus } from "../lib/graphFocus";
 import { QUICK_SWITCHER_EVENT } from "../lib/workspaceCommands";
 import { useWorkspaceStore } from "../store/workspace";
+import { OPEN_COMMAND_PALETTE } from "../lib/commandPaletteEvents";
 import { t } from "../lib/i18n";
 import {
   collectNoteMatches,
@@ -195,8 +196,13 @@ export function CommandPalette() {
         setOpen(false);
       }
     };
+    const onRequest = () => { setMode("global"); setOpen(true); };
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    window.addEventListener(OPEN_COMMAND_PALETTE, onRequest);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener(OPEN_COMMAND_PALETTE, onRequest);
+    };
   }, [open, mode]);
 
   // Если активная заметка пропала при открытой палитре (или открылись не во
@@ -534,7 +540,7 @@ export function CommandPalette() {
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
+          exit={{ opacity: 0, pointerEvents: "none" }}
           transition={{ duration: 0.12 }}
           onClick={() => setOpen(false)}
           style={{ zIndex: Z_OVERLAY, paddingTop: `${TOP_OFFSET_VH}vh` }}

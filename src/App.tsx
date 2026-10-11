@@ -25,9 +25,9 @@ import { Toaster } from "./components/Toaster";
 import { TrashView } from "./components/TrashView";
 import { VersionHistory } from "./components/VersionHistory";
 import { WikiLinkPicker } from "./components/WikiLinkPicker";
-import { WritingDashboard } from "./components/WritingDashboard";
+const WritingDashboard = lazy(() => import("./components/WritingDashboard").then(module => ({ default: module.WritingDashboard })));
 import { warmAssetResolver } from "./editor2026/lib/assets";
-import { warmIndex, wordCountsFor } from "./lib/fullTextSearch";
+import { warmIndex } from "./lib/fullTextSearch";
 import { seedTemplatesIfEmpty } from "./lib/templates";
 import { flattenNotes } from "./lib/treeUtils";
 import { flushAllPending, useNotesStore, type View } from "./store/notes";
@@ -106,12 +106,8 @@ export default function App({ bootstrap = true }: { bootstrap?: boolean } = {}) 
       void useTemplatesStore.getState().refresh();
       const flatNotes = flattenNotes(useNotesStore.getState().tree);
       void warmIndex(flatNotes);
-      // Fire-and-forget прогрев подсчёта слов, чтобы первый "Обзор" открылся
-      // без чтения диска: `warmIndex` заполняет кэш тел, а этот проход
-      // заполняет параллельный кэш подсчёта слов по тем же телам.
-      void wordCountsFor(flatNotes).catch(() => {
-        /* best-effort прогрев; ошибки логируются самим wordCountsFor. */
-      });
+      // Статистика слов загружается только по выбору «Объём текстов» в Обзоре.
+      // Параллельный прогрев здесь дублировал чтения холодного search-кэша.
       if (useNotesStore.getState().settings.openDailyOnStartup) {
         void useNotesStore.getState().openDailyNote(new Date());
       }
@@ -276,7 +272,7 @@ function renderView(view: View, activeId: string | null): ReactNode {
     case "calendar":
       return <CalendarView />;
     case "overview":
-      return <WritingDashboard />;
+      return <Suspense fallback={<div role="status" className="p-6 text-sm text-neutral-400">{t("Загрузка обзора…")}</div>}><WritingDashboard /></Suspense>;
     case "inbox":
       return <InboxView />;
     case "settings":
