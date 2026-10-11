@@ -20,6 +20,7 @@ import {
   useMemo,
   useRef,
   useState,
+  useLayoutEffect,
 } from "react";
 import { useSelection } from "../hooks/useSelection";
 import { cn } from "../lib/cn";
@@ -38,7 +39,10 @@ import { confirmDialog } from "../store/confirm";
 import { reportError, useNotesStore } from "../store/notes";
 import { useToastStore } from "../store/toasts";
 import { ContextMenu, type ContextMenuItem } from "./ContextMenu";
+import { useWorkspaceStore } from "../store/workspace";
 import { t } from "../lib/i18n";
+import { visibleWorkspaceTree, workspaceTreeWindow, WORKSPACE_TREE_ROW_HEIGHT } from "../lib/workspaceTree";
+import { WORKSPACE_REVEAL_NOTE_EVENT } from "../lib/workspaceCommands";
 
 const EASE_OUT = [0.16, 1, 0.3, 1] as const;
 const DEPTH_INDENT_PX = 14;
@@ -78,7 +82,7 @@ function useTreeCtx(): TreeCtx {
 
 // ─── Компонент ─────────────────────────────────────────────────────────────
 
-export function FolderTree() {
+export function FolderTree({ compact = false, orderedTree }: { compact?: boolean; orderedTree?: TreeNode[] } = {}) {
   const tree = useNotesStore((s) => s.tree);
   const startCreateNote = useNotesStore((s) => s.startCreateNote);
   const startCreateFolder = useNotesStore((s) => s.startCreateFolder);
@@ -264,8 +268,8 @@ export function FolderTree() {
 
   return (
     <TreeContext.Provider value={ctx}>
-      <div className="flex flex-col flex-1 min-h-0">
-        <div className="px-3 pt-3 pb-1.5 flex items-center justify-between">
+      <div className={cn("flex flex-col flex-1 min-h-0", compact && "workspace-file-tree")}>
+        {!compact && <div className="px-3 pt-3 pb-1.5 flex items-center justify-between">
           <span className="text-[10px] uppercase tracking-[0.08em] font-semibold text-zinc-600">
             {t("Файлы")}
           </span>
@@ -277,7 +281,7 @@ export function FolderTree() {
               <FilePlus size={13} strokeWidth={2} />
             </IconBtn>
           </div>
-        </div>
+        </div>}
 
         <div
           onDragOver={(e) => {
@@ -306,10 +310,10 @@ export function FolderTree() {
             rootDragOver && "bg-[var(--color-accent-bg)]/30",
           )}
         >
-          {creatingFolderIn === "" && (
+          {!compact && creatingFolderIn === "" && (
             <InlineCreator kind="folder" parent="" depth={0} />
           )}
-          {creatingNoteIn === "" && (
+          {!compact && creatingNoteIn === "" && (
             <InlineCreator kind="note" parent="" depth={0} />
           )}
 
@@ -322,7 +326,7 @@ export function FolderTree() {
               <span className="text-zinc-700">{t("Нажми + чтобы начать")}</span>
             </div>
           ) : (
-            tree.map((node) => (
+            compact ? <CompactTreeRows tree={orderedTree ?? tree} /> : (orderedTree ?? tree).map((node) => (
               <TreeNodeView key={nodeKey(node)} node={node} depth={0} />
             ))
           )}
@@ -342,6 +346,85 @@ export function FolderTree() {
 
 // ─── Рендеринг ─────────────────────────────────────────────────────────────
 
+/** Only nearby rows subscribe to the store; focused rename inputs stay mounted. */
+function CompactTreeRows({ tree }: { tree: TreeNode[] }) {
+  const expanded = useNotesStore(state => state.expandedFolders);
+  const creatingNoteIn = useNotesStore(state => state.creatingNoteIn);
+  const creatingFolderIn = useNotesStore(state => state.creatingFolderIn);
+  const rows = useMemo(() => visibleWorkspaceTree(tree, expanded, creatingNoteIn, creatingFolderIn), [tree, expanded, creatingNoteIn, creatingFolderIn]);
+  const spacer = useRef<HTMLDivElement>(null);
+  const draggedRow = useRef(-1);
+  const [viewport, setViewport] = useState({ top: 0, height: 600, pinned: -1 });
+  const wantedFocus = useRef<number | null>(null);
+  const measure = useCallback(() => {
+    const scroll = spacer.current?.parentElement;
+    if (!scroll) return;
+    const focused = document.activeElement?.closest<HTMLElement>("[data-tree-index]");
+    const pinned = draggedRow.current >= 0 ? draggedRow.current : focused && spacer.current?.contains(focused) ? Number(focused.dataset.treeIndex) : -1;
+    const next = { top: scroll.scrollTop, height: scroll.clientHeight, pinned };
+    setViewport(previous => previous.top === next.top && previous.height === next.height && previous.pinned === next.pinned ? previous : next);
+  }, []);
+  const jump = useCallback((index: number) => {
+    const scroll = spacer.current?.parentElement;
+    if (!scroll) return;
+    const top = index * WORKSPACE_TREE_ROW_HEIGHT;
+    if (top < scroll.scrollTop) scroll.scrollTop = top;
+    else if (top + WORKSPACE_TREE_ROW_HEIGHT > scroll.scrollTop + scroll.clientHeight) scroll.scrollTop = top + WORKSPACE_TREE_ROW_HEIGHT - scroll.clientHeight;
+    measure();
+  }, [measure]);
+  useLayoutEffect(() => {
+    const scroll = spacer.current?.parentElement;
+    if (!scroll) return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(scroll); scroll.addEventListener("scroll", measure, { passive: true }); measure();
+    return () => { observer.disconnect(); scroll.removeEventListener("scroll", measure); };
+  }, [measure]);
+  useEffect(() => {
+    const reveal = (event: Event) => {
+      const id = (event as CustomEvent<string>).detail;
+      const index = rows.findIndex(row => row.kind === "node" && row.node.kind === "note" && row.node.note.id === id);
+      if (index >= 0) jump(index);
+    };
+    window.addEventListener(WORKSPACE_REVEAL_NOTE_EVENT, reveal);
+    return () => window.removeEventListener(WORKSPACE_REVEAL_NOTE_EVENT, reveal);
+  }, [rows, jump]);
+  useLayoutEffect(() => {
+    const index = rows.findIndex(row => row.kind === "creator");
+    if (index >= 0) jump(index);
+  }, [creatingNoteIn, creatingFolderIn, rows, jump]);
+  const range = workspaceTreeWindow(rows.length, viewport.top, viewport.height);
+  const indexes = Array.from({ length: range.end - range.start }, (_, index) => range.start + index);
+  if (viewport.pinned >= 0 && viewport.pinned < rows.length && !indexes.includes(viewport.pinned)) indexes.push(viewport.pinned);
+  useLayoutEffect(() => {
+    if (wantedFocus.current === null) return;
+    const target = spacer.current?.querySelector<HTMLElement>(`[data-tree-index="${wantedFocus.current}"] [role="treeitem"]`);
+    if (target) { target.focus({ preventScroll: true }); wantedFocus.current = null; }
+  });
+  return <div ref={spacer} role="tree" aria-label={t("Файлы")} style={{ position: "relative", height: rows.length * WORKSPACE_TREE_ROW_HEIGHT }} onFocusCapture={measure} onBlurCapture={() => requestAnimationFrame(measure)} onDragStartCapture={event => {
+    const source = (event.target as HTMLElement).closest<HTMLElement>("[data-tree-index]");
+    draggedRow.current = Number(source?.dataset.treeIndex ?? -1); measure();
+  }} onDragEndCapture={() => { draggedRow.current = -1; measure(); }} onKeyDown={event => {
+    if (event.metaKey || event.ctrlKey || event.altKey) return;
+    if (!(event.target instanceof HTMLElement) || event.target.closest("input,textarea,[contenteditable=true]")) return;
+    const current = Number(event.target.closest<HTMLElement>("[data-tree-index]")?.dataset.treeIndex ?? -1);
+    let next = current;
+    if (event.key === "ArrowDown") next = Math.min(rows.length - 1, current + 1);
+    else if (event.key === "ArrowUp") next = Math.max(0, current - 1);
+    else if (event.key === "Home") next = 0;
+    else if (event.key === "End") next = rows.length - 1;
+    else return;
+    event.preventDefault(); wantedFocus.current = next; jump(next);
+    const target = spacer.current?.querySelector<HTMLElement>(`[data-tree-index="${next}"] [role="treeitem"]`);
+    if (target) { target.focus({ preventScroll: true }); wantedFocus.current = null; }
+  }}>{indexes.map(index => {
+    const row = rows[index];
+    const key = row.kind === "node" ? nodeKey(row.node) : `creator:${row.creator}:${row.parent}`;
+    return <div key={key} data-tree-index={index} style={{ position: "absolute", top: index * WORKSPACE_TREE_ROW_HEIGHT, left: 0, right: 0, minHeight: WORKSPACE_TREE_ROW_HEIGHT }}>
+      {row.kind === "node" ? <TreeNodeView node={row.node} depth={row.depth} flat /> : <InlineCreator kind={row.creator} parent={row.parent} depth={row.depth} />}
+    </div>;
+  })}</div>;
+}
+
 // Стабильные ключи (не по пути), чтобы переименование или перенос папки
 // обновлял строки на месте, а не перемонтировал всё поддерево (моргало бы).
 // См. lib/treeKeys.ts.
@@ -351,17 +434,19 @@ function nodeKey(node: TreeNode): string {
     : stableKey(node.note.id, "note");
 }
 
-function TreeNodeView({ node, depth }: { node: TreeNode; depth: number }) {
-  if (node.kind === "folder") return <FolderRow node={node} depth={depth} />;
+function TreeNodeView({ node, depth, flat = false }: { node: TreeNode; depth: number; flat?: boolean }) {
+  if (node.kind === "folder") return <FolderRow node={node} depth={depth} flat={flat} />;
   return <NoteRow note={node.note} depth={depth} />;
 }
 
 function FolderRow({
   node,
   depth,
+  flat = false,
 }: {
   node: Extract<TreeNode, { kind: "folder" }>;
   depth: number;
+  flat?: boolean;
 }) {
   const expanded = useNotesStore((s) => s.expandedFolders.has(node.path));
   const toggle = useNotesStore((s) => s.toggleFolder);
@@ -497,6 +582,14 @@ function FolderRow({
   return (
     <div>
       <div
+        role="treeitem"
+        tabIndex={0}
+        aria-expanded={expanded}
+        aria-level={depth + 1}
+        onKeyDown={event => {
+          if (renaming) return;
+          if (event.key === "Enter" || event.key === "ArrowRight" && !expanded || event.key === "ArrowLeft" && expanded) { event.preventDefault(); event.stopPropagation(); toggle(node.path); }
+        }}
         draggable={!renaming}
         onClick={onClick}
         onContextMenu={onContextMenu}
@@ -516,7 +609,7 @@ function FolderRow({
         onDragLeave={() => setDragOver(false)}
         onDrop={onDrop}
         className={cn(
-          "group flex items-center gap-1 px-1.5 py-1 cursor-pointer rounded-md text-[13px] transition-colors",
+          "workspace-tree-row is-folder group flex items-center gap-1 px-1.5 py-1 cursor-pointer rounded-md text-[13px] transition-colors",
           selected || dragOver
             ? "bg-[var(--color-accent-bg)] text-white ring-1 ring-inset ring-[var(--color-accent-border)]"
             : "hover:bg-white/[0.04] text-zinc-400",
@@ -528,7 +621,7 @@ function FolderRow({
         <motion.div
           animate={{ rotate: expanded ? 90 : 0 }}
           transition={{ duration: 0.18, ease: EASE_OUT }}
-          className="text-zinc-600 flex items-center"
+          className="workspace-folder-chevron text-zinc-600 flex items-center"
         >
           <ChevronRight size={11} strokeWidth={2.4} />
         </motion.div>
@@ -593,7 +686,7 @@ function FolderRow({
       </div>
 
       <AnimatePresence initial={false}>
-        {expanded && (
+        {expanded && !flat && (
           <motion.div
             key="children"
             initial={{ height: 0, opacity: 0 }}
@@ -636,8 +729,6 @@ function NoteRow({
   const active = useNotesStore(
     (s) => s.view === "notes" && s.activeId === note.id,
   );
-  const selectNote = useNotesStore((s) => s.selectNote);
-  const setView = useNotesStore((s) => s.setView);
   const trashNote = useNotesStore((s) => s.trashNote);
   const toggleFavorite = useNotesStore((s) => s.toggleFavorite);
   const renameNote = useNotesStore((s) => s.renameNote);
@@ -673,10 +764,10 @@ function NoteRow({
         label: t("Открыть"),
         icon: FileText,
         onClick: () => {
-          setView("notes");
-          void selectNote(note.id);
+          void useWorkspaceStore.getState().openNote(note.id);
         },
       },
+      { kind: "item", label: t("Открыть в новой вкладке"), icon: FilePlus, onClick: () => useWorkspaceStore.getState().openNote(note.id, true) },
       { kind: "separator" },
       {
         kind: "item",
@@ -737,8 +828,7 @@ function NoteRow({
       ctx.toggleNote(note.id);
       return;
     }
-    setView("notes");
-    void selectNote(note.id);
+    void useWorkspaceStore.getState().openNote(note.id);
   };
 
   return (
@@ -753,11 +843,18 @@ function NoteRow({
         }}
         onDragEnd={() => setDragging(false)}
         onClick={onClick}
+        onAuxClick={(e) => { if (e.button === 1) { e.preventDefault(); void useWorkspaceStore.getState().openNote(note.id, true); } }}
+        role="treeitem"
+        tabIndex={0}
+        aria-selected={active || selected}
+        aria-level={depth + 1}
+        data-note-id={note.id}
+        onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void useWorkspaceStore.getState().openNote(note.id, e.ctrlKey || e.metaKey); } }}
         onContextMenu={onContextMenu}
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
         className={cn(
-          "group relative flex items-center gap-1.5 px-1.5 py-1 cursor-pointer text-[13px] rounded-md transition-colors select-none",
+          "workspace-tree-row group relative flex items-center gap-1.5 px-1.5 py-1 cursor-pointer text-[13px] rounded-md transition-colors select-none",
           selected || active
             ? "bg-[var(--color-accent-bg)] text-white ring-1 ring-inset ring-[var(--color-accent-border)]"
             : "text-zinc-500 hover:bg-white/[0.04] hover:text-zinc-200",
