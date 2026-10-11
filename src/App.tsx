@@ -4,20 +4,20 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { AnimatePresence, motion } from "framer-motion";
 import { lazy, Suspense, useEffect, type ReactNode } from "react";
 import { t } from "./lib/i18n";
-import { CalendarView } from "./components/CalendarView";
+const CalendarView = lazy(() => import("./components/CalendarView").then(module => ({ default: module.CalendarView })));
 import { CommandPalette } from "./components/CommandPalette";
 import { ConfirmDialog } from "./components/ConfirmDialog";
 import { PromptDialog } from "./components/PromptDialog";
 import { TemplatePicker } from "./components/TemplatePicker";
-import { Editor2026 } from "./editor2026/Editor2026";
+const Editor2026 = lazy(() => import("./editor2026/Editor2026").then(module => ({ default: module.Editor2026 })));
 import { FilesView } from "./components/FilesView";
 const GraphView = lazy(() => import("./components/GraphView").then((module) => ({ default: module.GraphView })));
 import { ImageLightbox } from "./components/ImageLightbox";
-import { ImagesView } from "./components/ImagesView";
+const ImagesView = lazy(() => import("./components/ImagesView").then(module => ({ default: module.ImagesView })));
 import { InboxView } from "./components/InboxView";
 import { NotesGallery } from "./components/NotesGallery";
-import { MarkdownSourceEditor } from "./components/MarkdownSourceEditor";
-import { SettingsView } from "./components/SettingsView";
+const MarkdownSourceEditor = lazy(() => import("./components/MarkdownSourceEditor").then(module => ({ default: module.MarkdownSourceEditor })));
+const SettingsView = lazy(() => import("./components/SettingsView").then(module => ({ default: module.SettingsView })));
 import { WorkspaceChrome } from "./components/WorkspaceChrome";
 import { useWorkspaceStore } from "./store/workspace";
 import { TagsView } from "./components/TagsView";
@@ -229,7 +229,7 @@ export default function App({ bootstrap = true }: { bootstrap?: boolean } = {}) 
             role="tabpanel"
             className="workspace-view flex-1 flex flex-col min-w-0 min-h-0 overflow-hidden"
           >
-            {renderView(view, activeId)}
+            <Suspense fallback={<div role="status" className="p-6 text-sm text-neutral-400">{t("Загрузка…")}</div>}>{renderView(view, activeId)}</Suspense>
           </motion.div>
         </AnimatePresence>
       </WorkspaceChrome>

@@ -1,4 +1,5 @@
 import { createRoot } from "react-dom/client";
+import { Profiler } from "react";
 import App from "../../src/App";
 import { LanguageProvider } from "../../src/components/LanguageProvider";
 import { useNotesStore, registerFlusher } from "../../src/store/notes";
@@ -25,6 +26,8 @@ const tree: TreeNode[] = [
   { kind: "note", note: makeNote("note", "Заметка", "", true) },
   { kind: "note", note: makeNote("guide", "Инструкция по заметкам") },
 ];
+const benchCount = Math.min(10000, Math.max(0, Number(new URLSearchParams(location.search).get("nodes")) || 0));
+for (let index = 0; index < benchCount; index++) tree.push({ kind: "note", note: makeNote(`bench-${index}`, `Тест ${String(index).padStart(5, "0")}`) });
 let count = 1;
 useNotesStore.setState({ tree, folderColors: {"ВУЗ":"#ee6363","Работа":"#ee6363","Ascend":"#d9a253","Z_Мусорка":"#a9b963"},
   selectNote: async id => { useNotesStore.setState({activeId:id,activeNote:bodies.get(id) ?? null}); },
@@ -44,4 +47,12 @@ useNotesStore.setState({ tree, folderColors: {"ВУЗ":"#ee6363","Работа":
 });
 registerFlusher(() => Promise.resolve());
 await useWorkspaceStore.getState().restore();
-createRoot(document.getElementById("root")!).render(<LanguageProvider><App bootstrap={false} /></LanguageProvider>);
+const timings: Array<{ phase: string; duration: number }> = [];
+const report = document.createElement("output");
+report.id = "workspace-bench-metrics";
+report.style.cssText = "position:fixed;bottom:0;right:0;z-index:9999;font:10px monospace;max-width:430px;color:#ddd;background:#222;padding:4px;pointer-events:none";
+document.body.append(report);
+createRoot(document.getElementById("root")!).render(<Profiler id="workspace" onRender={(_id, phase, duration) => {
+  timings.push({ phase, duration });
+  requestAnimationFrame(() => { report.textContent = JSON.stringify({ nodes: benchCount, mountedRows: document.querySelectorAll(".workspace-tree-row").length, mountMs: timings.find(t => t.phase === "mount")?.duration, commits: timings.length, lastMs: duration }); });
+}}><LanguageProvider><App bootstrap={false} /></LanguageProvider></Profiler>);

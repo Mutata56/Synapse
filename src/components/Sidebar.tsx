@@ -4,20 +4,14 @@ import { buildSearchDocs, searchFullText, type SearchDoc } from "../lib/fullText
 import { t } from "../lib/i18n";
 import type { NoteMeta, TreeNode } from "../lib/storage";
 import { flattenNotes } from "../lib/treeUtils";
+import { sortWorkspaceTree } from "../lib/workspaceTree";
+import { WORKSPACE_REVEAL_NOTE_EVENT } from "../lib/workspaceCommands";
 import { useNotesStore } from "../store/notes";
 import { promptDialog } from "../store/confirm";
 import { clampSidebarWidth, defaultSidebarWidth, useWorkspaceStore } from "../store/workspace";
 import { ContextMenu, type ContextMenuItem } from "./ContextMenu";
 import { FolderTree } from "./FolderTree";
 import { WorkspaceIconButton } from "./WorkspaceChrome";
-
-function sortTree(tree: TreeNode[], order: "name" | "modified" | "created"): TreeNode[] {
-  return tree.map(node => node.kind === "folder" ? { ...node, children: sortTree(node.children, order) } : node).sort((a, b) => {
-    if (a.kind !== b.kind) return a.kind === "folder" ? -1 : 1;
-    if (a.kind === "note" && b.kind === "note" && order !== "name") return (order === "modified" ? b.note.updatedAt - a.note.updatedAt : b.note.createdAt - a.note.createdAt) || a.note.title.localeCompare(b.note.title);
-    return (a.kind === "folder" ? a.name : a.note.title).localeCompare(b.kind === "folder" ? b.name : b.note.title, undefined, { numeric: true, sensitivity: "base" });
-  });
-}
 
 export function Sidebar() {
   const visible = useWorkspaceStore(state => state.sidebarVisible);
@@ -26,7 +20,7 @@ export function Sidebar() {
   const label = useWorkspaceStore(state => state.vaultLabel);
   const sort = useWorkspaceStore(state => state.fileSort);
   const tree = useNotesStore(state => state.tree);
-  const ordered = useMemo(() => sortTree(tree, sort), [tree, sort]);
+  const ordered = useMemo(() => sortWorkspaceTree(tree, sort), [tree, sort]);
   const root = useRef<HTMLElement>(null), dragging = useRef(false), dragWidth = useRef(width);
   const [menu, setMenu] = useState<{ x: number; y: number; items: ContextMenuItem[] } | null>(null);
   const showPane = useWorkspaceStore(state => state.showSidebar);
@@ -37,11 +31,12 @@ export function Sidebar() {
   if (!visible) return null;
   const collapseAll = () => {
     const notes = useNotesStore.getState();
-    if (notes.expandedFolders.size) for (const path of notes.expandedFolders) useNotesStore.getState().toggleFolder(path);
-    else {
-      const visit = (nodes: TreeNode[]) => { for (const node of nodes) if (node.kind === "folder") { useNotesStore.getState().expandFolder(node.path); visit(node.children); } };
+    const expandedFolders = new Set<string>();
+    if (!notes.expandedFolders.size) {
+      const visit = (nodes: TreeNode[]) => { for (const node of nodes) if (node.kind === "folder") { expandedFolders.add(node.path); visit(node.children); } };
       visit(notes.tree);
     }
+    useNotesStore.setState({ expandedFolders });
   };
   const sortMenu = (button: HTMLButtonElement) => {
     const rect = button.getBoundingClientRect();
@@ -63,7 +58,7 @@ export function Sidebar() {
           <WorkspaceIconButton icon={PanelTop} label={t("Показать активный файл")} onClick={() => {
             const note = useNotesStore.getState().activeNote; if (!note) return;
             if (note.folder) useNotesStore.getState().expandFolder(note.folder);
-            requestAnimationFrame(() => { const item = [...(root.current?.querySelectorAll<HTMLElement>("[data-note-id]") ?? [])].find(element => element.dataset.noteId === note.id); item?.scrollIntoView({ block: "nearest" }); });
+            requestAnimationFrame(() => window.dispatchEvent(new CustomEvent(WORKSPACE_REVEAL_NOTE_EVENT, { detail: note.id })));
           }} />
           <WorkspaceIconButton icon={ChevronsDownUp} label={t("Свернуть или развернуть все папки")} onClick={collapseAll} />
         </div>

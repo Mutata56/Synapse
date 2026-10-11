@@ -122,11 +122,13 @@ export const useWorkspaceStore = create<State>((set, get) => ({
   },
 }));
 
-useWorkspaceStore.subscribe(state => {
+useWorkspaceStore.subscribe((state, previous) => {
   try {
-    localStorage.setItem(SESSION_KEY, serializeWorkspaceSession(state));
+    if (state.tabs !== previous.tabs || state.activeTabId !== previous.activeTabId) localStorage.setItem(SESSION_KEY, serializeWorkspaceSession(state));
     const { sidebarVisible, sidebarWidth, sidebarPane, rightVisible, fileSort, vaultLabel } = state;
-    localStorage.setItem(UI_KEY, JSON.stringify({ sidebarVisible, sidebarWidth, sidebarPane, rightVisible, fileSort, vaultLabel }));
+    if (sidebarVisible !== previous.sidebarVisible || sidebarWidth !== previous.sidebarWidth || sidebarPane !== previous.sidebarPane || rightVisible !== previous.rightVisible || fileSort !== previous.fileSort || vaultLabel !== previous.vaultLabel) {
+      localStorage.setItem(UI_KEY, JSON.stringify({ sidebarVisible, sidebarWidth, sidebarPane, rightVisible, fileSort, vaultLabel }));
+    }
   } catch { /* Private mode and quota do not block navigation. */ }
 });
 

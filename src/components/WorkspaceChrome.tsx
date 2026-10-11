@@ -3,7 +3,7 @@ import { listen } from "@tauri-apps/api/event";
 import { CalendarDays, ChartNoAxesCombined, ChevronDown, FilePlus2, FileText, FolderOpen, Hash, HelpCircle, Home, Image, Inbox, LayoutGrid, List, Network, PanelLeft, PanelRight, Plus, Search, Settings2, Shapes, Table2, Trash2, X, type LucideIcon } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type ButtonHTMLAttributes, type ReactNode } from "react";
 import { emptyModel } from "../editor2026/dataTable/model";
-import { hashString } from "../editor2026/loadDocument";
+import { hashString } from "../lib/hashString";
 import { cn } from "../lib/cn";
 import { t } from "../lib/i18n";
 import { flattenNotes } from "../lib/treeUtils";

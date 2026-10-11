@@ -55,19 +55,31 @@ test("session recovery rejects invalid data and serializes no document content o
 
 let fixtureNumber = 0;
 async function fixture(t, select) {
-  const saved = new Map(), events = [], original = {};
+  const saved = new Map(), events = [], writes = [], original = {};
   const notes = createStore(() => ({ tree: [], view: "notes", activeId: null, activeNote: null,
     selectNote: async id => { events.push(`read:${id}`); await select?.(id); notes.setState({ activeId: id, activeNote: id === "missing" ? null : { id } }); },
     closeActiveNote: async () => { events.push("close"); notes.setState({ activeId: null, activeNote: null }); },
     setView: view => notes.setState({ view }),
   }));
-  const globals = { window: { innerWidth: 1440, setTimeout: () => 0, clearTimeout() {} }, localStorage: { getItem: key => saved.get(key) ?? null, setItem: (key, value) => saved.set(key, value) }, workspaceTest: { notes, flush: async () => { events.push("flush"); } } };
+  const globals = { window: { innerWidth: 1440, setTimeout: () => 0, clearTimeout() {} }, localStorage: { getItem: key => saved.get(key) ?? null, setItem: (key, value) => { saved.set(key, value); writes.push(key); } }, workspaceTest: { notes, flush: async () => { events.push("flush"); } } };
   for (const [key, value] of Object.entries(globals)) { original[key] = Object.getOwnPropertyDescriptor(globalThis, key); Object.defineProperty(globalThis, key, { value, writable: true, configurable: true }); }
   const module = await import(`${pathToFileURL(storeEntry)}?fixture=${fixtureNumber++}`);
   const unsubscribe = module.connectWorkspaceNavigation();
   t.after(() => { unsubscribe(); for (const [key, descriptor] of Object.entries(original)) if (descriptor) Object.defineProperty(globalThis, key, descriptor); else delete globalThis[key]; });
-  return { workspace: module.useWorkspaceStore, notes, events, saved };
+  return { workspace: module.useWorkspaceStore, notes, events, saved, writes };
 }
+
+test("transient loading and help state do not rewrite persisted destinations; pane changes retain the saved session", async t => {
+  const { workspace, saved, writes } = await fixture(t);
+  await workspace.getState().openNote("A");
+  const session = saved.get("synapse-workspace-session-v1");
+  const initialWrites = writes.length;
+  workspace.getState().showHelp(true); workspace.getState().showHelp(false);
+  assert.equal(writes.length, initialWrites);
+  workspace.getState().toggleSidebar();
+  assert.equal(saved.get("synapse-workspace-session-v1"), session);
+  assert.equal(writes.length, initialWrites + 1);
+});
 
 test("opening and closing a note flushes pending edits before changing the active document", async t => {
   const { workspace, notes, events } = await fixture(t);
