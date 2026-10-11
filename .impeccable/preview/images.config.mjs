@@ -1,12 +1,12 @@
 import { defineConfig, mergeConfig } from 'vite';
 import base from '../../vite.config.ts';
 import fs from 'node:fs/promises';
-import { createReadStream } from 'node:fs';
+import { createReadStream, realpathSync } from 'node:fs';
 import path from 'node:path';
 const root='/private/tmp/synapse-images-review';
 const stats={previews:0,originals:0};
 export default defineConfig(async()=>mergeConfig(await base({}),{
- server:{port:1424,host:'127.0.0.1',strictPort:true},
+ server:{port:1424,host:'127.0.0.1',strictPort:true,fs:{allow:[process.cwd(),realpathSync('node_modules')]}},
  plugins:[{name:'read-only-image-review',configureServer(server){server.middlewares.use(async(req,res,next)=>{
   if(!req.url?.startsWith('/__images-'))return next();
   try{

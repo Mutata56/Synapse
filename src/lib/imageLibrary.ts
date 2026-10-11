@@ -95,8 +95,18 @@ export function buildImageIndex(input: readonly LibraryImage[]) {
   return { images, byId, search, folders: [...folders].sort(([a], [b]) => a.localeCompare(b)), formats: [...formats].sort(([a], [b]) => a.localeCompare(b)), totalBytes, used, unused: images.length - used, sorted };
 }
 
-export function queryImageIndex(index: ReturnType<typeof buildImageIndex>, filter: ImageFilter): LibraryImage[] {
+// Scans publish immutable image arrays, reusing the same array when metadata
+// is unchanged. Weak keys let superseded vault revisions be collected.
+const libraryIndexes = new WeakMap<readonly LibraryImage[], ReturnType<typeof buildImageIndex>>();
+export function getImageIndex(images: readonly LibraryImage[]) {
+  let index = libraryIndexes.get(images);
+  if (!index) { index = buildImageIndex(images); libraryIndexes.set(images, index); }
+  return index;
+}
+
+export function queryImageIndex(index: ReturnType<typeof buildImageIndex>, filter: ImageFilter): readonly LibraryImage[] {
   const terms = normalize(filter.query.trim()).split(/\s+/).filter(Boolean);
+  if (!terms.length && filter.scope === "all" && filter.folder === null && !filter.format) return index.sorted[filter.sort];
   return index.sorted[filter.sort].filter((image) =>
     (filter.scope === "all" || (filter.scope === "used" ? image.usedBy.length > 0 : image.usedBy.length === 0)) &&
     (filter.folder === null || image.folder === filter.folder || image.usedBy.some((usage) => isImageNote(usage) && usage.folder === filter.folder)) &&

@@ -1,5 +1,5 @@
 import { ChevronLeft, ChevronRight, Expand, ImageOff, Link2, Minus, Plus, X } from "lucide-react";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { isImageNote, type LibraryImage } from "../lib/imageLibrary";
 import { useI18n } from "./LanguageProvider";
@@ -7,7 +7,7 @@ import { Modal } from "./Modal";
 
 export default function LibraryImageViewer({ images, activeId, onChoose, onClose, onUsage }: { images: readonly LibraryImage[]; activeId: string; onChoose: (id: string) => void; onClose: () => void; onUsage: (id: string) => void }) {
   const { t } = useI18n();
-  const position = images.findIndex((image) => image.id === activeId);
+  const position = useMemo(() => images.findIndex((image) => image.id === activeId), [images, activeId]);
   const image = images[position];
   const root = useRef<HTMLDivElement>(null);
   const stage = useRef<HTMLDivElement>(null);
