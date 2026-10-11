@@ -1,23 +1,25 @@
 import { listen } from "@tauri-apps/api/event";
+import { isTauri } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { AnimatePresence, motion } from "framer-motion";
 import { lazy, Suspense, useEffect, type ReactNode } from "react";
 import { t } from "./lib/i18n";
-import { CalendarView } from "./components/CalendarView";
+const CalendarView = lazy(() => import("./components/CalendarView").then(module => ({ default: module.CalendarView })));
 import { CommandPalette } from "./components/CommandPalette";
 import { ConfirmDialog } from "./components/ConfirmDialog";
 import { PromptDialog } from "./components/PromptDialog";
 import { TemplatePicker } from "./components/TemplatePicker";
-import { Editor2026 } from "./editor2026/Editor2026";
+const Editor2026 = lazy(() => import("./editor2026/Editor2026").then(module => ({ default: module.Editor2026 })));
 import { FilesView } from "./components/FilesView";
 const GraphView = lazy(() => import("./components/GraphView").then((module) => ({ default: module.GraphView })));
 import { ImageLightbox } from "./components/ImageLightbox";
-import { ImagesView } from "./components/ImagesView";
+const ImagesView = lazy(() => import("./components/ImagesView").then(module => ({ default: module.ImagesView })));
 import { InboxView } from "./components/InboxView";
 import { NotesGallery } from "./components/NotesGallery";
-import { MarkdownSourceEditor } from "./components/MarkdownSourceEditor";
-import { SettingsView } from "./components/SettingsView";
-import { Sidebar } from "./components/Sidebar";
+const MarkdownSourceEditor = lazy(() => import("./components/MarkdownSourceEditor").then(module => ({ default: module.MarkdownSourceEditor })));
+const SettingsView = lazy(() => import("./components/SettingsView").then(module => ({ default: module.SettingsView })));
+import { WorkspaceChrome } from "./components/WorkspaceChrome";
+import { useWorkspaceStore } from "./store/workspace";
 import { TagsView } from "./components/TagsView";
 import { Toaster } from "./components/Toaster";
 import { TrashView } from "./components/TrashView";
@@ -55,7 +57,7 @@ const Z_KEY_CHARS = new Set(["z", "Z", "я", "Я"]);
 
 // ─── Component ─────────────────────────────────────────────────────────────
 
-export default function App() {
+export default function App({ bootstrap = true }: { bootstrap?: boolean } = {}) {
   const refreshTree = useNotesStore((s) => s.refreshTree);
   const loadFolderColors = useNotesStore((s) => s.loadFolderColors);
   const loadSettings = useNotesStore((s) => s.loadSettings);
@@ -70,6 +72,7 @@ export default function App() {
   // поиска в фоне, чтобы первый глобальный поиск не платил за чтение всех
   // заметок с диска при нажатии.
   useEffect(() => {
+    if (!bootstrap) return;
     // Разовая очистка устаревшего флага беты Editor2026 (старый ключ,
     // можно удалить позже). Старый <Editor/> ушёл на пенсию, Editor2026
     // теперь единственный редактор; ключ безвреден после переключения,
@@ -91,6 +94,7 @@ export default function App() {
       // (до чтения дерева, которое заполняет UI).
       await loadSettings();
       await refreshTree();
+      await useWorkspaceStore.getState().restore();
       // Создаём встроенные шаблоны, если их нет (идемпотентно, см.
       // seedTemplatesIfEmpty). Запускаем ПОСЛЕ refreshTree, так что
       // ensureWorkspace уже создал папку `notes/`; dotdir шаблонов
@@ -109,11 +113,12 @@ export default function App() {
       }
     })();
     void loadFolderColors();
-  }, [refreshTree, loadFolderColors, loadSettings]);
+  }, [bootstrap, refreshTree, loadFolderColors, loadSettings]);
 
   // Окно быстрого захвата пишет заметку в своём webview, затем шлёт это
   // событие, чтобы главное окно перечитало дерево и захват появился.
   useEffect(() => {
+    if (!isTauri()) return;
     let unlisten: (() => void) | undefined;
     void listen("note-captured", () => void refreshTree()).then((u) => {
       unlisten = u;
@@ -129,6 +134,7 @@ export default function App() {
   // flush. Пропускаем в окне быстрого захвата, у него свой простой
   // textarea и нет flusher-ов.
   useEffect(() => {
+    if (!isTauri()) return;
     const win = getCurrentWindow();
     if (win.label === "capture") return;
     let unlistenClose: (() => void) | undefined;
@@ -140,8 +146,8 @@ export default function App() {
         } catch (e) {
           console.error("close: flushAllPending failed:", e);
         } finally {
-          // Rust оставляет приложение в трее. Сохраняем тот же webview,
-          // чтобы повторный запуск мог показать его после flush сохранений.
+          // Скрываем окно после flush: процесс и main webview остаются
+          // живыми в трее, поэтому повторный запуск восстанавливает окно.
           await win.hide().catch((e) => {
             console.error("close: window.hide failed:", e);
           });
@@ -184,7 +190,7 @@ export default function App() {
   }, [undo, redo]);
 
   return (
-    <div className="app-shell flex h-screen w-screen overflow-hidden">
+    <div className="app-shell h-screen w-screen overflow-hidden">
       <CommandPalette />
       <Toaster />
       <WikiLinkPicker />
@@ -193,8 +199,7 @@ export default function App() {
       <PromptDialog />
       <TemplatePicker />
       <ImageLightbox />
-      <Sidebar />
-      <main className="flex-1 flex flex-col min-w-0 min-h-0 relative overflow-hidden">
+      <WorkspaceChrome>
         <AnimatePresence mode="wait">
           {/* IMPORTANT: the screen key intentionally does NOT include
               activeId. Switching between two notes inside the "notes"
@@ -220,12 +225,14 @@ export default function App() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -4 }}
             transition={VIEW_TRANSITION}
-            className="flex-1 flex flex-col min-w-0 min-h-0 overflow-hidden"
+            id="workspace-active-content"
+            role="tabpanel"
+            className="workspace-view flex-1 flex flex-col min-w-0 min-h-0 overflow-hidden"
           >
-            {renderView(view, activeId)}
+            <Suspense fallback={<div role="status" className="p-6 text-sm text-neutral-400">{t("Загрузка…")}</div>}>{renderView(view, activeId)}</Suspense>
           </motion.div>
         </AnimatePresence>
-      </main>
+      </WorkspaceChrome>
     </div>
   );
 }

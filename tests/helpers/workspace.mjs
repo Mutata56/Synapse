@@ -23,7 +23,7 @@ const buildOptions = { bundle: true, write: false, platform: "node", format: "es
 const storageBuild = await build({ ...buildOptions, entryPoints: [path.join(project, "src/lib/storage.ts")] });
 const storeBuild = await build({ ...buildOptions, stdin: { contents: "export * from './src/lib/storage.ts'; export { useNotesStore } from './src/store/notes.ts'; export { useToastStore } from './src/store/toasts.ts';", resolveDir: project } });
 
-export async function fixture(t, sources = {}, existingVault, withStore = false) {
+export async function fixture(t, sources = {}, existingVault, withStore = false, trace = () => {}) {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "synapse-import-test-"));
   const notes = path.join(root, "notes");
   await fs.mkdir(path.join(notes, ".synapse"), { recursive: true });
@@ -57,12 +57,12 @@ export async function fixture(t, sources = {}, existingVault, withStore = false)
     exists: async (name) => { try { await fs.access(bounded(name)); return true; } catch { return false; } },
     mkdir: (name, opts) => track(fs.mkdir(bounded(name), { recursive: opts?.recursive })),
     readDir: async (name) => (await fs.readdir(bounded(name), { withFileTypes: true })).map((entry) => ({ name: entry.name, isDirectory: entry.isDirectory(), isFile: entry.isFile(), isSymlink: entry.isSymbolicLink() })),
-    readFile: async (name) => new Uint8Array(await fs.readFile(bounded(name))),
+    readFile: async (name) => { trace("readFile", name); return new Uint8Array(await fs.readFile(bounded(name))); },
     // Match plugin-fs: its default TextDecoder strips the UTF-8 BOM.
-    readTextFile: async (name) => new TextDecoder().decode(await fs.readFile(bounded(name))),
+    readTextFile: async (name) => { trace("readTextFile", name); return new TextDecoder().decode(await fs.readFile(bounded(name))); },
     remove: (name, opts) => track(fs.rm(bounded(name), { recursive: Boolean(opts?.recursive) })),
     rename: (from, to) => { mutations.push(["rename", from, to]); return track(fs.rename(bounded(from), bounded(to))); },
-    stat: (name) => fs.stat(bounded(name)),
+    stat: (name) => { trace("stat", name); return fs.stat(bounded(name)); },
     writeFile: (name, bytes) => { mutations.push(["write", name]); return track(fs.writeFile(bounded(name), bytes)); },
     writeTextFile: async (name, text) => {
       if (beforeWrite) await beforeWrite(name, text);
