@@ -6,11 +6,16 @@ import { useNotesStore, registerFlusher } from "../../src/store/notes";
 import { useWorkspaceStore } from "../../src/store/workspace";
 import type { Note, TreeNode } from "../../src/lib/storage";
 import "@mantine/core/styles.css";
-import "@blocknote/core/fonts/inter.css";
+
 import "@blocknote/mantine/style.css";
 import "../../src/index.css";
 
 // Isolated in-memory notes: browser checks never touch the user's vault.
+const parameters = new URLSearchParams(location.search);
+const requestedZoom = Number(parameters.get("zoom"));
+if (parameters.has("zoom") && Number.isFinite(requestedZoom) && requestedZoom >= .7 && requestedZoom <= 2) {
+  localStorage.setItem("editor-zoom", String(requestedZoom));
+}
 const bodies = new Map<string, Note>();
 const makeNote = (id: string, title: string, folder = "", favorite = false): Note => {
   const content = `# ${title}\n\nЭто синтетическая заметка для проверки вкладок и сохранения.\n\n## Проверка\n\nТекст можно редактировать в этом локальном примере.`;
@@ -26,7 +31,7 @@ const tree: TreeNode[] = [
   { kind: "note", note: makeNote("note", "Заметка", "", true) },
   { kind: "note", note: makeNote("guide", "Инструкция по заметкам") },
 ];
-const benchCount = Math.min(10000, Math.max(0, Number(new URLSearchParams(location.search).get("nodes")) || 0));
+const benchCount = Math.min(10000, Math.max(0, Number(parameters.get("nodes")) || 0));
 for (let index = 0; index < benchCount; index++) tree.push({ kind: "note", note: makeNote(`bench-${index}`, `Тест ${String(index).padStart(5, "0")}`) });
 let count = 1;
 useNotesStore.setState({ tree, folderColors: {"ВУЗ":"#ee6363","Работа":"#ee6363","Ascend":"#d9a253","Z_Мусорка":"#a9b963"},

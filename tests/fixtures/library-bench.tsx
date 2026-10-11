@@ -7,7 +7,7 @@ import { LanguageProvider } from "../../src/components/LanguageProvider";
 import { useNotesStore } from "../../src/store/notes";
 import { ConfirmDialog } from "../../src/components/ConfirmDialog";
 import type { NoteMeta, Note, TreeNode } from "../../src/lib/storage";
-import "@blocknote/core/fonts/inter.css";
+
 import "../../src/index.css";
 
 const params = new URLSearchParams(location.search);

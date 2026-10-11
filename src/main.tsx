@@ -19,7 +19,7 @@ function StartupLoading() {
  * Не менять ни в коем случае!!
  */
 import "@mantine/core/styles.css";
-import "@blocknote/core/fonts/inter.css";
+
 import "@blocknote/mantine/style.css";
 import "./index.css";
 

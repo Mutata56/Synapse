@@ -1,0 +1,43 @@
+# Shared typography
+
+MODE: Operate for the interface; Read for note content.
+
+USER PIN: use Obsidian's font logic while keeping Synapse's palette and element
+placement. The live appearance profile selects Inter with a 17px note base.
+The AnuPpuccin style-settings profile selects JetBrains Mono for source
+Markdown, Inter for live preview/reading and Inter for headings. The user
+explicitly clarified JetBrains Mono for code.
+
+IMPLEMENTATION: four self-hosted variable faces, normal glyphs, semantic
+interface/text/code stacks in src/typography.css. Inter normal/italic are
+unchanged packaged Obsidian files; JetBrains Mono normal/italic are official
+2.304 files. Both families' cmap tables contain the complete Russian and Latin
+alphabets. Full SIL OFL notices are included in the built public/fonts folder.
+
+TYPE: interface15px with existing compact13/12px roles; primary note17px/1.5;
+heading ratios1.618/1.462/1.318/1.188/1.076/1; code0.875em; raw Markdown17px.
+Dense Tags/library/Files previews retain their local13/14px scales. The inline
+title follows body zoom; width/font changes schedule one guarded resize frame.
+
+QUALITY BAR: normal Russian/English glyphs, genuine italic, visible heading
+steps, fixed-width code, usable narrow readers and200% editor text. Wrapped
+note titles must fit their textarea after resizing. No polling or animation
+loop is introduced for title measurement. Browser checks use synthetic
+in-memory notes; their native-attachment lookup is unavailable in the browser
+and is not evidence about the installed native app.
+
+EVIDENCE: font cmap/axis checks and browser computed roles/captures are retained
+locally in the calling task's typography artifact directory. TypeScript,
+production bundle dependency checks, the repository regression suite and the
+native macOS bundle validate the implementation. Original note files are not
+part of the source changes or font assets.
+
+CONFIRMATION: browser1280×800 reading showed Inter17px/25.5px, H1 27.506px,
+H2 24.854px, genuine Inter italic and JetBrains Mono code14.875px. Both faces
+needed by the page were loaded locally. At760×900 the wrapped title's client
+and scroll heights both measured148px; at390×844 both measured115px. Editor
+zoom200% produced34px prose and55.012px title/heading without page overflow.
+No ResizeObserver loop warning appeared. The full suite passed156 tests with
+one optional copied-vault case skipped; TypeScript and macOS release build
+passed. The final type detector only flagged Inter as a common font: this is
+an intentional user-pinned exception, not a reason to replace the chosen face.

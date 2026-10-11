@@ -598,7 +598,7 @@ export function Editor2026({ imported }: { imported?: ImportedEditorBridge } = {
           className="e26-zoom-scope"
           style={{ "--e26-zoom": zoom } as CSSProperties}
         >
-          <NoteHero key={activeId} />
+          <NoteHero key={activeId} textZoom={zoom} />
           <TemplateChipRow visible={isEmpty} editor={editor} schema={schema} />
           <div className={cn(wide && "flex justify-center items-start gap-6 px-6")}>
             {wide && (

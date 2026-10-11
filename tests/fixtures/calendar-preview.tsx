@@ -12,7 +12,7 @@ import { setLanguage } from '../../src/lib/i18n';
 import { parseIcs } from '../../src/lib/ics';
 import type { NoteMeta, TreeNode } from '../../src/lib/storage';
 import type { Task } from '../../src/lib/tasks';
-import '@blocknote/core/fonts/inter.css';
+
 import '../../src/index.css';
 
 const query = new URLSearchParams(location.search), empty = query.has('empty');
