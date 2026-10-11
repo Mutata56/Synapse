@@ -8,14 +8,14 @@ import { CommandPalette } from "./components/CommandPalette";
 import { ConfirmDialog } from "./components/ConfirmDialog";
 import { PromptDialog } from "./components/PromptDialog";
 import { TemplatePicker } from "./components/TemplatePicker";
-import { Editor2026 } from "./editor2026/Editor2026";
+const Editor2026 = lazy(() => import("./editor2026/Editor2026").then(module => ({ default: module.Editor2026 })));
 import { FilesView } from "./components/FilesView";
 const GraphView = lazy(() => import("./components/GraphView").then((module) => ({ default: module.GraphView })));
 import { ImageLightbox } from "./components/ImageLightbox";
 import { ImagesView } from "./components/ImagesView";
 import { InboxView } from "./components/InboxView";
 import { NotesGallery } from "./components/NotesGallery";
-import { MarkdownSourceEditor } from "./components/MarkdownSourceEditor";
+const MarkdownSourceEditor = lazy(() => import("./components/MarkdownSourceEditor").then(module => ({ default: module.MarkdownSourceEditor })));
 import { SettingsView } from "./components/SettingsView";
 import { Sidebar } from "./components/Sidebar";
 import { TagsView } from "./components/TagsView";
@@ -25,9 +25,7 @@ import { VersionHistory } from "./components/VersionHistory";
 import { WikiLinkPicker } from "./components/WikiLinkPicker";
 const WritingDashboard = lazy(() => import("./components/WritingDashboard").then(module => ({ default: module.WritingDashboard })));
 import { warmAssetResolver } from "./editor2026/lib/assets";
-import { warmIndex } from "./lib/fullTextSearch";
 import { seedTemplatesIfEmpty } from "./lib/templates";
-import { flattenNotes } from "./lib/treeUtils";
 import { flushAllPending, useNotesStore, type View } from "./store/notes";
 import { useTemplatesStore } from "./store/templates";
 
@@ -64,11 +62,8 @@ export default function App() {
   const undo = useNotesStore((s) => s.undo);
   const redo = useNotesStore((s) => s.redo);
 
-  // Разовый bootstrap воркспейса. `refreshTree` сам ловит ошибки и логирует,
-  // так что на сайте вызова обрабатывать не нужно, но помечаем fire-and-forget
-  // через `void`. Когда дерево загружено, прогреваем кэш полнотекстового
-  // поиска в фоне, чтобы первый глобальный поиск не платил за чтение всех
-  // заметок с диска при нажатии.
+  // Bootstrap загружает только метаданные. Тела заметок и поисковый кэш
+  // читаются при первом поиске, открытии графа или статистики текстов.
   useEffect(() => {
     // Разовая очистка устаревшего флага беты Editor2026 (старый ключ,
     // можно удалить позже). Старый <Editor/> ушёл на пенсию, Editor2026
@@ -100,8 +95,6 @@ export default function App() {
         console.error("seedTemplatesIfEmpty failed (ignored):", e);
       });
       void useTemplatesStore.getState().refresh();
-      const flatNotes = flattenNotes(useNotesStore.getState().tree);
-      void warmIndex(flatNotes);
       // Статистика слов загружается только по выбору «Объём текстов» в Обзоре.
       // Параллельный прогрев здесь дублировал чтения холодного search-кэша.
       if (useNotesStore.getState().settings.openDailyOnStartup) {
@@ -280,9 +273,11 @@ function NoteEditor() {
   const note = useNotesStore((s) => s.activeNote);
   const reloadNonce = useNotesStore((s) => s.editorReloadNonce);
   if (!note) return <div className="flex-1 grid place-items-center text-zinc-500">Заметка не загружена</div>;
-  return note.markdownSource
-    ? <MarkdownSourceEditor key={`${note.id}:${reloadNonce}`} />
-    : <Editor2026 />;
+  return <Suspense fallback={<div role="status" className="flex-1 grid place-items-center text-sm text-[var(--text-secondary)]">{t("Загрузка…")}</div>}>
+    {note.markdownSource
+      ? <MarkdownSourceEditor key={`${note.id}:${reloadNonce}`} />
+      : <Editor2026 />}
+  </Suspense>;
 }
 
 /**

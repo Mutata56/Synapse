@@ -70,6 +70,32 @@ type CachedBody = { updatedAt: number; body: string; bodyLower: string };
 
 /** id это последнее прочитанное тело. Живёт между открытиями палитры всю жизнь приложения. */
 const bodyCache = new Map<string, CachedBody>();
+const bodyFlights = new Map<string, { updatedAt: number; promise: Promise<CachedBody> }>();
+
+/** Share a disk read across overlapping searches, graph indexing and statistics. */
+function cachedBodyFor(note: NoteMeta): Promise<CachedBody> {
+  const cached = bodyCache.get(note.id);
+  if (cached?.updatedAt === note.updatedAt) return Promise.resolve(cached);
+  const pending = bodyFlights.get(note.id);
+  if (pending?.updatedAt === note.updatedAt) return pending.promise;
+
+  const flight = { updatedAt: note.updatedAt, promise: null! as Promise<CachedBody> };
+  flight.promise = (async () => {
+    try {
+      const full = await readNote(note.id);
+      const body = full?.content ?? "";
+      const result = { updatedAt: note.updatedAt, body, bodyLower: body.toLowerCase() };
+      // A slow old revision must not replace the newest cache. Missing reads
+      // remain retryable instead of caching an empty body for the whole session.
+      if (full && bodyFlights.get(note.id) === flight) bodyCache.set(note.id, result);
+      return result;
+    } finally {
+      if (bodyFlights.get(note.id) === flight) bodyFlights.delete(note.id);
+    }
+  })();
+  bodyFlights.set(note.id, flight);
+  return flight.promise;
+}
 
 /** id это последний посчитанный word count, по тому же `updatedAt`, что и
  *  `bodyCache`. Держит горячий путь дашборда (ряды по дням, суммы за год,
@@ -103,11 +129,8 @@ export async function buildSearchDocs(notes: NoteMeta[]): Promise<SearchDoc[]> {
   }
 
   await pooledForEach(misses, READ_CONCURRENCY, async (note) => {
-    const full = await readNote(note.id);
-    const body = full?.content ?? "";
-    const bodyLower = body.toLowerCase();
-    bodyCache.set(note.id, { updatedAt: note.updatedAt, body, bodyLower });
-    docs.push(toDoc(note, body, bodyLower));
+    const cached = await cachedBodyFor(note);
+    docs.push(toDoc(note, cached.body, cached.bodyLower));
   });
 
   // Выкидываем из кэша удалённые и отправленные в корзину заметки.
@@ -167,12 +190,9 @@ export async function wordCountsFor(notes: NoteMeta[]): Promise<WordEntry[]> {
   }
 
   await pooledForEach(misses, READ_CONCURRENCY, async (note) => {
-    const full = await readNote(note.id);
-    const body = full?.content ?? "";
-    const bodyLower = body.toLowerCase();
-    bodyCache.set(note.id, { updatedAt: note.updatedAt, body, bodyLower });
-    const words = countWords(body);
-    wordCountCache.set(note.id, { updatedAt: note.updatedAt, words });
+    const cached = await cachedBodyFor(note);
+    const words = countWords(cached.body);
+    if (bodyCache.get(note.id) === cached) wordCountCache.set(note.id, { updatedAt: note.updatedAt, words });
     out.push({ createdAt: note.createdAt, words });
   });
 

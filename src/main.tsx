@@ -1,10 +1,12 @@
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import React from "react";
 import ReactDOM from "react-dom/client";
-import App from "./App";
-import { CaptureWindow } from "./components/CaptureWindow";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { LanguageProvider } from "./components/LanguageProvider";
+import { t } from "./lib/i18n";
+
+const App = React.lazy(() => import("./App"));
+const CaptureWindow = React.lazy(() => import("./components/CaptureWindow").then(module => ({ default: module.CaptureWindow })));
 
 
 /*
@@ -92,7 +94,9 @@ ReactDOM.createRoot(container).render(
   <React.StrictMode>
     <ErrorBoundary>
       <LanguageProvider>
-        {isCaptureWindow ? <CaptureWindow /> : <App />}
+        <React.Suspense fallback={<div role="status" className="h-screen grid place-items-center text-sm text-[var(--text-secondary)]">{t("Загрузка…")}</div>}>
+          {isCaptureWindow ? <CaptureWindow /> : <App />}
+        </React.Suspense>
       </LanguageProvider>
     </ErrorBoundary>
   </React.StrictMode>,
