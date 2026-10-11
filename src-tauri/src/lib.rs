@@ -4,6 +4,8 @@ use std::sync::Mutex;
 mod single_instance_macos;
 mod image_previews;
 #[cfg(desktop)]
+mod workspace_menu;
+#[cfg(desktop)]
 use std::time::Duration;
 
 use std::io::Write;
@@ -124,6 +126,12 @@ fn show_main(app: &AppHandle) {
         let _ = w.show();
         let _ = w.set_focus();
     }
+}
+
+#[cfg(desktop)]
+#[tauri::command]
+fn exit_application(app: AppHandle) {
+    app.exit(0);
 }
 
 /// Показывает безрамочное окно быстрого захвата поверх остальных.
@@ -503,6 +511,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             image_previews::image_preview,
             set_capture_shortcut,
+            exit_application,
             fetch_ics,
             caldav_discover,
             caldav_put,
@@ -518,6 +527,9 @@ pub fn run() {
                 };
 
                 log_line("setup: старт");
+                if let Err(error) = workspace_menu::install(app.handle()) {
+                    log_line(&format!("setup: меню вкладок не установлено: {error}"));
+                }
 
                 // По умолчанию Ctrl+Shift+N открывает окно быстрого захвата.
                 // Активная комбинация лежит в managed state чтобы

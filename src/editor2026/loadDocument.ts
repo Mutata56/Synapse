@@ -7,6 +7,8 @@
 // исключение и заметка не открывается).
 
 import type { BlockNoteEditor } from "@blocknote/core";
+import { hashString } from "../lib/hashString";
+export { hashString } from "../lib/hashString";
 import {
   knownBlockTypes,
   normalizeLoadedDocument,
@@ -16,18 +18,6 @@ import {
 /** Свободный хэндлер редактора, нужные методы есть у каждого BlockNote editor
  *  вне зависимости от конкретной схемы. */
 type AnyEditor = BlockNoteEditor<any, any, any>;
-
-/**
- * Хеш строки djb2. Канонический производитель `bnHash`, ключ
- * reconciliation между lossless и markdown. Стабилен между версиями, заметки
- * сохраняют этот хеш, смена алгоритма инвалидирует lossless BlockNote JSON
- * для всех существующих заметок.
- */
-export function hashString(s: string): number {
-  let h = 5381;
-  for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0;
-  return h >>> 0;
-}
 
 /** Один пустой параграф, возвращается свежим чтобы вызывающий мог передать
  *  в `replaceBlocks` без shared array identity. */
