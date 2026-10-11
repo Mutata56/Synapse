@@ -21,6 +21,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { isViewEnabled } from "../lib/modules";
 import { buildGraph } from "../lib/buildGraph";
 import { cn } from "../lib/cn";
 import { DEFAULT_NOTE_TITLE, EMOJI_FONT_STACK } from "../lib/format";
@@ -133,6 +134,7 @@ export function CommandPalette() {
   // предыдущий (иначе первый таймер погасит подсветку второго).
   const lingerTimerRef = useRef<number | null>(null);
 
+  const modules = useNotesStore(state => state.settings.modules);
   const tree = useNotesStore((s) => s.tree);
   const view = useNotesStore((s) => s.view);
   const activeId = useNotesStore((s) => s.activeId);
@@ -339,8 +341,15 @@ export function CommandPalette() {
       { id: "go-settings", label: "Настройки", icon: Settings,
         keywords: "settings настройки preferences опции цвет хоткей", run: () => goToView("settings") },
     );
-    return base;
+    return base.filter(action => {
+      if (action.id === "new-note") return modules.newNote;
+      if (action.id === "new-folder") return modules.files;
+      if (action.id === "daily-template") return modules.calendar;
+      if (action.id.startsWith("go-")) return isViewEnabled({modules}, action.id.slice(3) as View);
+      return true;
+    });
   }, [
+    modules,
     createNote,
     setView,
     closeActive,

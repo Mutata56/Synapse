@@ -12,10 +12,12 @@ export const useCalendarStore = create<CalendarState>((set, get) => {
   let current: { url: string; request: Promise<void> } | null = null;
   let lastUrl = "";
   let lastText = "", lastZone = "", failureUrl = "", lastFailure: number | null = null;
+  const moduleEnabled = () => useNotesStore.getState().settings.modules.calendar;
   const configuredUrl = () => useNotesStore.getState().settings.calendarIcsUrl.trim();
   return {
     events: [], status: "idle", error: null, lastSync: null,
     syncNow: () => {
+      if (!moduleEnabled()) return Promise.resolve();
       const url = configuredUrl();
       if (!url) { current = null; lastUrl = ""; lastText = ""; lastFailure = null; set({ events: [], status: "idle", error: null, lastSync: null }); return Promise.resolve(); }
       if (current?.url === url) return current.request;
@@ -25,19 +27,24 @@ export const useCalendarStore = create<CalendarState>((set, get) => {
       pending.request = (async () => {
         try {
           const text = await invoke<string>("fetch_ics", { url });
-          if (current !== pending || configuredUrl() !== url) return;
+          if (current !== pending || configuredUrl() !== url || !moduleEnabled()) {
+            if (current === pending && !moduleEnabled()) set({ status: "idle" });
+            return;
+          }
           if (!/BEGIN:VCALENDAR/i.test(text)) throw new Error(t("Ссылка не похожа на iCal-фид. Выбери ссылку экспорта .ics в настройках внешнего календаря."));
           const events = parseIcs(text);
           lastUrl = url;
           lastText = text; lastZone = Intl.DateTimeFormat().resolvedOptions().timeZone; lastFailure = null;
           set({ events, status: "ok", error: null, lastSync: Date.now() });
         } catch (error) {
-          if (current === pending && configuredUrl() === url) { failureUrl = url; lastFailure = Date.now(); set({ status: "error", error: typeof error === "string" ? error : String(error) }); }
+          if (current === pending && !moduleEnabled()) set({ status: "idle" });
+          if (current === pending && configuredUrl() === url && moduleEnabled()) { failureUrl = url; lastFailure = Date.now(); set({ status: "error", error: typeof error === "string" ? error : String(error) }); }
         } finally { if (current === pending) current = null; }
       })();
       return pending.request;
     },
     syncIfStale: (maxAgeMs = FRESH_MS) => {
+      if (!moduleEnabled()) return;
       const url = configuredUrl();
       if (current?.url === url) return;
       if (url && lastUrl === url && lastText) {

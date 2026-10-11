@@ -7,6 +7,7 @@ import { getWorkspaceDir, listVaultFiles } from "../lib/storage";
 import { flattenNotes } from "../lib/treeUtils";
 import { setGraphFocusHandler } from "../lib/graphFocus";
 import { t } from "../lib/i18n";
+import { availableGraphModes, resolveGraphMode } from "../lib/modules";
 import type { GraphAppearance, GraphMode, GraphOptions, GraphReferenceMap } from "../lib/graphTypes";
 import { useNotesStore } from "../store/notes";
 import { useToastStore } from "../store/toasts";
@@ -34,12 +35,15 @@ export function GraphView({ documents, obsidianSettings }: { documents?: readonl
   const setCurrentFolder = useNotesStore((state) => state.setCurrentFolder);
   const expandFolder = useNotesStore((state) => state.expandFolder);
   const notes = useMemo(() => flattenNotes(tree), [tree]);
-  const [mode, setMode] = useState<GraphMode>(() => {
+  const graphFeatures = useNotesStore(state => state.settings.graph);
+  const [preferredMode, setMode] = useState<GraphMode>(() => {
     try { return localStorage.getItem(MODE_KEY) === "obsidian" ? "obsidian" : "volume"; } catch { return "volume"; }
   });
   const [appearances, setAppearances] = useState(() => graphSession.preferences?.appearances ?? DEFAULT_APPEARANCE);
   const [options, setOptions] = useState(() => graphSession.preferences?.options ?? DEFAULT_OPTIONS);
-  const appearance = appearances[mode];
+  const mode = resolveGraphMode(preferredMode, graphFeatures);
+  const modes = availableGraphModes(graphFeatures);
+  const appearance = useMemo(() => ({ ...appearances[mode], breathing: appearances[mode].breathing && graphFeatures.breathing }), [appearances, mode, graphFeatures.breathing]);
   const [references, setReferences] = useState<GraphReferenceMap | null>(() => graphSession.references.hasSnapshot ? graphSession.references.references : null);
   const [files, setFiles] = useState<string[]>([]);
   const [referencesLoading, setReferencesLoading] = useState(false);
@@ -111,22 +115,25 @@ export function GraphView({ documents, obsidianSettings }: { documents?: readonl
   useEffect(() => { try { localStorage.setItem(MODE_KEY, mode); } catch { /* optional preference */ } setSelected(null); setMenu(null); setPanel(null); }, [mode]);
   useEffect(() => {
     let canceled = false;
+    const activeWorkers = new Map<Worker, (reason: Error) => void>();
     setReferencesLoading(true); setReferenceError(null);
     const supplied = documents?.map((document) => ({ id: document.note.id, body: document.body }));
     void graphSession.references.update(notes,
       async () => (await buildSearchDocs(notes)).map((document) => ({ id: document.note.id, body: document.body })),
       (changed) => new Promise<GraphReferenceMap>((resolve, reject) => {
+        if (canceled) { reject(new Error("Graph unmounted")); return; }
         let worker: Worker;
         try { worker = new GraphReferencesWorker(); recordGraphDiagnostic("referenceWorkers"); }
         catch (reason) { reject(reason); return; }
+        activeWorkers.set(worker, reject);
         worker.onmessage = ({ data }: MessageEvent<{ ok: boolean; references?: GraphReferenceMap; error?: string }>) => {
-          worker.terminate(); if (data.ok && data.references) resolve(data.references); else reject(new Error(data.error ?? t("Не удалось обновить связи")));
+          activeWorkers.delete(worker); worker.terminate(); if (data.ok && data.references) resolve(data.references); else reject(new Error(data.error ?? t("Не удалось обновить связи")));
         };
-        worker.onerror = (event) => { worker.terminate(); reject(new Error(event.message || t("Не удалось обновить связи"))); };
+        worker.onerror = (event) => { activeWorkers.delete(worker); worker.terminate(); reject(new Error(event.message || t("Не удалось обновить связи"))); };
         recordGraphDiagnostic("parsedDocuments", changed.length); worker.postMessage(changed);
       }), supplied).then((value) => { if (!canceled) { setReferences(value); setReferencesLoading(false); } })
       .catch((reason) => { if (!canceled) { setReferenceError(String(reason)); setReferencesLoading(false); } });
-    return () => { canceled = true; };
+    return () => { canceled = true; for (const [worker, reject] of activeWorkers) { worker.terminate(); reject(new Error("Graph unmounted")); } activeWorkers.clear(); };
   }, [documents, notes, referenceRetry]);
   useEffect(() => {
     if (mode !== "obsidian" || !options.showAttachments) return;
@@ -158,6 +165,7 @@ export function GraphView({ documents, obsidianSettings }: { documents?: readonl
       context: (key, x, y, pinned) => setMenu({ key, x, y, pinned }),
       minimap: (snapshot) => minimap.current?.update(snapshot), error: (message) => { if (revision === sceneRevision.current) setError(message); },
     }, graphSession.layouts[mode]);
+    current.setMinimapEnabled(graphFeatures.minimap);
     scene.current = current;
     void current.start().then(() => {
       if (revision !== sceneRevision.current) { current.destroy(); return; }
@@ -169,6 +177,7 @@ export function GraphView({ documents, obsidianSettings }: { documents?: readonl
     if (scene.current) { graphSession.layouts[sceneMode.current] = scene.current.snapshot(); scene.current.destroy(); scene.current = null; }
   }, []);
   useEffect(() => { scene.current?.setAppearance(appearance); }, [appearance]);
+  useEffect(() => { scene.current?.setMinimapEnabled(graphFeatures.minimap); }, [graphFeatures.minimap]);
   useEffect(() => { scene.current?.setFilter(visible); }, [visible]);
   useEffect(() => { scene.current?.setSelected(selected); }, [selected]);
   useEffect(() => { setGraphFocusHandler((key) => scene.current?.focus(key)); return () => setGraphFocusHandler(null); }, []);
@@ -194,15 +203,15 @@ export function GraphView({ documents, obsidianSettings }: { documents?: readonl
     <div ref={host} className="graph-render-host" data-graph-mode={mode} />
     <div className="graph-toolbar">
       <div className="graph-mode-switch" role="radiogroup" aria-label={t("Режим графа")}>
-        {(["volume", "obsidian"] as const).map((value) => <button type="button" key={value} role="radio" aria-checked={mode === value} tabIndex={mode === value ? 0 : -1}
+        {modes.map((value) => <button type="button" key={value} role="radio" aria-checked={mode === value} tabIndex={mode === value ? 0 : -1}
           title={t(value === "volume" ? "Объёмный граф с островами папок" : "Граф в стиле Obsidian")}
           onClick={() => setMode(value)} onKeyDown={(event) => {
             if (["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) {
               event.preventDefault();
-              const next = event.key === "Home" ? "volume" : event.key === "End" ? "obsidian" : value === "volume" ? "obsidian" : "volume";
+              const next = event.key === "Home" ? modes[0] : event.key === "End" ? modes[modes.length - 1] : modes[(modes.indexOf(value) + 1) % modes.length];
               const parent = event.currentTarget.parentElement;
               setMode(next);
-              requestAnimationFrame(() => (parent?.querySelectorAll<HTMLButtonElement>('[role="radio"]')[next === "volume" ? 0 : 1])?.focus());
+              requestAnimationFrame(() => (parent?.querySelectorAll<HTMLButtonElement>('[role="radio"]')[modes.indexOf(next)])?.focus());
             }
           }}>{value === "volume" ? <Sparkles size={14} /> : <Network size={14} />}{t(value === "volume" ? "Объёмный" : "Obsidian")}</button>)}
       </div>
@@ -246,7 +255,7 @@ export function GraphView({ documents, obsidianSettings }: { documents?: readonl
           <Slider label={t("Разделение островов")} value={appearance.clusterSeparation} min={0} max={500000} step={5000} change={(value) => changeAppearance({ clusterSeparation: value })} />
           <Slider label={t("Отталкивание в холле")} value={appearance.internalRepulsion} min={0} max={200000} step={2000} change={(value) => changeAppearance({ internalRepulsion: value })} />
           <Slider label={t("Сплочённость")} value={appearance.cohesion} min={0.01} max={0.5} step={0.005} change={(value) => changeAppearance({ cohesion: value })} />
-          <Toggle label={t("Дыхание капель")} checked={appearance.breathing} change={(value) => changeAppearance({ breathing: value })} />
+          {graphFeatures.breathing ? <Toggle label={t("Дыхание капель")} checked={appearance.breathing} change={(value) => changeAppearance({ breathing: value })} /> : null}
         </> : null}
         <Slider label={t("Порог подписей")} value={appearance.labelZoom} min={0.15} max={3} step={0.05} change={(value) => changeAppearance({ labelZoom: value })} />
         <Toggle label={t("Связи (линии)")} checked={appearance.showEdges} change={(value) => changeAppearance({ showEdges: value })} />
@@ -254,7 +263,7 @@ export function GraphView({ documents, obsidianSettings }: { documents?: readonl
         <button type="button" className="graph-text-action" onClick={() => setAppearances((current) => ({ ...current, [mode]: DEFAULT_APPEARANCE[mode] }))}><RotateCcw size={13} />{t("Сбросить")}</button>
       </>}
     </div> : null}
-    {graph.nodes.length ? <GraphMinimap ref={minimap} host={host} center={center} /> : <div className="graph-empty"><Network size={30} /><h2>{t("Пока нет узлов")}</h2><p>{t("Заметки и их связи появятся здесь после создания или импорта.")}</p></div>}
+    {graph.nodes.length ? graphFeatures.minimap ? <GraphMinimap ref={minimap} host={host} center={center} /> : null : <div className="graph-empty"><Network size={30} /><h2>{t("Пока нет узлов")}</h2><p>{t("Заметки и их связи появятся здесь после создания или импорта.")}</p></div>}
     <div className="graph-bottom-controls"><div role="status">{referencesLoading ? <Loader2 size={13} className="graph-loading" /> : null}<span>{t("Узлов")}: {graph.nodes.length} · {t("Связей")}: {graph.edges.length}</span></div><div><button type="button" onClick={() => scene.current?.zoom(1 / 1.2)} aria-label={t("Отдалить")}><Minus size={15} /></button><button type="button" onClick={() => scene.current?.zoom(1.2)} aria-label={t("Приблизить")}><Plus size={15} /></button></div></div>
     {selectedNode ? <div className="graph-node-preview"><button type="button" className="graph-preview-close" onClick={() => { setSelected(null); scene.current?.clearFocus(); }} aria-label={t("Закрыть")}><X size={14} /></button><div className="graph-preview-type">{selectedNode.kind === "folder" ? <Folder size={14} /> : <FileText size={14} />}{t(selectedNode.kind === "unresolved" ? "Неразрешённая ссылка" : selectedNode.kind === "folder" ? "Папка" : "Заметка")}</div><h3>{selectedNode.label}</h3><p>{selectedNode.note?.preview || selectedNode.path}</p><button type="button" onClick={() => selectedNode.kind === "unresolved" ? void createMissing() : openNode(selectedNode.key)} disabled={creating}>{creating ? <Loader2 size={13} className="graph-loading" /> : <ArrowRight size={13} />}{t(selectedNode.kind === "unresolved" ? "Создать заметку" : "Открыть")}</button></div> : null}
     {error ? <div className="graph-error" role="alert"><strong>{t("Не удалось открыть граф")}</strong><p>{error}</p><button type="button" onClick={() => setRetry((value) => value + 1)}>{t("Повторить")}</button></div> : null}

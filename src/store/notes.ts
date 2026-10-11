@@ -1,4 +1,4 @@
-import { invoke } from "@tauri-apps/api/core";
+import { invoke, isTauri } from "@tauri-apps/api/core";
 import { create } from "zustand";
 import {
   DAILY_TEMPLATE_ID,
@@ -9,9 +9,10 @@ import {
 } from "../lib/daily";
 import {
   applyAccent,
-  DEFAULT_SETTINGS,
+  coerceSettings,
   type AppSettings,
 } from "../lib/settings";
+import { isViewEnabled } from "../lib/modules";
 import { pluralRu } from "../lib/format";
 import { t } from "../lib/i18n";
 import { normalizeTag, type TagMatch } from "../lib/tagExplorer";
@@ -56,6 +57,8 @@ import {
   type TreeNode,
 } from "../lib/storage";
 import { useToastStore } from "./toasts";
+
+let settingsWriteQueue: Promise<void> = Promise.resolve();
 
 // ─── Модель конкурентности ──────────────────────────────────────────────────
 // -  selectNote использует монотонный токен `selectGen`, чтобы сбрасывать
@@ -160,6 +163,7 @@ type State = {
   /** Глобальные настройки (акцент, шорткат захвата, поведение при старте).
    *  Загружаются из `notes/.settings.json` при запуске, см. `loadSettings`. */
   settings: AppSettings;
+  settingsSaveState: "idle" | "saving" | "saved" | "error";
   /** Выбор при неоднозначном `[[wiki-link]]`: ставится когда кликнутая ссылка
    *  матчит больше одной заметки по заголовку. null = закрыто. */
   linkPicker: { title: string; matches: NoteMeta[] } | null;
@@ -732,7 +736,7 @@ const movingNoteIds = new Set<string>();
 // синхронно сбросить таймеры, переход (Ctrl+K, клик в сайдбаре, goBack)
 // за ~400мс до последнего нажатия молча терял незаписанное. Компоненты
 // регистрируют async flushNow() при монтировании, `flushAllPending()` ждёт
-// их все параллельно и вызывается ПЕРЕД каждым selectNote / openNoteByTitle /
+// сначала снимки блоков, затем документы, и вызывается ПЕРЕД каждым selectNote / openNoteByTitle /
 // openLinkMatch / goBack / openDailyNote / restoreNoteVersion / createNote /
 // closeActiveNote, которые меняют activeId.
 //
@@ -741,7 +745,8 @@ const movingNoteIds = new Set<string>();
 //   -  Promise.race с FLUSH_TIMEOUT_MS: если flush завис (битая FS, антивирус),
 //     идём дальше и теряем данные, вместо того чтобы вешать весь UI.
 type Flusher = () => Promise<void>;
-const pendingFlushers = new Set<Flusher>();
+type FlushPhase = "blocks" | "documents";
+const pendingFlushers = new Map<Flusher, FlushPhase>();
 const FLUSH_TIMEOUT_MS = 2000;
 
 /** Сколько чип показывает "saved" перед тем как скрыться. Достаточно
@@ -769,33 +774,30 @@ function scheduleSavedToIdle(): void {
 /** Редакторы/инпуты вызывают при монтировании и unregister при размонтировании.
  *  Несколько регистраций независимы: и title, и body flusher регистрируются,
  *  оба срабатывают при переключении. */
-export function registerFlusher(fn: Flusher): () => void {
-  pendingFlushers.add(fn);
+export function registerFlusher(fn: Flusher, phase: FlushPhase = "documents"): () => void {
+  pendingFlushers.set(fn, phase);
   return () => {
     pendingFlushers.delete(fn);
   };
 }
 
-/** Запускает все зарегистрированные flusher параллельно и ждёт все. Каждый
- *  flusher обёрнут в try/catch + timeout-raced, так что один битой flusher
- *  не может заблокировать навигацию, которая вызвала этот вызов. Безопасно
- *  вызывать откуда угодно. */
+/** Commit rich block state before serializing enclosing documents. Callers
+ * await both phases before changing active content. Existing per-callback
+ * timeouts remain bounded; settings writes are also awaited before exit. */
 export async function flushAllPending(): Promise<void> {
-  if (pendingFlushers.size === 0) return;
-  const runs = Array.from(pendingFlushers).map((fn) => {
-    const timeout = new Promise<void>((resolve) =>
-      setTimeout(resolve, FLUSH_TIMEOUT_MS),
-    );
-    return Promise.race([
-      Promise.resolve()
-        .then(fn)
-        .catch((e) => {
-          console.error("flushAllPending: flusher failed:", e);
-        }),
-      timeout,
-    ]);
-  });
-  await Promise.all(runs);
+  for (const phase of ["blocks", "documents"] as const) {
+    const callbacks = [...pendingFlushers].filter(([, value]) => value === phase).map(([callback]) => callback);
+    await Promise.all(callbacks.map(async callback => {
+      let timeout: ReturnType<typeof setTimeout> | undefined;
+      try {
+        await Promise.race([
+          Promise.resolve().then(callback).catch(error => console.error("flushAllPending: flusher failed:", error)),
+          new Promise<void>(resolve => { timeout = setTimeout(resolve, FLUSH_TIMEOUT_MS); }),
+        ]);
+      } finally { if (timeout !== undefined) clearTimeout(timeout); }
+    }));
+  }
+  await settingsWriteQueue.catch(() => {});
 }
 
 /** Ставится `goBack`, чтобы `selectNote` который он вызывает, не пушнул
@@ -1279,7 +1281,8 @@ export const useNotesStore = create<Store>((set, get) => {
     currentTag: null,
     tagsFilter: { tags: [], match: "all", untagged: false },
     folderColors: {},
-    settings: { ...DEFAULT_SETTINGS },
+    settings: coerceSettings(null),
+    settingsSaveState: "idle",
     linkPicker: null,
     versionHistoryFor: null,
     editorReloadNonce: 0,
@@ -1290,7 +1293,9 @@ export const useNotesStore = create<Store>((set, get) => {
     _undoStack: [],
     _redoStack: [],
 
-    setView: (v) => set({ view: v }),
+    setView: (v) => {
+      if (v === "notes" && get().activeId || isViewEnabled(get().settings, v)) set({ view: v });
+    },
     setCurrentFolder: (folder) => set({ currentFolder: folder }),
     setCurrentTrashFolder: (folder) => set({ currentTrashFolder: folder }),
     // Existing editor/dashboard links still open a fresh single-tag filter.
@@ -1391,6 +1396,7 @@ export const useNotesStore = create<Store>((set, get) => {
      * по правильной дате, даже если записали задним числом.
      */
     openDailyNote: async (date) => {
+      if (!get().settings.modules.calendar) return;
       const id = dailyNoteId(date);
       const folder = dailyNoteFolder(date);
       set({ view: "notes" });
@@ -1643,6 +1649,7 @@ export const useNotesStore = create<Store>((set, get) => {
     },
 
     startCreateNote: (parent) => {
+      if (!get().settings.modules.newNote) return;
       if (parent) get().expandFolder(parent);
       set({ creatingNoteIn: parent, creatingFolderIn: null });
     },
@@ -1735,6 +1742,7 @@ export const useNotesStore = create<Store>((set, get) => {
     },
 
     createNote: async (folder = "", title = "") => {
+      if (!get().settings.modules.newNote) return "";
       // Склейка быстрых двойных кликов. Возвращаем "", а не предыдущий
       // activeId, чтобы вызывающие (сейчас игнорируют, но могут измениться)
       // получили однозначный "ничего не создано".
@@ -2043,64 +2051,39 @@ export const useNotesStore = create<Store>((set, get) => {
         const settings = await readSettings();
         set({ settings });
         applyAccent(settings.accentColor);
-        // Дефолтный шорткат уже зарегистрирован нативно при старте; пушим
-        // только если он отличается, чтобы Rust перебиндился. Best-effort,
-        // ошибка просто оставит дефолтный биндинг.
-        if (settings.captureShortcut !== DEFAULT_SETTINGS.captureShortcut) {
-          try {
-            await invoke("set_capture_shortcut", {
-              accelerator: settings.captureShortcut,
-            });
-          } catch (e) {
-            console.error("set_capture_shortcut (load) failed:", e);
-          }
+        if (isTauri()) {
+          await invoke("set_capture_shortcut", { accelerator: settings.captureShortcut, enabled: settings.modules.newNote }).catch(e => console.error("set_capture_shortcut (load) failed:", e));
         }
-      } catch (e) {
-        console.error("loadSettings failed:", e);
-      }
+      } catch (e) { console.error("loadSettings failed:", e); }
     },
 
-    updateSettings: async (patch) => {
-      const prev = get().settings;
-      const next = { ...prev, ...patch };
-      set({ settings: next }); // оптимистично
-
-      if (
-        patch.accentColor !== undefined &&
-        patch.accentColor !== prev.accentColor
-      ) {
-        applyAccent(next.accentColor);
-      }
-
-      // Перебиндим глобальный шорткат ПЕРВЫМ: если нативный слой отклонит
-      // (плохой комбо, или уже занят другим приложением), откатываем и
-      // выходим до записи шортката, который реально не работает.
-      if (
-        patch.captureShortcut !== undefined &&
-        patch.captureShortcut !== prev.captureShortcut
-      ) {
+    // Serialize whole-file writes. Each patch is merged with the latest state,
+    // so rapid controls cannot overwrite one another or leave a false saved state.
+    updateSettings: (patch) => {
+      const operation = settingsWriteQueue.catch(() => {}).then(async () => {
+        set({ settingsSaveState: "saving" });
+        const prev = get().settings;
+        const next = coerceSettings({ ...prev, ...patch,
+          modules: { ...prev.modules, ...patch.modules }, graph: { ...prev.graph, ...patch.graph },
+        });
+        const rebind = next.captureShortcut !== prev.captureShortcut || next.modules.newNote !== prev.modules.newNote;
         try {
-          await invoke("set_capture_shortcut", {
-            accelerator: next.captureShortcut,
-          });
-        } catch (e) {
-          set({
-            settings: { ...get().settings, captureShortcut: prev.captureShortcut },
-          });
-          reportError(
-            "Не удалось назначить хоткей (возможно, занят другим приложением)",
-            "set_capture_shortcut failed:",
-            e,
-          );
-          return;
+          if (rebind && isTauri()) await invoke("set_capture_shortcut", { accelerator: next.captureShortcut, enabled: next.modules.newNote });
+          await writeSettings(next);
+          set({ settings: next, settingsSaveState: "saved" });
+          if (next.accentColor !== prev.accentColor) applyAccent(next.accentColor);
+        } catch (error) {
+          if (rebind && isTauri()) await invoke("set_capture_shortcut", { accelerator: prev.captureShortcut, enabled: prev.modules.newNote }).catch(() => {});
+          set({ settingsSaveState: "error" });
+          reportError("Не удалось сохранить настройки", "updateSettings failed:", error);
+          throw error;
         }
-      }
-
-      try {
-        await writeSettings(get().settings);
-      } catch (e) {
-        reportError("Не удалось сохранить настройки", "writeSettings failed:", e);
-      }
+      });
+      settingsWriteQueue = operation;
+      // Existing callers may intentionally fire-and-forget; they still get the
+      // store's error toast, while settings forms can await the rejected promise.
+      void operation.catch(() => {});
+      return operation;
     },
 
     uploadCoverFromDisk: async (absolutePath) => {

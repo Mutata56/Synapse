@@ -2,6 +2,8 @@ import { listen } from "@tauri-apps/api/event";
 import { isTauri } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { lazy, Suspense, useEffect, type ReactNode } from "react";
+import { MotionConfig } from "framer-motion";
+import { isViewEnabled } from "./lib/modules";
 import { t } from "./lib/i18n";
 const CalendarView = lazy(() => import("./components/CalendarView").then(module => ({ default: module.CalendarView })));
 import { CommandPalette } from "./components/CommandPalette";
@@ -13,16 +15,16 @@ import { FilesView } from "./components/FilesView";
 const GraphView = lazy(() => import("./components/GraphView").then((module) => ({ default: module.GraphView })));
 import { ImageLightbox } from "./components/ImageLightbox";
 const ImagesView = lazy(() => import("./components/ImagesView").then(module => ({ default: module.ImagesView })));
-import { InboxView } from "./components/InboxView";
+const InboxView = lazy(() => import("./components/InboxView").then(module => ({ default: module.InboxView })));
 import { NotesGallery } from "./components/NotesGallery";
 const MarkdownSourceEditor = lazy(() => import("./components/MarkdownSourceEditor").then(module => ({ default: module.MarkdownSourceEditor })));
 const SettingsView = lazy(() => import("./components/SettingsView").then(module => ({ default: module.SettingsView })));
 import { WorkspaceChrome } from "./components/WorkspaceChrome";
 import { useWorkspaceStore } from "./store/workspace";
 import { activeWorkspaceTab } from "./lib/workspaceTabs";
-import { TagsView } from "./components/TagsView";
+const TagsView = lazy(() => import("./components/TagsView").then(module => ({ default: module.TagsView })));
 import { Toaster } from "./components/Toaster";
-import { TrashView } from "./components/TrashView";
+const TrashView = lazy(() => import("./components/TrashView").then(module => ({ default: module.TrashView })));
 import { VersionHistory } from "./components/VersionHistory";
 import { WikiLinkPicker } from "./components/WikiLinkPicker";
 const WritingDashboard = lazy(() => import("./components/WritingDashboard").then(module => ({ default: module.WritingDashboard })));
@@ -57,8 +59,13 @@ export default function App({ bootstrap = true }: { bootstrap?: boolean } = {}) 
   const loadFolderColors = useNotesStore((s) => s.loadFolderColors);
   const loadSettings = useNotesStore((s) => s.loadSettings);
   const target = useWorkspaceStore(state => activeWorkspaceTab(state).target);
+  const settings = useNotesStore(state => state.settings);
   const view: View = target.kind === "view" ? target.view : "notes";
   const activeId = target.kind === "note" ? target.noteId : null;
+  useEffect(() => {
+    document.documentElement.dataset.interfaceMotion = settings.animations ? "on" : "off";
+    return () => { delete document.documentElement.dataset.interfaceMotion; };
+  }, [settings.animations]);
   const undo = useNotesStore((s) => s.undo);
   const redo = useNotesStore((s) => s.redo);
 
@@ -101,10 +108,10 @@ export default function App({ bootstrap = true }: { bootstrap?: boolean } = {}) 
       });
       void useTemplatesStore.getState().refresh();
       const flatNotes = flattenNotes(useNotesStore.getState().tree);
-      void warmIndex(flatNotes);
+      if (useNotesStore.getState().settings.modules.search) void warmIndex(flatNotes);
       // Статистика слов загружается только по выбору «Объём текстов» в Обзоре.
       // Параллельный прогрев здесь дублировал чтения холодного search-кэша.
-      if (useNotesStore.getState().settings.openDailyOnStartup) {
+      if (useNotesStore.getState().settings.openDailyOnStartup && useNotesStore.getState().settings.modules.calendar) {
         void useNotesStore.getState().openDailyNote(new Date());
       }
     })();
@@ -186,8 +193,8 @@ export default function App({ bootstrap = true }: { bootstrap?: boolean } = {}) 
   }, [undo, redo]);
 
   return (
-    <div className="app-shell h-screen w-screen overflow-hidden">
-      <CommandPalette />
+    <MotionConfig reducedMotion={settings.animations ? "user" : "always"}><div className="app-shell h-screen w-screen overflow-hidden" data-animations={settings.animations ? "on" : "off"}>
+      {settings.modules.search ? <CommandPalette /> : null}
       <Toaster />
       <WikiLinkPicker />
       <VersionHistory />
@@ -200,10 +207,10 @@ export default function App({ bootstrap = true }: { bootstrap?: boolean } = {}) 
             render immediately rather than waiting for a background RAF/exit. */}
         <div key={screenKeyFor(view, activeId)} id="workspace-active-content" role="tabpanel"
           className="workspace-view flex-1 flex flex-col min-w-0 min-h-0 overflow-hidden">
-          <Suspense fallback={<div role="status" className="p-6 text-sm text-[var(--text-secondary)]">{t("Загрузка…")}</div>}>{renderView(view, activeId)}</Suspense>
+          <Suspense fallback={<div role="status" className="p-6 text-sm text-[var(--text-secondary)]">{t("Загрузка…")}</div>}>{activeId || isViewEnabled(settings, view) ? renderView(view, activeId) : <SettingsView />}</Suspense>
         </div>
       </WorkspaceChrome>
-    </div>
+    </div></MotionConfig>
   );
 }
 

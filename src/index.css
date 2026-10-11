@@ -2158,3 +2158,16 @@ button.e26-wb-sp__row:hover {
   .e26-wb-nodeov__textarea,
   .e26-wb-nodeov__code { transition: none; }
 }
+
+/* Interface effects can be disabled independently of the OS preference. */
+html[data-interface-motion="off"] *,
+html[data-interface-motion="off"] *::before,
+html[data-interface-motion="off"] *::after {
+  animation: none !important;
+  transition: none !important;
+  scroll-behavior: auto !important;
+}
+.module-disabled-block { display: flex; flex-direction: column; align-items: flex-start; gap: 7px; padding: 16px; border: 1px solid var(--color-border-strong); border-radius: 6px; background: var(--surface-1); color: var(--color-text); font: inherit; font-size: 13px; }
+.module-disabled-block small { color: var(--text-secondary); }
+.module-disabled-block button { background: transparent; border: 0; color: var(--color-link); cursor: pointer; padding: 4px 0; }
+.module-disabled-block button:focus-visible { outline: 2px solid var(--color-link); outline-offset: 3px; }
