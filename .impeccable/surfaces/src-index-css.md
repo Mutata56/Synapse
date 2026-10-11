@@ -41,3 +41,11 @@ No ResizeObserver loop warning appeared. The full suite passed156 tests with
 one optional copied-vault case skipped; TypeScript and macOS release build
 passed. The final type detector only flagged Inter as a common font: this is
 an intentional user-pinned exception, not a reason to replace the chosen face.
+
+COMBINED DELIVERY: merged the latest Settings/module changes from main before
+shipping. The combined suite passed170 tests with one optional copied-vault
+test skipped. Production startup remained within the existing budget:936322
+bytes of library JavaScript and278168 bytes for quick capture; both editors
+remain deferred. Only the four intended font files and both licenses appear
+in the build. This merge changes no typography selectors or title measurement
+logic validated above.
