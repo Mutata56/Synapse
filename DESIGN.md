@@ -16,6 +16,11 @@ colors:
   tags-muted: "#9a9aa6"
   tags-control: "#24242d"
   library-muted: "color-mix(in srgb, var(--color-text) 70%, var(--color-bg))"
+  files-muted: "#9a9aa6"
+  files-folder: "#9296db"
+  files-tag: "#74b39a"
+  files-danger: "#e87983"
+  files-dialog-scrim: "rgba(0,0,0,.5)"
 typography:
   headline:
     fontFamily: "Inter, system-ui, sans-serif"
@@ -91,6 +96,51 @@ typography:
   library-reader-body:
     fontSize: "13px"
     lineHeight: 1.75
+  files-page-title:
+    fontSize: "30px"
+    fontWeight: 700
+    lineHeight: "36px"
+    letterSpacing: "-0.025em"
+  files-page-title-condensed:
+    fontSize: "27px"
+    fontWeight: 700
+    lineHeight: "36px"
+    letterSpacing: "-0.025em"
+  files-page-title-compact:
+    fontSize: "25px"
+    fontWeight: 700
+    lineHeight: "36px"
+    letterSpacing: "-0.025em"
+  files-page-title-narrow:
+    fontSize: "24px"
+    fontWeight: 700
+    lineHeight: "31px"
+    letterSpacing: "-0.025em"
+  files-properties-title:
+    fontSize: "20px"
+    fontWeight: 600
+    lineHeight: "28px"
+    letterSpacing: "-0.015em"
+  files-empty-title:
+    fontSize: "18px"
+    fontWeight: 500
+  files-row-label:
+    fontSize: "15px"
+    lineHeight: "20px"
+  files-control-label:
+    fontSize: "14px"
+  files-metadata:
+    fontSize: "13px"
+  files-column-label:
+    fontSize: "12px"
+  files-tag-label:
+    fontSize: "11px"
+    lineHeight: "18px"
+  files-reader-body:
+    fontSize: "13px"
+    lineHeight: 1.6
+  files-reader-heading:
+    fontSize: "16px"
 rounded:
   control: "6px"
   card: "12px"
@@ -102,6 +152,9 @@ rounded:
   library-control: "7px"
   library-detail: "5px"
   library-tag: "4px"
+  files-detail: "4px"
+  files-icon: "5px"
+  files-menu: "8px"
 spacing:
   tight: "6px"
   control: "12px"
@@ -110,6 +163,9 @@ spacing:
   page-inset: "40px"
   library-inset: "28px"
   library-inset-narrow: "18px"
+  files-inset: "24px"
+  files-inset-compact: "18px"
+  files-inset-narrow: "14px"
 components:
   button-primary:
     backgroundColor: "{colors.primary}"
@@ -175,6 +231,58 @@ components:
     textColor: "#ffffff"
     rounded: "{rounded.library-control}"
     padding: "9px 12px"
+  files-button:
+    backgroundColor: "transparent"
+    textColor: "{colors.foreground}"
+    typography: "{typography.files-control-label}"
+    rounded: "{rounded.control}"
+    padding: "0 13px"
+    height: "39px"
+  files-button-primary:
+    backgroundColor: "{colors.primary}"
+    textColor: "#ffffff"
+    typography: "{typography.files-control-label}"
+    rounded: "{rounded.control}"
+    padding: "0 13px"
+    height: "39px"
+  files-button-tonal:
+    backgroundColor: "var(--color-accent-bg)"
+    textColor: "{colors.foreground}"
+    typography: "{typography.files-control-label}"
+    rounded: "{rounded.control}"
+    padding: "0 13px"
+    height: "39px"
+  files-search:
+    backgroundColor: "var(--color-bg-elevated)"
+    textColor: "{colors.foreground}"
+    typography: "{typography.files-control-label}"
+    rounded: "{rounded.control}"
+    padding: "0 12px"
+    height: "43px"
+    width: "259px"
+  files-route-current:
+    backgroundColor: "var(--color-accent-bg)"
+    textColor: "{colors.foreground}"
+    typography: "{typography.files-control-label}"
+    rounded: "{rounded.control}"
+    padding: "0 8px"
+    height: "38px"
+  files-selection-bar:
+    backgroundColor: "var(--color-bg-elevated)"
+    textColor: "{colors.foreground}"
+    rounded: "{rounded.control}"
+    padding: "10px 16px"
+    height: "60px"
+  files-table-row:
+    textColor: "{colors.foreground}"
+    typography: "{typography.files-row-label}"
+    height: "49px"
+  files-tag:
+    backgroundColor: "color-mix(in srgb, var(--fs-tag) 12%, transparent)"
+    textColor: "{colors.files-tag}"
+    typography: "{typography.files-tag-label}"
+    rounded: "{rounded.files-detail}"
+    padding: "2px 7px"
 ---
 
 # Design System: Synapse
@@ -188,6 +296,8 @@ This records the incumbent visual system, rather than a new identity. The author
 The implemented Tags finder supplies a scoped extension, evidenced by `src/components/TagsView.css` and the approved actual viewport. Its dense rows, mint tag markers and quiet reading area use the incumbent shell and semantic tokens. The `tags-` entries below describe this surface; they do not replace the global type or shape vocabulary.
 
 The implemented All Notes library supplies a second scoped extension, evidenced by `src/components/NotesGallery.css` and the finished desktop, narrow and reading captures. Its `library-` entries retain the incumbent palette and font family while recording the library's content cards, context contrast and compact controls. Surface composition and acceptance evidence stay in `.impeccable/surfaces/src-components-notesgallery-tsx.md`.
+
+The implemented Files and Trash workspace supplies a scoped extension, evidenced by `src/components/fileBrowser.css`, the shared `FileBrowser` and the finished dark desktop, narrow and Trash captures. Its `files-` entries record a dense work table, a current-folder route, selection actions and a collapsible properties region. It inherits the same Inter family, dark surfaces and violet interaction states. Surface direction and delegated-choice provenance stay in `.impeccable/surfaces/src-components-filesview-tsx.md`; operation details stay in `docs/FILES_BROWSER.md`.
 
 **Key Characteristics:**
 
@@ -211,6 +321,12 @@ The local `library-muted` role mixes the existing text and background in the sou
 
 **The Library Accent Rule.** Within All Notes, mint identifies tags; violet identifies focus, selection, the previewed card and the primary New note action.
 
+### Files and Trash extension
+
+The local `files-muted` role carries paths, dates, type labels, counts and quiet controls. `files-folder` is the default folder outline and `files-tag` is the bounded mint membership summary. `files-danger` is the implemented fallback for destructive controls when the shell has no danger alias. The dialog scrim darkens the existing work area without changing its palette. These roles remain local to Files, Trash and their dialogs; they do not replace the shell or Tags tokens.
+
+**The Files Accent Rule.** Within Files and Trash, violet marks selection, keyboard focus, destinations and primary actions; mint identifies note tags, lavender identifies uncustomized folders, and the local danger role identifies destructive actions. Preserve user-assigned folder colors.
+
 ## Typography
 
 The existing Inter and system fallback stack supplies the interface. Section titles are compact and semibold; controls and note rows use a smaller workhorse scale. Monospace is reserved for source/code values.
@@ -228,6 +344,12 @@ At the narrow container breakpoint, the view title becomes (22px), the reading t
 The `library-` title roles distinguish the view, shelf, card and reading title. Excerpts use their own compact prose role; controls and dates stay subordinate. Cards without covers show a two-line title and up to four excerpt lines. Compact cards use the smaller title step (15px) and up to three excerpt lines; cards with covers use that smaller title step and two excerpt lines. Folders and footer tag summaries use the small context step (10px).
 
 At library container widths of (680px) and below the view title becomes (23px) and the normal uncovered card title becomes (16px); at (450px) and below the view title becomes (22px). The reading prose inherits the Tags reader line height and measure (72ch), with the library's smaller body role. These observations belong to All Notes and do not revise the global or Tags type ramp.
+
+### Files and Trash hierarchy
+
+The `files-` title roles distinguish the view from the properties heading. The main title condenses at the three Files container thresholds; the narrow title keeps its own line height. Single-line names use the row role, search and named actions use the control role, and type/date context uses the metadata role. Table headings and mint membership summaries use the smaller column/tag steps. Dates use tabular figures. The empty-state heading remains a secondary title rather than a competing page heading.
+
+The properties heading becomes (18px) on narrow layouts, while row names become (13px). Quick-look prose uses the local reader role and a bounded measure (72ch); its Markdown headings step through (20px), (18px) and the local reader-heading role. These are Files adaptations of the incumbent Inter family, not a new global type ramp.
 
 ## Layout
 
@@ -249,6 +371,14 @@ The header, search/filter row and view controls remain above one independently s
 
 Library container queries, rather than the whole window, govern wrapping. At (1000px) and below controls wrap and the reading drawer can occupy (65%) of the work area. At (680px) and below search spans a row, insets reduce, and reading fills the work area. At (450px) and below title/count stack and the controls tighten. The drawer otherwise occupies the smaller of (560px) or (55%) of the work area. It overlays the card region without changing the shelf's column calculation.
 
+### Files and Trash workspace
+
+The header sits above a folder route, a stable selection/action strip and one scrolling table. The desktop header is (77px) high, the route (66px), the action strip (60px) and the sticky table heading (52px). Rows remain (49px) high and mount only around the viewport. The wide column grid reserves (64px) for selection, a flexible name column with a (180px) minimum, then type (144px), modified date (160px) and actions (48px). The properties region occupies `clamp(260px, 24.7%, 319px)` and scrolls independently behind a thin vertical divider.
+
+Files container queries respect the actual work-area width. At (1160px) and below, columns, gaps and header insets condense. At (900px) and below, creation actions become labeled icon controls, row tag summaries disappear and properties becomes an optional right overlay; it starts collapsed when the work area is below that width. At (640px) and below, the header is (112px) high with search on a full row, the route is (54px), the action strip (52px) and the table heading (44px). Only selection, name and row actions remain as columns. Long routes scroll horizontally to keep the current folder reachable; their full path remains available in properties and the folder picker.
+
+**The Files Row Rule.** Keep Files and Trash rows at their fixed height while windowing the list. Long names truncate with their full title available; narrow layouts remove secondary columns instead of turning rows into variable-height cards.
+
 ## Elevation & Depth
 
 Tonal surfaces and thin low-contrast borders establish depth. Floating menus use the existing `--shadow-float` token; ordinary work regions need no additional decorative elevation.
@@ -257,6 +387,8 @@ Tags remains flat at rest. The tag catalog uses the low surface, selected result
 
 All Notes cards use tonal fill and a thin border at rest, with no card shadow. Hover changes the surface and border; selection and the previewed card use violet fill and stroke. The reading drawer alone uses a soft directional shadow (`-16px 0 40px rgba(0,0,0,.22)`) to separate an overlapping reading region. This is a local overlay treatment, not a new global elevation scale. Card color/border transitions last (140ms); checkbox/star visibility transitions last (120ms). The reduced-motion preference removes both.
 
+Files and Trash rows are flat at rest, separated by fine rules. Hover changes tone; selected rows gain violet fill and an inset stroke, while the active keyboard row has an inset violet focus outline. Ordinary work regions have no decorative shadow. Structural depth is reserved for the narrow properties overlay (`-12px 0 30px rgba(0,0,0,.25)`), action menu (`0 10px 32px rgba(0,0,0,.42)`) and dialog (`0 18px 60px rgba(0,0,0,.45)`). Files buttons use a short background response (120ms); the reduced-motion preference removes it.
+
 ## Shapes
 
 Controls are gently rounded, note cards have the existing card radius, and the recorded pill primitive remains available to incumbent surfaces. Lucide outline icons carry a consistent stroke.
@@ -264,6 +396,8 @@ Controls are gently rounded, note cards have the existing card radius, and the r
 Tags uses a nested compact corner vocabulary: small checks, dismiss controls and inline code use `tags-detail`; segmented buttons, result tag summaries and the Open action use `tags-segment`; tree/result rows, inline tag actions, active filter chips, pane controls and attachments use `tags-row`. Search fields and the note-action menu retain the control radius; the selected-tag popover uses `tags-popover`. These local steps keep dense controls distinct from the broader note-card and pill shapes.
 
 All Notes reuses the established card radius. Its search, filters and primary action use `library-control`; checkbox/favorite controls use `library-detail`; footer tags and the eye action use `library-tag`. Rounded corners bound useful note content, with no empty decorative cover panel for a note that has no cover.
+
+Files reuses the control radius for search, named actions, route buttons and the selection strip, and the card radius for dialogs. The local `files-detail` step bounds checks, tag summaries and small scope controls; `files-icon` bounds icon actions, folder-picker rows and quick-look code blocks; `files-menu` bounds the floating action menu. Table rows keep square aligned edges. Lucide outline folder/note icons remain visible even when secondary columns are hidden.
 
 ## Components
 
@@ -297,6 +431,20 @@ Selection and favorite controls reveal on hover or keyboard focus, with selected
 
 Search uses the metadata index, including title, folder, cached excerpt, tags and aliases. Folder, tag and favorite filters combine with sorting and grouping. Bulk selection operates on filtered results and routes trash through the existing recoverable action with confirmation. Reading lazily reuses `TagReadingPane`; only the selected note body loads, preview text is bounded to (24,000 characters), and the reader cache is bounded to five entries. Images in the reading body remain attachment actions. Empty, loading, missing-note/retry and long-preview states retain explicit recovery actions.
 
+### Files routes, selection and actions
+
+The current route segment has violet tone and a semantic current-page label. Folder rows and route segments are move destinations; drag feedback uses violet fill and outline. Search defaults to the current folder and has an explicit descendant-scope toggle. Type filtering and name/date sorting use the metadata index, with folders first in either sort direction. The action strip shows a result count and Refresh at rest, then the selected count and mode-specific actions. Files offers Move and Trash; Trash offers Restore and Permanent delete and retains its own separate navigation entry.
+
+Single clicks select, modifier clicks toggle, and Shift selects a range. The grid exposes multiselection, logical row indices and only a mounted active descendant. Arrow keys and Home/End reveal the destination row. Visible focus uses a violet outline (2px), with an inset outline for the active row. Named actions are disabled during work and the selected count becomes a busy message. Empty and filtered-empty states explain the next step and offer a filter reset where relevant.
+
+### Files properties and dialogs
+
+Properties shows the selected item or aggregate, real location and metadata; without selection it describes the current folder. It exposes Open, Move/Trash or Restore/Permanent delete as appropriate. A single note can expose an explicit quick-look section. Tags are bounded summaries, and unsupported sizes or deletion dates are not fabricated.
+
+**The Explicit Quick Look Rule.** A selected note does not read its body until quick look is explicitly requested. Show loading, retry and truncation states in the properties region, and keep image references as inert attachment labels.
+
+Creation and rename dialogs use a labeled name field and inline validation. The move/navigation picker shows real folder hierarchy, a windowed destination list and an explicit destination summary; moving a folder into itself or a descendant is unavailable. Dialogs trap focus, restore their connected opener on close, and close with Escape or outside interaction when idle. Destructive confirmations explain folder contents and permanence. The full note opens through the existing editor rather than embedding an editor in the browser.
+
 ## Do's and Don'ts
 
 - Do use the semantic CSS variables and the existing icon family.
@@ -309,6 +457,11 @@ Search uses the metadata index, including title, folder, cached excerpt, tags an
 - Do keep All Notes type, context and corner roles scoped to the library.
 - Do use actual note excerpts when covers are absent, and keep editor and quick-reading actions explicit.
 - Do preserve measured-width windowing, visible focus and the return context in All Notes.
+- Do keep Files type, context, folder and corner roles scoped to the shared Files/Trash browser.
+- Do keep the current folder route and selection actions reachable in narrow Files layouts.
+- Do preserve fixed row bounds, folders-first ordering and mounted keyboard targets in Files and Trash.
+- Do load Files quick look only on request and describe Trash dates as modification dates.
 - Don't let a local feature silently change the global palette or typography.
 - Don't impose decorative image covers or motion on dense note indexes.
 - Don't turn preview tag actions into note edits or load image covers while filtering Tags.
+- Don't invent file sizes or deletion timestamps in Files and Trash.

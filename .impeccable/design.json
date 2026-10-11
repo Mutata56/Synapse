@@ -17,6 +17,11 @@
         "name": "library-card-actions",
         "value": "opacity 120ms",
         "purpose": "Reveal checkbox and favorite actions on hover/focus; disabled with reduced motion."
+      },
+      {
+        "name": "files-button-state",
+        "value": "background-color 120ms",
+        "purpose": "Files named-button hover response; disabled with reduced motion."
       }
     ],
     "shadows": [
@@ -39,6 +44,21 @@
         "name": "library-reading-overlay",
         "value": "-16px 0 40px rgba(0,0,0,.22)",
         "purpose": "Only the overlapping All Notes reading drawer; cards remain flat at rest."
+      },
+      {
+        "name": "files-properties-overlay",
+        "value": "-12px 0 30px rgba(0,0,0,.25)",
+        "purpose": "Only the optional overlapping Files/Trash properties region at narrow container widths."
+      },
+      {
+        "name": "files-action-menu",
+        "value": "0 10px 32px rgba(0,0,0,.42)",
+        "purpose": "Shared Files/Trash context menu; ordinary rows remain flat."
+      },
+      {
+        "name": "files-dialog",
+        "value": "0 18px 60px rgba(0,0,0,.45)",
+        "purpose": "Files creation, rename, navigation and move dialogs."
       }
     ],
     "breakpoints": [
@@ -65,6 +85,18 @@
       {
         "name": "library-small-container",
         "value": "450px"
+      },
+      {
+        "name": "files-condensed-container",
+        "value": "1160px"
+      },
+      {
+        "name": "files-properties-overlay-container",
+        "value": "900px"
+      },
+      {
+        "name": "files-single-name-container",
+        "value": "640px"
       }
     ],
     "colorMeta": {
@@ -108,6 +140,81 @@
           "oklch(0.7214 0.00344 286.31)",
           "oklch(0.8357 0.00344 286.31)",
           "oklch(0.9500 0.00344 286.31)"
+        ]
+      },
+      "files-muted": {
+        "role": "neutral",
+        "displayName": "Files secondary context",
+        "canonical": "#9a9aa6",
+        "tonalRamp": [
+          "oklch(0.1500 0.01741 285.93)",
+          "oklch(0.2643 0.01741 285.93)",
+          "oklch(0.3786 0.01741 285.93)",
+          "oklch(0.4929 0.01741 285.93)",
+          "oklch(0.6071 0.01741 285.93)",
+          "oklch(0.7214 0.01741 285.93)",
+          "oklch(0.8357 0.01741 285.93)",
+          "oklch(0.9500 0.01741 285.93)"
+        ]
+      },
+      "files-folder": {
+        "role": "secondary",
+        "displayName": "Files default folder outline",
+        "canonical": "#9296db",
+        "tonalRamp": [
+          "oklch(0.1500 0.10093 280.88)",
+          "oklch(0.2643 0.10093 280.88)",
+          "oklch(0.3786 0.10093 280.88)",
+          "oklch(0.4929 0.10093 280.88)",
+          "oklch(0.6071 0.10093 280.88)",
+          "oklch(0.7214 0.10093 280.88)",
+          "oklch(0.8357 0.10093 280.88)",
+          "oklch(0.9500 0.10093 280.88)"
+        ]
+      },
+      "files-tag": {
+        "role": "secondary",
+        "displayName": "Files tag membership",
+        "canonical": "#74b39a",
+        "tonalRamp": [
+          "oklch(0.1500 0.07493 167.32)",
+          "oklch(0.2643 0.07493 167.32)",
+          "oklch(0.3786 0.07493 167.32)",
+          "oklch(0.4929 0.07493 167.32)",
+          "oklch(0.6071 0.07493 167.32)",
+          "oklch(0.7214 0.07493 167.32)",
+          "oklch(0.8357 0.07493 167.32)",
+          "oklch(0.9500 0.07493 167.32)"
+        ]
+      },
+      "files-danger": {
+        "role": "tertiary",
+        "displayName": "Files destructive action",
+        "canonical": "#e87983",
+        "tonalRamp": [
+          "oklch(0.1500 0.13718 15.57)",
+          "oklch(0.2643 0.13718 15.57)",
+          "oklch(0.3786 0.13718 15.57)",
+          "oklch(0.4929 0.13718 15.57)",
+          "oklch(0.6071 0.13718 15.57)",
+          "oklch(0.7214 0.13718 15.57)",
+          "oklch(0.8357 0.13718 15.57)",
+          "oklch(0.9500 0.13718 15.57)"
+        ]
+      },
+      "files-dialog-scrim": {
+        "role": "neutral",
+        "displayName": "Files modal scrim",
+        "canonical": "rgba(0,0,0,.5)",
+        "tonalRamp": [
+          "oklch(0.1500 0 0 / .5)",
+          "oklch(0.2643 0 0 / .5)",
+          "oklch(0.3786 0 0 / .5)",
+          "oklch(0.4929 0 0 / .5)",
+          "oklch(0.6071 0 0 / .5)",
+          "oklch(0.7214 0 0 / .5)",
+          "oklch(0.8357 0 0 / .5)",
+          "oklch(0.9500 0 0 / .5)"
         ]
       }
     },
@@ -179,6 +286,58 @@
       "library-reader-body": {
         "displayName": "All Notes reading prose",
         "purpose": "Bounded read-only prose with the inherited generous reader line height."
+      },
+      "files-page-title": {
+        "displayName": "Files view title",
+        "purpose": "Desktop Files/Trash heading; retains the incumbent Inter family."
+      },
+      "files-page-title-condensed": {
+        "displayName": "Files condensed title",
+        "purpose": "Heading at the 1160px Files container threshold."
+      },
+      "files-page-title-compact": {
+        "displayName": "Files compact title",
+        "purpose": "Heading at the 900px Files container threshold."
+      },
+      "files-page-title-narrow": {
+        "displayName": "Files narrow title",
+        "purpose": "Heading and line height at the 640px Files container threshold."
+      },
+      "files-properties-title": {
+        "displayName": "Files properties title",
+        "purpose": "Selected item or current-folder heading; also used by dialog titles."
+      },
+      "files-empty-title": {
+        "displayName": "Files empty title",
+        "purpose": "Secondary heading explaining an empty or filtered-empty folder."
+      },
+      "files-row-label": {
+        "displayName": "Files row name",
+        "purpose": "Single-line item title inside the fixed-height work table."
+      },
+      "files-control-label": {
+        "displayName": "Files named control",
+        "purpose": "Search, route and desktop named actions."
+      },
+      "files-metadata": {
+        "displayName": "Files metadata",
+        "purpose": "Type, modification date and compact secondary controls."
+      },
+      "files-column-label": {
+        "displayName": "Files column label",
+        "purpose": "Quiet table headings and folder-picker context."
+      },
+      "files-tag-label": {
+        "displayName": "Files tag summary",
+        "purpose": "Bounded mint membership labels."
+      },
+      "files-reader-body": {
+        "displayName": "Files quick-look prose",
+        "purpose": "Explicit read-only preview, bounded in length and measure."
+      },
+      "files-reader-heading": {
+        "displayName": "Files quick-look subheading",
+        "purpose": "Smallest Markdown heading step in quick look."
       }
     }
   },
@@ -259,11 +418,67 @@
       "description": "A normal library card without a cover: a useful excerpt, folder and mint tags; opening and quick reading are distinct actions. Illustrative metadata, not a live note.",
       "html": "<article class=\"ds-library-card\"><button type=\"button\" class=\"ds-library-check\" aria-label=\"Выделить\" aria-pressed=\"false\"></button><button type=\"button\" class=\"ds-library-star\" aria-label=\"В избранное\" aria-pressed=\"false\"><svg width=\"15\" height=\"15\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"m12 3 2.78 5.63L21 9.54l-4.5 4.39 1.06 6.2L12 17.2l-5.56 2.93 1.06-6.2L3 9.54l6.22-.91L12 3Z\"/></svg></button><button type=\"button\" class=\"ds-library-open\" aria-label=\"Открыть заметку: Карта изучения WMS Driver\"><div class=\"ds-library-content\"><div class=\"ds-library-meta\"><span><svg width=\"15\" height=\"15\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z\"/><path d=\"M14 2v6h6M8 13h8M8 17h6\"/></svg></span><time>пятница</time></div><h3>Карта изучения WMS Driver</h3><p>WMS Driver получает задачи, преобразует сообщения и передаёт их дальше. Карта заметок помогает найти нужный этап.</p><span class=\"ds-library-folder\">Работа/LTM/Магнит/WMS Driver</span></div></button><footer><div><button type=\"button\" class=\"ds-library-tag\">#wmsdriver</button><button type=\"button\" class=\"ds-library-tag\">#wtms</button><span class=\"ds-library-more\">+3</span></div><button type=\"button\" class=\"ds-library-peek\" aria-label=\"Быстрый просмотр: Карта изучения WMS Driver\"><svg width=\"15\" height=\"15\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0\"/><circle cx=\"12\" cy=\"12\" r=\"3\"/></svg></button></footer></article>",
       "css": ".ds-library-card{--ds-library-muted:color-mix(in srgb,var(--text) 70%,var(--bg));display:flex;flex-direction:column;position:relative;width:min(100%,320px);height:282px;overflow:hidden;border:1px solid var(--border-strong);border-radius:12px;background:var(--surface-1);color:var(--text);font-family:var(--font-sans,Inter,system-ui,sans-serif);transition:background-color 140ms,border-color 140ms}.ds-library-card:hover{border-color:color-mix(in srgb,var(--accent) 38%,var(--border-strong));background:var(--surface-2)}.ds-library-card.is-selected,.ds-library-card.is-previewing{border-color:var(--accent);background:var(--accent-bg)}.ds-library-card button{cursor:pointer}.ds-library-card button:focus-visible{outline:2px solid var(--accent);outline-offset:3px}.ds-library-open{display:flex;flex:1;min-height:0;width:100%;padding:0;border:0;background:transparent;text-align:left;color:inherit}.ds-library-open:focus-visible{outline-offset:-3px!important;border-radius:12px}.ds-library-content{display:flex;flex-direction:column;flex:1;min-height:0;gap:13px;padding:20px 18px 15px}.ds-library-meta{display:flex;align-items:center;justify-content:space-between;min-height:16px;padding-right:28px;color:var(--ds-library-muted);font-size:11px;line-height:16px}.ds-library-meta>span{display:flex;margin-left:24px}.ds-library-content h3{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;margin:0;color:var(--text-strong);font-size:17px;font-weight:580;line-height:1.35;letter-spacing:-.015em}.ds-library-content p{display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden;flex:1;min-height:0;margin:0;color:var(--ds-library-muted);font-size:12px;line-height:1.6}.ds-library-folder{overflow:hidden;flex-shrink:0;color:var(--ds-library-muted);font-size:10px;line-height:15px;opacity:.86;white-space:nowrap;text-overflow:ellipsis}.ds-library-card footer{box-sizing:border-box;display:flex;align-items:center;justify-content:space-between;gap:6px;flex-shrink:0;height:50px;padding:10px 14px;border-top:1px solid var(--border)}.ds-library-card footer>div{display:flex;align-items:center;gap:6px;min-width:0;overflow:hidden}.ds-library-tag{display:inline-flex;max-width:110px;overflow:hidden;padding:2px 5px;border:0;border-radius:4px;background:color-mix(in srgb,var(--tag-accent) 10%,transparent);color:var(--tag-accent);font:10px/15px var(--font-sans,Inter,system-ui,sans-serif);white-space:nowrap;text-overflow:ellipsis}.ds-library-more{color:var(--ds-library-muted);font-size:10px}.ds-library-peek{display:flex;align-items:center;justify-content:center;min-width:28px;min-height:28px;padding:4px;border:0;border-radius:4px;background:transparent;color:var(--ds-library-muted)}.ds-library-peek:hover{color:var(--link)}.ds-library-check,.ds-library-star{position:absolute;top:13px;z-index:2;display:flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:5px;opacity:0;transition:opacity 120ms}.ds-library-check{left:13px;border:1px solid var(--border-strong);background:var(--bg);color:var(--text)}.ds-library-star{right:13px;border:0;background:var(--surface-1);color:var(--ds-library-muted)}.ds-library-card:hover .ds-library-check,.ds-library-card:hover .ds-library-star,.ds-library-card:focus-within .ds-library-check,.ds-library-card:focus-within .ds-library-star{opacity:1}@media(prefers-reduced-motion:reduce){.ds-library-card,.ds-library-check,.ds-library-star{transition:none}}.ds-library-card.is-selected .ds-library-check{opacity:1;background:var(--accent);border-color:var(--accent);color:#fff}.ds-library-star[aria-pressed=true]{opacity:1;color:var(--accent)}"
+    },
+    {
+      "name": "Files outline action",
+      "kind": "button",
+      "refersTo": "files-button",
+      "description": "Scoped Files action with the implemented shape, hover response and visible keyboard focus.",
+      "html": "<button type=\"button\" class=\"ds-files-button-neutral\">Отмена</button>",
+      "css": ".ds-files-button-neutral{display:inline-flex;align-items:center;justify-content:center;gap:9px;height:39px;padding:0 13px;border:1px solid var(--color-border-strong);border-radius:6px;background:transparent;color:var(--color-text);font:14px var(--font-sans,Inter,system-ui,sans-serif);white-space:nowrap;cursor:pointer;transition:background-color 120ms}.ds-files-button-neutral:hover:not(:disabled){background:var(--color-bg-overlay)}.ds-files-button-neutral:focus-visible{outline:2px solid var(--color-accent);outline-offset:2px}.ds-files-button-neutral:disabled{opacity:.42;cursor:default}@media(prefers-reduced-motion:reduce){.ds-files-button-neutral{transition:none}}"
+    },
+    {
+      "name": "Files primary action",
+      "kind": "button",
+      "refersTo": "files-button-primary",
+      "description": "Scoped Files action with the implemented shape, hover response and visible keyboard focus.",
+      "html": "<button type=\"button\" class=\"ds-files-button-primary\">Создать</button>",
+      "css": ".ds-files-button-primary{display:inline-flex;align-items:center;justify-content:center;gap:9px;height:39px;padding:0 13px;border:1px solid var(--color-accent);border-radius:6px;background:var(--color-accent);color:#fff;font:14px var(--font-sans,Inter,system-ui,sans-serif);white-space:nowrap;cursor:pointer;transition:background-color 120ms}.ds-files-button-primary:hover:not(:disabled){filter:brightness(1.08)}.ds-files-button-primary:focus-visible{outline:2px solid var(--color-accent);outline-offset:2px}.ds-files-button-primary:disabled{opacity:.42;cursor:default}@media(prefers-reduced-motion:reduce){.ds-files-button-primary{transition:none}}"
+    },
+    {
+      "name": "Files tonal selection action",
+      "kind": "button",
+      "refersTo": "files-button-tonal",
+      "description": "Scoped Files action with the implemented shape, hover response and visible keyboard focus.",
+      "html": "<button type=\"button\" class=\"ds-files-button-tonal\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M20 20H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h5l2 2h9a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2Z\"/></svg>Переместить</button>",
+      "css": ".ds-files-button-tonal{display:inline-flex;align-items:center;justify-content:center;gap:9px;height:39px;padding:0 13px;border:1px solid var(--color-accent-border);border-radius:6px;background:var(--color-accent-bg);color:var(--color-text);font:14px var(--font-sans,Inter,system-ui,sans-serif);white-space:nowrap;cursor:pointer;transition:background-color 120ms}.ds-files-button-tonal:hover:not(:disabled){background:var(--color-bg-overlay)}.ds-files-button-tonal:focus-visible{outline:2px solid var(--color-accent);outline-offset:2px}.ds-files-button-tonal:disabled{opacity:.42;cursor:default}@media(prefers-reduced-motion:reduce){.ds-files-button-tonal{transition:none}}"
+    },
+    {
+      "name": "Files folder search",
+      "kind": "input",
+      "refersTo": "files-search",
+      "description": "Metadata search in the current folder with an explicit descendant toggle.",
+      "html": "<div class=\"ds-files-search\"><svg width=\"17\" height=\"17\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" aria-hidden=\"true\"><circle cx=\"11\" cy=\"11\" r=\"8\"/><path d=\"m21 21-4.3-4.3\"/></svg><input aria-label=\"Поиск в папке\" placeholder=\"Поиск в папке…\"><button type=\"button\" aria-label=\"Искать во вложенных папках\" aria-pressed=\"false\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M20 20H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h5l2 2h9a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2Z\"/></svg></button></div>",
+      "css": ".ds-files-search{display:flex;align-items:center;gap:10px;width:259px;max-width:100%;height:43px;padding:0 12px;border:1px solid var(--color-border-strong);border-radius:6px;background:var(--color-bg-elevated);color:var(--fs-muted,#9a9aa6);font-family:var(--font-sans,Inter,system-ui,sans-serif)}.ds-files-search>svg{flex-shrink:0}.ds-files-search input{width:100%;min-width:0;border:0;background:transparent;color:var(--color-text);font:14px var(--font-sans,Inter,system-ui,sans-serif);caret-color:var(--color-accent)}.ds-files-search input::placeholder{color:var(--fs-muted,#9a9aa6)}.ds-files-search button{display:grid;place-items:center;width:22px;min-width:22px;height:25px;padding:0;border:0;border-radius:4px;background:transparent;color:inherit;cursor:pointer}.ds-files-search button[aria-pressed=true]{background:var(--color-accent-bg);color:var(--color-accent)}.ds-files-search input:focus-visible,.ds-files-search button:focus-visible{outline:2px solid var(--color-accent);outline-offset:2px}"
+    },
+    {
+      "name": "Files current folder route",
+      "kind": "nav",
+      "refersTo": "files-route-current",
+      "description": "Current path segment and move destination; illustrative folder name.",
+      "html": "<nav class=\"ds-files-route\" aria-label=\"Хлебные крошки\"><button type=\"button\" aria-current=\"page\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M20 20H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h5l2 2h9a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2Z\"/></svg><span>Этап 02 SELECT</span></button></nav>",
+      "css": ".ds-files-route button{display:inline-flex;align-items:center;gap:13px;min-height:38px;padding:0 8px;border:0;border-radius:6px;background:transparent;color:var(--fs-muted,#9a9aa6);font:14px var(--font-sans,Inter,system-ui,sans-serif);white-space:nowrap;cursor:pointer}.ds-files-route svg{color:var(--fs-folder,#9296db)}.ds-files-route button:hover{background:var(--color-bg-overlay)} .ds-files-route button[aria-current=page]{background:var(--color-accent-bg);color:var(--color-text)}.ds-files-route button:focus-visible{outline:2px solid var(--color-accent);outline-offset:2px}"
+    },
+    {
+      "name": "Files selected work row",
+      "kind": "custom",
+      "refersTo": "files-table-row",
+      "description": "A fixed-height selected note row with quiet metadata; illustrative content, not a live note.",
+      "html": "<div class=\"ds-files-demo\"><div class=\"ds-files-row ds-files-selected\" role=\"row\" aria-selected=\"true\" tabindex=\"0\"><button type=\"button\" role=\"checkbox\" aria-checked=\"true\" aria-label=\"Выбрать заметку\"><svg width=\"13\" height=\"13\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" aria-hidden=\"true\"><path d=\"m20 6-11 11-5-5\"/></svg></button><span class=\"ds-files-name\"><svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z\"/><path d=\"M14 2v6h6M8 13h8M8 17h6\"/></svg><span>2.03 WHERE и предикаты</span></span><span class=\"ds-files-kind\">Заметка</span><time class=\"ds-files-date\">5 окт.</time><button type=\"button\" class=\"ds-files-more\" aria-label=\"Действия: заметка\"><svg width=\"17\" height=\"17\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"1\"/><circle cx=\"19\" cy=\"12\" r=\"1\"/><circle cx=\"5\" cy=\"12\" r=\"1\"/></svg></button></div></div>",
+      "css": ".ds-files-demo{container-type:inline-size;container-name:files-row-demo}.ds-files-row{display:grid;grid-template-columns:42px minmax(160px,1fr) 90px 112px 36px;align-items:center;height:49px;border-bottom:1px solid var(--color-border);color:var(--color-text);font:15px var(--font-sans,Inter,system-ui,sans-serif)}.ds-files-row:hover{background:var(--color-bg-overlay)}.ds-files-row.ds-files-selected{background:var(--color-accent-bg);box-shadow:inset 0 0 0 1px var(--color-accent-border)}.ds-files-row>button:first-child{display:grid;place-items:center;justify-self:center;width:18px;height:18px;padding:0;border:1px solid var(--color-accent);border-radius:4px;background:var(--color-accent);color:#fff;cursor:pointer}.ds-files-name{display:flex;align-items:center;gap:12px;min-width:0;padding:0 10px;line-height:20px}.ds-files-name>svg{flex-shrink:0}.ds-files-name>span{overflow:hidden;white-space:nowrap;text-overflow:ellipsis}.ds-files-kind,.ds-files-date{font-size:13px;color:var(--fs-muted,#9a9aa6);white-space:nowrap}.ds-files-date{font-variant-numeric:tabular-nums}.ds-files-more{display:grid;place-items:center;justify-self:center;width:30px;height:30px;padding:0;border:0;border-radius:5px;background:transparent;color:var(--fs-muted,#9a9aa6);cursor:pointer}.ds-files-more:hover{background:var(--color-bg-overlay);color:var(--color-text)}.ds-files-row:focus-visible,.ds-files-row>button:focus-visible{outline:2px solid var(--color-accent);outline-offset:-2px}@container files-row-demo (max-width:640px){.ds-files-row{grid-template-columns:36px minmax(120px,1fr) 36px;font-size:13px}.ds-files-kind,.ds-files-date{display:none}.ds-files-name{padding:0 7px;gap:10px}.ds-files-name>svg{width:17px}}"
+    },
+    {
+      "name": "Files tag summary",
+      "kind": "chip",
+      "refersTo": "files-tag",
+      "description": "Inert mint metadata label used in rows and properties; it does not edit the note.",
+      "html": "<span class=\"ds-files-tag\">#sql</span>",
+      "css": ".ds-files-tag{display:inline-flex;align-items:center;gap:5px;max-width:100%;overflow:hidden;padding:2px 7px;border:1px solid color-mix(in srgb,var(--fs-tag,#74b39a) 18%,transparent);border-radius:4px;background:color-mix(in srgb,var(--fs-tag,#74b39a) 12%,transparent);color:var(--fs-tag,#74b39a);font:11px/18px var(--font-sans,Inter,system-ui,sans-serif);white-space:nowrap;text-overflow:ellipsis}"
     }
   ],
   "narrative": {
     "northStar": "Existing Synapse desktop interface",
-    "overview": "This records the incumbent visual system, rather than a new identity. The authority is `src/index.css`, the existing Sidebar, TagsView, NoteCard, and the running desktop interface. New local surfaces inherit this shell; their own layout decisions stay in surface briefs.\n\nThe implemented Tags finder supplies a scoped extension, evidenced by `src/components/TagsView.css` and the approved actual viewport. Its dense rows, mint tag markers and quiet reading area use the incumbent shell and semantic tokens. The `tags-` entries below describe this surface; they do not replace the global type or shape vocabulary.\n\nThe implemented All Notes library supplies a second scoped extension, evidenced by `src/components/NotesGallery.css` and the finished desktop, narrow and reading captures. Its `library-` entries retain the incumbent palette and font family while recording the library's content cards, context contrast and compact controls. Surface composition and acceptance evidence stay in `.impeccable/surfaces/src-components-notesgallery-tsx.md`.",
+    "overview": "This records the incumbent visual system, rather than a new identity. The authority is `src/index.css`, the existing Sidebar, TagsView, NoteCard, and the running desktop interface. New local surfaces inherit this shell; their own layout decisions stay in surface briefs.\n\nThe implemented Tags finder supplies a scoped extension, evidenced by `src/components/TagsView.css` and the approved actual viewport. Its dense rows, mint tag markers and quiet reading area use the incumbent shell and semantic tokens. The `tags-` entries below describe this surface; they do not replace the global type or shape vocabulary.\n\nThe implemented All Notes library supplies a second scoped extension, evidenced by `src/components/NotesGallery.css` and the finished desktop, narrow and reading captures. Its `library-` entries retain the incumbent palette and font family while recording the library's content cards, context contrast and compact controls. Surface composition and acceptance evidence stay in `.impeccable/surfaces/src-components-notesgallery-tsx.md`.\n\nThe implemented Files and Trash workspace supplies a scoped extension, evidenced by `src/components/fileBrowser.css`, the shared `FileBrowser` and the finished dark desktop, narrow and Trash captures. Its `files-` entries record a dense work table, a current-folder route, selection actions and a collapsible properties region. It inherits the same Inter family, dark surfaces and violet interaction states. Surface direction and delegated-choice provenance stay in `.impeccable/surfaces/src-components-filesview-tsx.md`; operation details stay in `docs/FILES_BROWSER.md`.",
     "keyCharacteristics": [
       "Dark tonal surfaces",
       "Violet selection",
@@ -284,6 +499,21 @@
         "name": "The Library Accent Rule",
         "body": "Within All Notes, mint identifies tags; violet identifies focus, selection, the previewed card and the primary New note action.",
         "section": "colors"
+      },
+      {
+        "name": "The Files Accent Rule",
+        "body": "Within Files and Trash, violet marks selection, keyboard focus, destinations and primary actions; mint identifies note tags, lavender identifies uncustomized folders, and the local danger role identifies destructive actions. Preserve user-assigned folder colors.",
+        "section": "colors"
+      },
+      {
+        "name": "The Files Row Rule",
+        "body": "Keep Files and Trash rows at their fixed height while windowing the list. Long names truncate with their full title available; narrow layouts remove secondary columns instead of turning rows into variable-height cards.",
+        "section": "layout"
+      },
+      {
+        "name": "The Explicit Quick Look Rule",
+        "body": "A selected note does not read its body until quick look is explicitly requested. Show loading, retry and truncation states in the properties region, and keep image references as inert attachment labels.",
+        "section": "components"
       }
     ],
     "dos": [
@@ -296,13 +526,18 @@
       "Do move focus into the visible pane after a narrow-layout pane switch.",
       "Do keep All Notes type, context and corner roles scoped to the library.",
       "Do use actual note excerpts when covers are absent, and keep editor and quick-reading actions explicit.",
-      "Do preserve measured-width windowing, visible focus and the return context in All Notes."
+      "Do preserve measured-width windowing, visible focus and the return context in All Notes.",
+      "Do keep Files type, context, folder and corner roles scoped to the shared Files/Trash browser.",
+      "Do keep the current folder route and selection actions reachable in narrow Files layouts.",
+      "Do preserve fixed row bounds, folders-first ordering and mounted keyboard targets in Files and Trash.",
+      "Do load Files quick look only on request and describe Trash dates as modification dates."
     ],
     "donts": [
       "Don't let a local feature silently change the global palette or typography.",
       "Don't impose decorative image covers or motion on dense note indexes.",
-      "Don't turn preview tag actions into note edits or load image covers while filtering Tags."
+      "Don't turn preview tag actions into note edits or load image covers while filtering Tags.",
+      "Don't invent file sizes or deletion timestamps in Files and Trash."
     ]
   },
-  "generatedAt": "2026-10-11T01:10:45+00:00"
+  "generatedAt": "2026-10-11T01:56:47.245473+00:00"
 }

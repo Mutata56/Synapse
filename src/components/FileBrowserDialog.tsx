@@ -7,10 +7,12 @@ import { useI18n } from "./LanguageProvider";
 import { useWindowedRows } from "./useWindowedRows";
 
 export type FileDialogMode = "createNote" | "createFolder" | "rename" | "move" | "navigate";
-type Props = { mode: FileDialogMode; index: FileIndex; folder: string; entry?: FileEntry; targets: FileTarget[]; busy: boolean; onClose: () => void; onSubmit: (value: string) => Promise<void> };
+type Props = { mode: FileDialogMode; source: "files" | "trash"; index: FileIndex; folder: string; entry?: FileEntry; targets: FileTarget[]; busy: boolean; onClose: () => void; onSubmit: (value: string) => Promise<void> };
 
-export function FileBrowserDialog({ mode, index, folder, entry, targets, busy, onClose, onSubmit }: Props) {
+export function FileBrowserDialog({ mode, source, index, folder, entry, targets, busy, onClose, onSubmit }: Props) {
   const { t, lang } = useI18n();
+  const rootName = source === "trash" ? t("Корзина") : t("Хранилище");
+  const rootLabel = source === "trash" ? t("Корень корзины") : t("Корень хранилища");
   const picker = mode === "move" || mode === "navigate";
   const [value, setValue] = useState(mode === "rename" ? entry?.name ?? "" : "");
   const [query, setQuery] = useState("");
@@ -56,14 +58,14 @@ export function FileBrowserDialog({ mode, index, folder, entry, targets, busy, o
       }}>
         {picker ? <>
           <div className="fs-search"><Search size={16} /><input ref={input} value={query} disabled={busy} onChange={event => setQuery(event.target.value)} placeholder={t("Поиск папки…")} aria-label={t("Поиск папки")} /></div>
-          <nav className="fs-picker-route" aria-label={t("Папка назначения")}><button type="button" onClick={() => browse("")} disabled={busy}>{t("Хранилище")}</button>{buildBreadcrumbs(browsing).map(crumb => <span key={crumb.path}><ChevronRight size={13} /><button type="button" disabled={busy} onClick={() => browse(crumb.path)}>{crumb.name}</button></span>)}</nav>
-          <button type="button" className={`fs-picker-current${destination === browsing ? " is-selected" : ""}`} disabled={busy || unavailable(browsing)} onClick={() => setDestination(browsing)}><Folder size={17} /><span>{browsing ? t("Эта папка") : t("Корень хранилища")}</span></button>
+          <nav className="fs-picker-route" aria-label={t("Папка назначения")}><button type="button" onClick={() => browse("")} disabled={busy}>{rootName}</button>{buildBreadcrumbs(browsing).map(crumb => <span key={crumb.path}><ChevronRight size={13} /><button type="button" disabled={busy} onClick={() => browse(crumb.path)}>{crumb.name}</button></span>)}</nav>
+          <button type="button" className={`fs-picker-current${destination === browsing ? " is-selected" : ""}`} disabled={busy || unavailable(browsing)} onClick={() => setDestination(browsing)}><Folder size={17} /><span>{browsing ? t("Эта папка") : rootLabel}</span></button>
           <div className="fs-picker-list fs-scroll" ref={windowed.ref} onScroll={windowed.onScroll}>
-            {rows.length ? <div style={{ height: rows.length * 48, position: "relative" }}>{rows.slice(windowed.start, windowed.end).map((row, offset) => <button type="button" key={row.key} className={`fs-picker-row${destination === row.path ? " is-selected" : ""}`} disabled={busy || unavailable(row.path)} style={{ position: "absolute", top: (windowed.start + offset) * 48, height: 48, width: "100%" }} onClick={() => setDestination(row.path)} onDoubleClick={() => browse(row.path)}><Folder size={17} /><span><strong>{row.name}</strong><small>{query ? row.parent || t("Хранилище") : t("{n} заметок", { n: row.notes })}</small></span><ChevronRight size={14} /></button>)}</div> : <div className="fs-empty-small">{query ? t("Папки не найдены") : t("Вложенных папок нет")}</div>}
+            {rows.length ? <div style={{ height: rows.length * 48, position: "relative" }}>{rows.slice(windowed.start, windowed.end).map((row, offset) => <button type="button" key={row.key} className={`fs-picker-row${destination === row.path ? " is-selected" : ""}`} disabled={busy || unavailable(row.path)} style={{ position: "absolute", top: (windowed.start + offset) * 48, height: 48, width: "100%" }} onClick={() => setDestination(row.path)} onDoubleClick={() => browse(row.path)}><Folder size={17} /><span><strong>{row.name}</strong><small>{query ? row.parent || rootName : t("{n} заметок", { n: row.notes })}</small></span><ChevronRight size={14} /></button>)}</div> : <div className="fs-empty-small">{query ? t("Папки не найдены") : t("Вложенных папок нет")}</div>}
           </div>
-          <p className="fs-destination"><span>{mode === "move" ? t("Переместить в:") : t("Открыть:")}</span> <strong>{destination || t("Хранилище")}</strong></p>
+          <p className="fs-destination"><span>{mode === "move" ? t("Переместить в:") : t("Открыть:")}</span> <strong>{destination || rootName}</strong></p>
           {mode === "move" && validDestination && !unavailable(destination) && !canSubmit && <p className="fs-dialog-hint">{t("Выбранные элементы уже находятся в этой папке")}</p>}
-        </> : <label className="fs-name-field"><span>{folderName ? t("Название папки") : t("Название заметки")}</span><input ref={input} autoComplete="off" value={value} disabled={busy} onChange={event => setValue(event.target.value)} aria-invalid={invalidName || undefined} maxLength={240} />{invalidName && <small role="alert">{t("Название не должно начинаться с точки или содержать слеши")}</small>}<small>{folder || t("Хранилище")}</small></label>}
+        </> : <label className="fs-name-field"><span>{folderName ? t("Название папки") : t("Название заметки")}</span><input ref={input} autoComplete="off" value={value} disabled={busy} onChange={event => setValue(event.target.value)} aria-invalid={invalidName || undefined} maxLength={240} />{invalidName && <small role="alert">{t("Название не должно начинаться с точки или содержать слеши")}</small>}<small>{folder || rootName}</small></label>}
         <footer><button type="button" className="fs-button" onClick={onClose} disabled={busy}>{t("Отмена")}</button><button type="submit" className="fs-button fs-primary" disabled={!canSubmit || busy}>{busy ? t("Обработка…") : mode === "move" ? t("Переместить") : mode === "navigate" ? t("Открыть") : mode === "rename" ? t("Сохранить") : t("Создать")}</button></footer>
       </form>
     </div>

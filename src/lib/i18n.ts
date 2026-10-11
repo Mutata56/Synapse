@@ -52,6 +52,7 @@ const en: Record<string, string> = {
   "Папка назначения": "Destination folder",
   "Эта папка": "This folder",
   "Корень хранилища": "Vault root",
+  "Корень корзины": "Trash root",
   "Вложенных папок нет": "No subfolders",
   "Переместить в:": "Move to:",
   "Открыть:": "Open:",

@@ -49,3 +49,9 @@ Support keyboard navigation, visible focus, meaningful labels, empty states, and
 ## All Notes Library
 
 The user requested a complete rethink, redesign and optimization of All Notes. They prioritize visual browsing with large cards and meaningful grouping. They asked for a separate branch and authorized Codex to choose the composition and finish while they sleep. The library preserves local source content, ordinary note opening, favorites and recoverable bulk actions. It adds metadata search, filters, sorting, grouped shelves and bounded quick reading. Large libraries must mount only nearby cards, defer cover work until visible and preserve browsing context across editor navigation.
+
+## Files and Trash Workspace
+
+Files is the local vault-management workspace: navigate folders, search metadata, select notes and folders, create or rename items, and move or trash a batch. Trash remains a separate navigation item with the same browser and selection model, exposing restore and explicitly confirmed permanent deletion. The user delegated scoped application decisions and the final composition while asleep.
+
+Browsing must preserve source content and avoid reading Markdown bodies. A shared in-memory folder index and bounded mounted rows keep list work predictable as the vault grows. Quick look is explicit, read-only and bounded; the full note opens through the existing editor. Moves preserve typed file/folder identities, unknown frontmatter, source-mode state and attachments inside moved folders. Batch moves use one final refresh and one composite undo entry for successful work. Permanent deletion is irreversible and requires an explicit confirmation.
