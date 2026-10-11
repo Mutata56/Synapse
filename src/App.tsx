@@ -19,6 +19,7 @@ const MarkdownSourceEditor = lazy(() => import("./components/MarkdownSourceEdito
 const SettingsView = lazy(() => import("./components/SettingsView").then(module => ({ default: module.SettingsView })));
 import { WorkspaceChrome } from "./components/WorkspaceChrome";
 import { useWorkspaceStore } from "./store/workspace";
+import { activeWorkspaceTab } from "./lib/workspaceTabs";
 import { TagsView } from "./components/TagsView";
 import { Toaster } from "./components/Toaster";
 import { TrashView } from "./components/TrashView";
@@ -55,8 +56,9 @@ export default function App({ bootstrap = true }: { bootstrap?: boolean } = {}) 
   const refreshTree = useNotesStore((s) => s.refreshTree);
   const loadFolderColors = useNotesStore((s) => s.loadFolderColors);
   const loadSettings = useNotesStore((s) => s.loadSettings);
-  const view = useNotesStore((s) => s.view);
-  const activeId = useNotesStore((s) => s.activeId);
+  const target = useWorkspaceStore(state => activeWorkspaceTab(state).target);
+  const view: View = target.kind === "view" ? target.view : "notes";
+  const activeId = target.kind === "note" ? target.noteId : null;
   const undo = useNotesStore((s) => s.undo);
   const redo = useNotesStore((s) => s.redo);
 
@@ -194,16 +196,11 @@ export default function App({ bootstrap = true }: { bootstrap?: boolean } = {}) 
       <TemplatePicker />
       <ImageLightbox />
       <WorkspaceChrome>
-        {/* Keep the editor mounted when only activeId changes. Replace routes
-            immediately: a background WebView must not finish an exit animation
-            before the selected workspace tab can display its content. */}
-        <div
-          key={screenKeyFor(view, activeId)}
-          id="workspace-active-content"
-          role="tabpanel"
-          className="workspace-view flex-1 flex flex-col min-w-0 min-h-0 overflow-hidden"
-        >
-          <Suspense fallback={<div role="status" className="p-6 text-sm text-neutral-400">{t("Загрузка…")}</div>}>{renderView(view, activeId)}</Suspense>
+        {/* The editor key stays stable across note selections. View changes
+            render immediately rather than waiting for a background RAF/exit. */}
+        <div key={screenKeyFor(view, activeId)} id="workspace-active-content" role="tabpanel"
+          className="workspace-view flex-1 flex flex-col min-w-0 min-h-0 overflow-hidden">
+          <Suspense fallback={<div role="status" className="p-6 text-sm text-[var(--text-secondary)]">{t("Загрузка…")}</div>}>{renderView(view, activeId)}</Suspense>
         </div>
       </WorkspaceChrome>
     </div>
@@ -213,7 +210,8 @@ export default function App({ bootstrap = true }: { bootstrap?: boolean } = {}) 
 // ─── Хелперы ─────────────────────────────────────────────────────────────
 
 /**
- * (view, activeId) - стабильный ключ экрана. Удержание
+ * (view, activeId) - стабильный ключ анимации. Ключ управляет какими
+ * mount/unmount циклами запускаются внутри <AnimatePresence>. Удержание
  * ключа для "notes" свёрнутого в "editor" или "gallery" означает, что
  * переключение между двумя заметками НЕ размонтирует редактор.
  */

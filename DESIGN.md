@@ -493,6 +493,8 @@ Files and Trash rows are flat at rest, separated by fine rules. Hover changes to
 
 Workspace work regions and rows are flat at rest, using tonal fills and thin borders. Structural depth appears only on the tab-list menu (`0 10px 30px rgba(0,0,0,.3)`), help dialog (`0 14px 45px rgba(0,0,0,.35)`) and overlapping side panes (`6px 4px 22px rgba(0,0,0,.24)` on the left, `-6px 4px 22px rgba(0,0,0,.24)` on the right). Workspace icon background/color responses last (120ms), with transitions removed by the reduced-motion preference. Outline jumps also respect that preference.
 
+The application shell and top-level workspace content remain visible from their first render. Route changes do not wait for an exit animation or background RAF; the editor key stays stable across note selections. Loading uses the existing readable secondary text token.
+
 ## Shapes
 
 Controls are gently rounded, note cards have the existing card radius, and the recorded pill primitive remains available to incumbent surfaces. Lucide outline icons carry a consistent stroke.

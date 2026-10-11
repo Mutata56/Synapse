@@ -192,16 +192,6 @@ body {
       transparent 70%
     ),
     var(--color-bg);
-  animation: app-fade 0.25s ease-out;
-}
-
-@keyframes app-fade {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
 }
 
 @keyframes pulse-once {

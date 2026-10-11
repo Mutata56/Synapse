@@ -147,6 +147,7 @@ export function MarkdownSourceEditor() {
       await save();
     });
     return () => {
+      if (useNotesStore.getState().activeId === id) void save().catch(() => undefined);
       unregister();
       if (timerRef.current) clearTimeout(timerRef.current);
     };

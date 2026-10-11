@@ -253,6 +253,8 @@ export function Editor2026() {
     };
     const unregister = registerFlusher(flush);
     return () => {
+      // Immediate view changes must not discard a pending editor debounce.
+      void flush();
       unregister();
       if (saveTimerRef.current !== null) {
         window.clearTimeout(saveTimerRef.current);
