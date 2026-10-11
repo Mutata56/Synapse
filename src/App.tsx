@@ -23,7 +23,7 @@ import { Toaster } from "./components/Toaster";
 import { TrashView } from "./components/TrashView";
 import { VersionHistory } from "./components/VersionHistory";
 import { WikiLinkPicker } from "./components/WikiLinkPicker";
-import { WritingDashboard } from "./components/WritingDashboard";
+const WritingDashboard = lazy(() => import("./components/WritingDashboard").then(module => ({ default: module.WritingDashboard })));
 import { warmAssetResolver } from "./editor2026/lib/assets";
 import { warmIndex, wordCountsFor } from "./lib/fullTextSearch";
 import { seedTemplatesIfEmpty } from "./lib/templates";
@@ -271,7 +271,7 @@ function renderView(view: View, activeId: string | null): ReactNode {
     case "calendar":
       return <CalendarView />;
     case "overview":
-      return <WritingDashboard />;
+      return <Suspense fallback={<div role="status" className="p-6 text-sm text-neutral-400">{t("Загрузка обзора…")}</div>}><WritingDashboard /></Suspense>;
     case "inbox":
       return <InboxView />;
     case "settings":

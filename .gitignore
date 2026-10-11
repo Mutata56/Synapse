@@ -4,3 +4,5 @@ target/
 .idea/
 *.log
 /tests/fixtures/graph-vault.json
+
+/tests/fixtures/overview-vault.json
