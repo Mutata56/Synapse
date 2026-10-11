@@ -4,6 +4,8 @@ use std::sync::Mutex;
 mod single_instance_macos;
 mod image_previews;
 #[cfg(desktop)]
+mod image_inventory;
+#[cfg(desktop)]
 use std::time::Duration;
 
 use std::io::Write;
@@ -502,6 +504,7 @@ pub fn run() {
         .manage(image_previews::PreviewJobs::default())
         .invoke_handler(tauri::generate_handler![
             image_previews::image_preview,
+            image_inventory::image_inventory,
             set_capture_shortcut,
             fetch_ics,
             caldav_discover,

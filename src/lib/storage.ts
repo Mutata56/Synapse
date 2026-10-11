@@ -1,3 +1,4 @@
+import { readNativeImageInventory, type InventoryFile } from "./nativeImageInventory";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { appDataDir, join } from "@tauri-apps/api/path";
 import {
@@ -2422,9 +2423,34 @@ async function scanImageLibrary(): Promise<ImageLibrary> {
       }
     }));
   };
-  const [tree, dir] = await Promise.all([listTree(), getAppDataDir(), walk(ROOT)]);
+  const [dir, inventory] = await Promise.all([getAppDataDir(), readNativeImageInventory()]);
+  const metadata = new Map<string, InventoryFile>();
+  let liveNotes: NoteMeta[];
+  if (inventory) {
+    complete = inventory.complete;
+    for (const file of inventory.images) { imagePaths.push(file.path); metadata.set(`${ROOT}/${file.path}`, file); }
+    for (const file of inventory.notes) { markdownPaths.push(`${ROOT}/${file.path}`); metadata.set(`${ROOT}/${file.path}`, file); }
+    if (!imagePaths.length) return { images: [], complete };
+    await Promise.all([loadMetaCache(), loadObsidianState()]);
+    const liveFiles = inventory.notes.filter((file) => !file.path.split("/").some((part) => part.startsWith(".")));
+    const seen = new Set(liveFiles.map((file) => `${ROOT}/${file.path}`));
+    const metas = await Promise.all(liveFiles.map((file) => fileReadSemaphore.run(async () => {
+      const filePath = `${ROOT}/${file.path}`;
+      const id = file.path.slice(0, -NOTE_EXT.length);
+      const cached = metaCache.get(filePath);
+      if (cached && file.mtime && cached.mtime === file.mtime && cached.size === file.size) return applyObsidianMetadata(cached.meta, id);
+      const folder = id.slice(0, Math.max(0, id.lastIndexOf("/")));
+      return readNoteMeta(filePath, id, folder, true);
+    })));
+    liveNotes = metas.filter((note): note is NoteMeta => note !== null);
+    if (complete) for (const key of metaCache.keys()) if (!isTrashPath(key) && !seen.has(key)) { metaCache.delete(key); metaCacheDirty = true; }
+    void flushMetaCache();
+  } else {
+    const [tree] = await Promise.all([listTree(), walk(ROOT)]);
+    liveNotes = flattenNotes(tree);
+  }
   if (!imagePaths.length) return { images: [], complete };
-  const notes = new Map(flattenNotes(tree).map((note) => [note.id, note]));
+  const notes = new Map(liveNotes.map((note) => [note.id, note]));
   const files = createImageFilesIndex(imagePaths);
   const usage = new Map<string, Map<string, { id: string; title: string; folder: string }>>();
   const addUsage = (path: string, ref: { id: string; title: string; folder: string }) => {
@@ -2456,7 +2482,7 @@ async function scanImageLibrary(): Promise<ImageLibrary> {
     try {
       if (path.startsWith(`${VERSIONS}/`) && cached) references = cached.references;
       else {
-        const info = await stat(path, APP_DATA);
+        const info = metadata.get(path) ?? await stat(path, APP_DATA);
         const mtime = info.mtime ? new Date(info.mtime).getTime() : 0;
         const size = Number(info.size ?? 0);
         if (mtime && cached?.mtime === mtime && cached.size === size) references = cached.references;
@@ -2490,7 +2516,7 @@ async function scanImageLibrary(): Promise<ImageLibrary> {
   }
   const results = await Promise.all(imagePaths.map((id) => fileReadSemaphore.run(async (): Promise<LibraryImage | null> => {
     try {
-      const info = await stat(`${ROOT}/${id}`, APP_DATA);
+      const info = metadata.get(`${ROOT}/${id}`) ?? await stat(`${ROOT}/${id}`, APP_DATA);
       const mtime = info.mtime ? new Date(info.mtime).getTime() : 0;
       const modifiedAt = Number.isFinite(mtime) ? mtime : 0;
       const sizeBytes = Number(info.size ?? 0);
