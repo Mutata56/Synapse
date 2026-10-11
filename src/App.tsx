@@ -144,12 +144,10 @@ export default function App() {
         } catch (e) {
           console.error("close: flushAllPending failed:", e);
         } finally {
-          // Tauri 2: window.destroy() реально закрывает (в отличие от
-          // `close()`, который снова запускает цикл запросов). Оборачиваем,
-          // чтобы поглотить ошибку tear-down, и окно гарантированно
-          // закроется, даже если flusher крикнул.
-          await win.destroy().catch((e) => {
-            console.error("close: window.destroy failed:", e);
+          // Rust оставляет приложение в трее. Сохраняем тот же webview,
+          // чтобы повторный запуск мог показать его после flush сохранений.
+          await win.hide().catch((e) => {
+            console.error("close: window.hide failed:", e);
           });
         }
       })
