@@ -3,8 +3,8 @@
  *
  * Сделано декорацией ProseMirror, а не своим inline-типом: `[[...]]` остаётся
  * обычным текстом в документе и без изменений переживает markdown импорт/экспорт
- * BlockNote. Мы только рисуем декорации поверх скобок (подсветка) и перехватываем
- * клики (переход). Резолвим по заголовку, как в Obsidian.
+ * BlockNote. Показываем название без скобок; синтаксис виден только при правке
+ * самой ссылки. Перехватываем клики и резолвим по заголовку, как в Obsidian.
  */
 
 import { createExtension } from "@blocknote/core";
@@ -52,8 +52,10 @@ function buildDecorations(doc: PMNode): DecorationSet {
       decorations.push(
         Decoration.inline(from, to, {
           class: resolved ? "bn-wikilink" : "bn-wikilink bn-wikilink--broken",
-          [DATA_ATTR]: target,
-        }),
+        }, { wikiLink: true }),
+        Decoration.inline(from + 2, to - 2, { [DATA_ATTR]: target }),
+        Decoration.inline(from, from + 2, { class: "bn-wikilink-syntax" }),
+        Decoration.inline(to - 2, to, { class: "bn-wikilink-syntax" }),
       );
     }
   });
@@ -74,7 +76,16 @@ const wikiLinkPlugin = new Plugin<DecorationSet>({
   },
   props: {
     decorations(state) {
-      return wikiLinkPluginKey.getState(state);
+      const decorations = wikiLinkPluginKey.getState(state);
+      if (!decorations || !state.selection.empty) return decorations;
+      const cursor = state.selection.from;
+      // Selection-only transactions reuse the cached link index. No document
+      // edits or vault scans are needed to expose syntax at the text cursor.
+      const active = decorations.find(cursor, cursor, spec => spec.wikiLink === true)
+        .filter(link => cursor > link.from && cursor < link.to);
+      return active.length ? decorations.add(state.doc, active.map(link =>
+        Decoration.inline(link.from, link.to, { class: "bn-wikilink--editing" }),
+      )) : decorations;
     },
     // Что значит клик решает стор: перейти (совпал один заголовок), открыть
     // пикер выбора (совпало несколько) или вернуть false. В последнем случае
@@ -107,4 +118,3 @@ export const wikiLinkExtension = createExtension({
 export function refreshWikiLinks(view: EditorView): void {
   view.dispatch(view.state.tr.setMeta(wikiLinkPluginKey, true));
 }
-

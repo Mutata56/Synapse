@@ -342,6 +342,14 @@ input:focus-visible {
 .bn-wikilink:hover {
   background-color: var(--color-accent-bg-hover);
 }
+.bn-wikilink-syntax {
+  display: none;
+}
+/* Preserve the raw text for Markdown, copy and undo; reveal it only while
+   the focused editor's caret is inside this link. */
+.bn-editor:focus-within .bn-wikilink--editing.bn-wikilink-syntax {
+  display: inline;
+}
 .bn-wikilink--broken {
   color: #f87171;
   background-color: transparent;
