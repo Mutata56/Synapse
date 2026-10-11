@@ -138,8 +138,9 @@ function WorkspaceTabs() {
   const [menu, setMenu] = useState(false);
   const menuRoot = useRef<HTMLDivElement>(null);
   const activeButton = useRef<HTMLButtonElement>(null);
+  const keyboardTabFocus = useRef(false);
   const label = (target: WorkspaceTarget) => target.kind === "empty" ? t("Новая вкладка") : target.kind === "view" ? t(WORKSPACE_VIEW_LABELS[target.view]) : labels.get(target.noteId) ?? target.noteId.split("/").slice(-1)[0] ?? t("Без названия");
-  useEffect(() => { activeButton.current?.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "instant" }); }, [activeId]);
+  useEffect(() => { activeButton.current?.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "instant" }); if (keyboardTabFocus.current) { activeButton.current?.focus({ preventScroll: true }); keyboardTabFocus.current = false; } }, [activeId]);
   useEffect(() => {
     if (!menu) return;
     const close = (event: PointerEvent) => { if (!menuRoot.current?.contains(event.target as Node)) setMenu(false); };
@@ -155,7 +156,7 @@ function WorkspaceTabs() {
         return <div className={cn("workspace-tab", tab.id === activeId && "is-active")} key={tab.id} draggable onDragStart={event => { event.dataTransfer.setData("application/x-synapse-workspace-tab", tab.id); event.dataTransfer.effectAllowed = "move"; }} onDragOver={event => { if (event.dataTransfer.types.includes("application/x-synapse-workspace-tab")) event.preventDefault(); }} onDrop={event => { event.preventDefault(); useWorkspaceStore.getState().reorder(event.dataTransfer.getData("application/x-synapse-workspace-tab"), tab.id); }} onAuxClick={event => { if (event.button === 1) { event.preventDefault(); void useWorkspaceStore.getState().closeTab(tab.id); } }}>
           <button ref={tab.id === activeId ? activeButton : undefined} className="workspace-tab-select" type="button" role="tab" aria-selected={tab.id === activeId} aria-controls="workspace-active-content" tabIndex={tab.id === activeId ? 0 : -1} title={label(tab.target)} onClick={() => void useWorkspaceStore.getState().activateTab(tab.id)} onKeyDown={event => {
             if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
-            event.preventDefault(); const index = tabs.indexOf(tab); const next = (index + (event.key === "ArrowRight" ? 1 : -1) + tabs.length) % tabs.length; void useWorkspaceStore.getState().activateTab(tabs[next].id);
+            event.preventDefault(); keyboardTabFocus.current = true; const index = tabs.indexOf(tab); const next = (index + (event.key === "ArrowRight" ? 1 : -1) + tabs.length) % tabs.length; void useWorkspaceStore.getState().activateTab(tabs[next].id);
           }}>{Icon ? <Icon size={14} aria-hidden="true" /> : null}<span>{label(tab.target)}</span></button>
           <button className="workspace-tab-close" type="button" aria-label={t("Закрыть вкладку {title}", { title: label(tab.target) })} title={t("Закрыть вкладку")} onClick={() => void useWorkspaceStore.getState().closeTab(tab.id)}><X size={15} aria-hidden="true" /></button>
         </div>;
@@ -188,9 +189,10 @@ function WorkspaceHelp() {
   const close = () => useWorkspaceStore.getState().showHelp(false);
   const root = useRef<HTMLDivElement>(null);
   useEffect(() => {
+    const previousFocus = document.activeElement as HTMLElement | null;
     root.current?.focus();
-    const key = (event: KeyboardEvent) => { if (event.key === "Escape") close(); };
-    window.addEventListener("keydown", key); return () => window.removeEventListener("keydown", key);
+    const key = (event: KeyboardEvent) => { if (event.key === "Escape") close(); else if (event.key === "Tab") { event.preventDefault(); root.current?.querySelector<HTMLButtonElement>("button")?.focus(); } };
+    window.addEventListener("keydown", key); return () => { window.removeEventListener("keydown", key); previousFocus?.focus({ preventScroll: true }); };
   }, []);
   const shortcuts = [["Новая заметка", `${keyModifier} N`], ["Новая вкладка", `${keyModifier} T`], ["Закрыть вкладку", `${keyModifier} W`], ["Перейти к файлу", `${keyModifier} O`], ["Поиск", `${keyModifier} K`], ["Левая панель", `${keyModifier} \\`], ["Правая панель", `${keyModifier} Shift \\`]];
   return <div className="workspace-modal-backdrop" onMouseDown={event => { if (event.target === event.currentTarget) close(); }}><div ref={root} className="workspace-help" role="dialog" aria-modal="true" aria-label={t("Помощь и сочетания клавиш")} tabIndex={-1}>

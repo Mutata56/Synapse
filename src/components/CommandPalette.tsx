@@ -117,6 +117,7 @@ const itemKey = (item: Item): string => {
 
 export function CommandPalette() {
   const [open, setOpen] = useState(false);
+  const [filesOnly, setFilesOnly] = useState(false);
   const [mode, setMode] = useState<Mode>("global");
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState(0);
@@ -148,7 +149,7 @@ export function CommandPalette() {
   const graphAvailable = view === "graph";
 
   useEffect(() => {
-    const openSwitcher = () => { setMode("global"); setQuery(""); setSelected(0); setOpen(true); };
+    const openSwitcher = () => { setFilesOnly(true); setMode("global"); setQuery(""); setSelected(0); setOpen(true); };
     window.addEventListener(QUICK_SWITCHER_EVENT, openSwitcher);
     return () => window.removeEventListener(QUICK_SWITCHER_EVENT, openSwitcher);
   }, []);
@@ -173,6 +174,7 @@ export function CommandPalette() {
             : null;
 
       if (mod && (isK || isF)) {
+        setFilesOnly(false);
         e.preventDefault();
         // Ctrl+F ведёт в контекстную область (граф в графе, заметка в заметке),
         // Ctrl+K всегда глобальный.
@@ -183,7 +185,7 @@ export function CommandPalette() {
           setMode(target);
           setOpen(true);
         }
-      } else if (open && e.key === "Tab") {
+      } else if (open && !filesOnly && e.key === "Tab") {
         e.preventDefault();
         // Переключаемся между глобальной и контекстной областью, если она есть.
         if (localTarget) setMode((m) => (m === "global" ? localTarget : "global"));
@@ -196,14 +198,14 @@ export function CommandPalette() {
         setOpen(false);
       }
     };
-    const onRequest = () => { setMode("global"); setOpen(true); };
+    const onRequest = () => { setFilesOnly(false); setMode("global"); setOpen(true); };
     window.addEventListener("keydown", onKey);
     window.addEventListener(OPEN_COMMAND_PALETTE, onRequest);
     return () => {
       window.removeEventListener("keydown", onKey);
       window.removeEventListener(OPEN_COMMAND_PALETTE, onRequest);
     };
-  }, [open, mode]);
+  }, [open, mode, filesOnly]);
 
   // Если активная заметка пропала при открытой палитре (или открылись не во
   // вью заметки), выходим из области заметки: искать там нечего.
@@ -348,6 +350,7 @@ export function CommandPalette() {
 
   // ─── Поисковые индексы (глобальная область) ─────────────────────────────────────
   const allNotes = useMemo(() => flattenNotes(tree), [tree]);
+  const fileFuse = useMemo(() => new Fuse(allNotes, { keys: ["title", "id", "folder", "aliases"], threshold: 0.3, ignoreLocation: true }), [allNotes]);
 
   // Собираем полнотекстовые доки только пока открыта глобальная область. Тела
   // кэшируются по `updatedAt` в fullTextSearch.ts, так что бамп дерева от
@@ -360,7 +363,7 @@ export function CommandPalette() {
     // (например, заметку успели удалить) до того, как доедет свежая пересборка.
     // Вью без запроса (недавние и действия) доки не читает, так что пустого
     // мигания при открытии не будет.
-    if (!open || mode !== "global") {
+    if (!open || mode !== "global" || filesOnly) {
       setDocs([]);
       setDocsLoading(false);
       return;
@@ -381,7 +384,7 @@ export function CommandPalette() {
     return () => {
       cancelled = true;
     };
-  }, [open, mode, allNotes]);
+  }, [open, mode, filesOnly, allNotes]);
 
   const actionFuse = useMemo(() => new Fuse(actions, ACTION_FUSE_OPTIONS), [actions]);
 
@@ -440,6 +443,10 @@ export function CommandPalette() {
       return list.map<Item>((node) => ({ kind: "gnode", node }));
     }
     const q = query.trim();
+    if (filesOnly) {
+      const files = q ? fileFuse.search(q).slice(0, NOTE_RESULTS_LIMIT).map(hit => hit.item) : [...allNotes].sort((a, b) => b.updatedAt - a.updatedAt).slice(0, NOTE_RESULTS_LIMIT);
+      return files.map<Item>(note => ({ kind: "note", note }));
+    }
     if (!q) {
       const recent = [...allNotes]
         .sort((a, b) => b.updatedAt - a.updatedAt)
@@ -454,7 +461,7 @@ export function CommandPalette() {
       ...actionHits.map<Item>((h) => ({ kind: "action", action: h.item })),
       ...noteHits.map<Item>((h) => ({ kind: "note", note: h.note, snippet: h.snippet })),
     ];
-  }, [mode, matches, query, allNotes, actions, docs, actionFuse, graphNodes, graphFuse]);
+  }, [mode, filesOnly, fileFuse, matches, query, allNotes, actions, docs, actionFuse, graphNodes, graphFuse]);
 
   // Подсвечивает все совпадения и выбранное, скроллит к нему и закрывается.
   // Подсветка держится чуть-чуть, чтобы юзер увидел, куда попал, когда оверлей
@@ -527,7 +534,7 @@ export function CommandPalette() {
     }
   };
 
-  const placeholder =
+  const placeholder = filesOnly ? t("Поиск по имени файла…") :
     mode === "note"
       ? "Поиск по тексту заметки…"
       : mode === "graph"
@@ -555,7 +562,7 @@ export function CommandPalette() {
             style={{ maxWidth: PALETTE_MAX_WIDTH_PX }}
             className="w-full bg-[var(--color-bg-overlay)] rounded-xl border border-[var(--color-border-strong)] shadow-[var(--shadow-float)] backdrop-blur-xl backdrop-saturate-[1.7] overflow-hidden flex flex-col"
             role="dialog"
-            aria-label="Командная палитра"
+            aria-label={filesOnly ? t("Перейти к файлу") : "Командная палитра"}
           >
             <div className="flex items-center gap-3 px-4 py-3 border-b border-[var(--color-border)]">
               {mode === "note" ? (
@@ -577,7 +584,7 @@ export function CommandPalette() {
               <Kbd>Esc</Kbd>
             </div>
 
-            <div className="flex items-center gap-1 px-2 py-1.5 border-b border-[var(--color-border)]">
+            {!filesOnly && <div className="flex items-center gap-1 px-2 py-1.5 border-b border-[var(--color-border)]">
               <Tab
                 active={mode === "global"}
                 onClick={() => setMode("global")}
@@ -603,7 +610,7 @@ export function CommandPalette() {
                   В заметке
                 </Tab>
               )}
-            </div>
+            </div>}
 
             <div
               ref={listRef}
@@ -631,7 +638,7 @@ export function CommandPalette() {
               )}
             </div>
 
-            <Footer mode={mode} count={items.length} selected={selected} />
+            <Footer mode={mode} filesOnly={filesOnly} count={items.length} selected={selected} />
           </motion.div>
         </motion.div>
       )}
@@ -849,10 +856,12 @@ function MatchRowContent({ match }: { match: NoteMatch }) {
 
 function Footer({
   mode,
+  filesOnly,
   count,
   selected,
 }: {
   mode: Mode;
+  filesOnly: boolean;
   count: number;
   selected: number;
 }) {
@@ -871,7 +880,7 @@ function Footer({
           {mode === "note" ? "Перейти" : "Открыть"}
         </span>
       </div>
-      {mode === "note" ? (
+      {mode === "note" || filesOnly ? (
         <span className="font-mono">
           {count === 0 ? "нет совпадений" : `${selected + 1} / ${count}`}
         </span>

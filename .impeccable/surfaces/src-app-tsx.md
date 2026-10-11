@@ -1,0 +1,47 @@
+---
+version: 1
+slug: src-app-tsx
+primary_target: src/App.tsx
+related_targets: [src/components/WorkspaceChrome.tsx, src/components/Sidebar.tsx, src/components/WorkspaceContext.tsx, src/components/FolderTree.tsx, src/components/workspace.css]
+---
+
+# Obsidian workspace layout
+
+Mode: Operate. The user supplied an Obsidian screenshot and pinned its spatial arrangement while preserving the Synapse palette. The user then delegated every implementation decision and authorized completion without further questions.
+
+Build path: code-led. The supplied screenshot is the spatial critique reference, not a new Synapse palette or an AI generated comp. No concept alternatives are owed for the user's pinned arrangement.
+
+REFERENCE PROVENANCE: user-supplied Obsidian screenshot at `/var/folders/r3/xzdbd7514nb4ths7v6p657qm0000gn/T/codex-clipboard-9d8b91a0-c22f-46c2-82ba-d30856370db6.png`. The user pinned the placement of elements and explicitly excluded copying its colors. The completed shell retains `src/index.css` semantic tokens and the incumbent `PRODUCT.md` / `DESIGN.md` authority.
+
+SEED / EXPLORATION WAIVER: no seed roll, concept roll, identity replacement, AI comp or concept approval occurred. The user-selected reference fixes the spatial direction; the user's later delegation covers remaining application decisions. Alternative compositions and another confirmation were therefore not owed. This is a source-grounded extension of an existing system.
+
+THESIS: a slim icon ribbon, tabbed file/search/bookmark sidebar, a compact file toolbar, bottom vault controls, centered document tabs, and a rounded working area reproduce the supplied arrangement.
+
+STORY: a utility sequence with three stable layers. The ribbon chooses a section; the left pane finds a local file through tree, search or bookmarks; document tabs keep destinations above the active work area. A new tab presents four real next steps in the center, while the vault/help/settings footer anchors local workspace controls. Outline and backlinks appear only when the optional right pane is opened. No promotional narrative or decorative content is needed for this pinned work surface.
+
+FORM: an asymmetric docked desktop shell. The narrow ribbon and aligned horizontal headers frame a broad finder beside a rounded work area; tabs center over the work area, five file actions center over the finder, and the vault controls sit at the bottom. Four compact pills form one centered action column. Thin borders and incumbent tonal surfaces provide separation. The large stage, action and keycap radii are intentional local shell geometry, recorded in `DESIGN.md`; compact row and icon corners remain distinct. When width runs out, side panes overlay or collapse while the active content keeps a usable center.
+
+FIRST VIEWPORT: default new tab, actual vault tree on the left, four centered real actions (new note, database, canvas and file switcher), tab and panel controls across the top. Sidebar starts at about 44.5% of viewport including ribbon and remains resizable/collapsible.
+
+OWN-WORLD: retain existing Synapse color tokens, Inter/system typography, accent and note/source storage behavior.
+
+SIGNATURE INTERACTION: files open in the active tab; middle click and the context menu open another tab. Tab changes and closure flush pending saves; existing note routes and source editors remain intact. No graph or editor instances run for hidden tabs.
+
+CONSTRAINTS: no fake plugin buttons, no note rewrites, no loss of the existing Graph, Tags, Files, Notes, Images, Inbox, Overview, Calendar, Trash or Settings screens. Search and bookmarks are working left-side panes; the optional right sidebar exposes outline and backlinks.
+
+REVIEW: required desktop, narrow viewport and actual native build. Screenshot comparison checks layout rather than color. Review verdict and documentation must be recorded before delivery.
+
+
+IMPLEMENTED GEOMETRY: ribbon (56px); aligned header bars (56px); sidebar initial width `min(860px, max(240px, 44.5vw - 56px))`, including the ribbon at about 44.5% on ordinary desktop widths; desktop resize minimum (220px). File toolbar (48px), five centered actions and tree rows at least (38px); vault footer (54px). A normal tab is (38px) high with a (248px) flex basis, (130px) minimum and (410px) maximum for the single-tab case. Stage corners are (30px), reducing to (18px) at viewport widths up to (759px); actions have (24px) corners and a minimum (40px) height; keycap corners are (9px), with (12px) shortcut text. The optional right pane is (270px) docked and overlays at widths up to (1000px). Left pane overlays up to (759px) and initially collapses below (760px). Native window minimum is (700 × 500); the (390 × 844) browser capture exercises responsive resilience and does not promise a phone-native application.
+
+COMPUTED TYPE EVIDENCE: browser DOM at (1280 × 720), default palette: tab and vault labels (16px, weight 400, line-height 24.8px); empty-page actions (14px, weight 400, line-height 21.7px); file-tree rows (15px, weight 400, line-height 23.25px). The button font reset overrides weaker per-class declarations on tab/vault labels. `DESIGN.md` records these measured values. Active-tab text uses the existing link token; contextual text uses the existing secondary foreground.
+
+QUALITY BAR: compare the desktop capture with the supplied screenshot by the relative positions of ribbon, left-pane tabs, file toolbar, file tree, vault footer, centered document tab, trailing tab/panel controls, rounded stage and four-action group. Preserve the incumbent palette rather than assessing color similarity. File tree, Search and Bookmarks must expose real local content; every visible creation/switcher/panel action must work. Text must remain legible with visible keyboard focus. At narrow widths, keep the active work region, actions and panel controls reachable without horizontal clipping; permit the documented overlays. Switching/closing the active tab must flush pending saves; session storage carries destinations rather than bodies; hidden tabs must not mount extra editors or graphs. Outline must distinguish formatted duplicate headings in reading and source modes. Source-file preservation and a successful native build are acceptance evidence, not inferred from visual similarity.
+
+REVIEW EVIDENCE: `.impeccable/review/desktop.jpg` (1280 × 720), `narrow.jpg` (760 × 900), `mobile.jpg` (390 × 844), and `outline-reader.jpg` / `outline-source.jpg` (1280 × 720). The earlier (482 × 807) desktop recapture was replaced before a fresh full finish review. One mechanical detector run was supplied to the independent finish reviewer. That full review requested fixes for contextual/active-label contrast and outline navigation. Both were corrected together; the same reviewer then passed precisely those two corrections with disposition `ship`, including active-tab contrast (6.04:1) and the second formatted Important heading in both modes. The pass was a targeted follow-up, not a second full-surface audit.
+
+VALIDATION EVIDENCE: parent execution reports the latest main suite at (89 passed, one optional copied-vault test skipped), an earlier complete copied (530-note) vault run at (90 passed), and the outline/workspace subset at (12/12 passed). TypeScript and the final merged macOS Tauri release/bundle build passed after corrections; local ad-hoc bundle signature was repaired and `codesign --verify --deep --strict` passed. Browser checks covered save/switch/back, last-tab fallback, quick switcher, table/canvas creation, responsive panels and duplicate formatted outline jumps. The final original (534) Markdown hash comparison had (0 changed, 0 added, 0 missing). Built bundle: `OUT/native-target/release/bundle/macos/Synapse.app`; checked installation: `/Users/kirill/Applications/Synapse.app`; prior app preserved at `OUT/before-layout-install/Synapse.app`. The running app was not forcibly restarted while the Mac was locked; native shortcut behavior remains unverified and the new layout appears after a full quit/relaunch.
+
+NOT CANONIZED: the pre-existing CommandPalette shortcut label uses (9px) text with `text-zinc-600` in `CommandPalette.tsx`; the detector's advisory is retained as inherited drift rather than promoted into a workspace type role or repaired outside scope. Workspace shortcut keycaps use (12px) text; their separate (9px) corner radius is intentional geometry. No broader palette or local-view documentation repairs were performed.
+
+SOURCE BOUNDARY: graph project Synapse was indexed from main at `2026-10-10T23:56:33Z`, not from this worktree. Coverage reported new workspace files missing and App/CommandPalette metadata changed. This documentation pass checked owning worktree source directly and sampled desktop/mobile rendered artifacts; acceptance/test claims above are attributed to the parent's completed execution rather than rerun by the documenter.

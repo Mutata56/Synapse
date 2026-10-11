@@ -46,6 +46,7 @@ const en: Record<string, string> = {
   "Новый холст": "New canvas",
   "Холст": "Canvas",
   "Перейти к файлу": "Go to file",
+  "Поиск по имени файла…": "Search by file name…",
   "Помощь и сочетания клавиш": "Help and keyboard shortcuts",
   "Сочетания клавиш": "Keyboard shortcuts",
   "Контекст заметки": "Note context",

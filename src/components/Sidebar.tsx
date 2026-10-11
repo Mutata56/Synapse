@@ -30,6 +30,9 @@ export function Sidebar() {
   const root = useRef<HTMLElement>(null), dragging = useRef(false), dragWidth = useRef(width);
   const [menu, setMenu] = useState<{ x: number; y: number; items: ContextMenuItem[] } | null>(null);
   const showPane = useWorkspaceStore(state => state.showSidebar);
+  useEffect(() => () => {
+    if (dragging.current) { dragging.current = false; document.body.style.cursor = ""; document.body.style.userSelect = ""; }
+  }, [visible]);
   const paneTabs: Array<{ id: "files" | "search" | "bookmarks"; icon: LucideIcon; title: string }> = [{ id: "files", icon: Folder, title: "Файлы" }, { id: "search", icon: Search, title: "Поиск" }, { id: "bookmarks", icon: Bookmark, title: "Закладки" }];
   if (!visible) return null;
   const collapseAll = () => {

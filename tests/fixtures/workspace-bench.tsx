@@ -2,6 +2,7 @@ import { createRoot } from "react-dom/client";
 import App from "../../src/App";
 import { LanguageProvider } from "../../src/components/LanguageProvider";
 import { useNotesStore, registerFlusher } from "../../src/store/notes";
+import { useWorkspaceStore } from "../../src/store/workspace";
 import type { Note, TreeNode } from "../../src/lib/storage";
 import "@mantine/core/styles.css";
 import "@blocknote/core/fonts/inter.css";
@@ -30,14 +31,17 @@ useNotesStore.setState({ tree, folderColors: {"ВУЗ":"#ee6363","Работа":
   closeActiveNote: async () => { useNotesStore.setState({activeId:null,activeNote:null}); },
   createNote: async (folder = "", title = "") => {
     const note = makeNote(`test-${count++}`, title || "Без названия", folder);
+    // New Synapse documents use the block editor, unlike imported Markdown files.
+    Object.assign(note, { content: "", markdownSource: false, sourceText: undefined, sourceRevision: undefined });
     useNotesStore.setState(s => ({ tree:[...s.tree,{kind:"note",note}],activeId:note.id,activeNote:note })); return note.id;
   },
   saveNote: async patch => {
     const active = useNotesStore.getState().activeNote;
     if (!active) return;
-    const next = {...active,...patch,content:patch.sourceText ?? patch.content ?? active.content};
+    const next = {...active,...patch,content:patch.sourceText ?? patch.content ?? active.content,sourceRevision:patch.sourceText ?? active.sourceRevision};
     bodies.set(next.id,next); useNotesStore.setState({activeNote:next});
   },
 });
 registerFlusher(() => Promise.resolve());
+await useWorkspaceStore.getState().restore();
 createRoot(document.getElementById("root")!).render(<LanguageProvider><App bootstrap={false} /></LanguageProvider>);

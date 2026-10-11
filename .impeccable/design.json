@@ -22,6 +22,11 @@
         "name": "files-button-state",
         "value": "background-color 120ms",
         "purpose": "Files named-button hover response; disabled with reduced motion."
+      },
+      {
+        "name": "workspace-icon-state",
+        "value": "background-color 120ms, color 120ms",
+        "purpose": "Workspace icon hover/active response; removed with reduced motion."
       }
     ],
     "shadows": [
@@ -59,6 +64,26 @@
         "name": "files-dialog",
         "value": "0 18px 60px rgba(0,0,0,.45)",
         "purpose": "Files creation, rename, navigation and move dialogs."
+      },
+      {
+        "name": "workspace-tab-list",
+        "value": "0 10px 30px rgba(0,0,0,.3)",
+        "purpose": "Workspace document-tab overflow list."
+      },
+      {
+        "name": "workspace-help",
+        "value": "0 14px 45px rgba(0,0,0,.35)",
+        "purpose": "Workspace help/shortcut dialog."
+      },
+      {
+        "name": "workspace-left-overlay",
+        "value": "6px 4px 22px rgba(0,0,0,.24)",
+        "purpose": "Left shell pane only when it overlaps the work area."
+      },
+      {
+        "name": "workspace-right-overlay",
+        "value": "-6px 4px 22px rgba(0,0,0,.24)",
+        "purpose": "Right outline/backlinks pane only when it overlaps the work area."
       }
     ],
     "breakpoints": [
@@ -97,6 +122,14 @@
       {
         "name": "files-single-name-container",
         "value": "640px"
+      },
+      {
+        "name": "workspace-context-overlay-viewport",
+        "value": "1000px"
+      },
+      {
+        "name": "workspace-left-overlay-viewport",
+        "value": "759px"
       }
     ],
     "colorMeta": {
@@ -338,6 +371,30 @@
       "files-reader-heading": {
         "displayName": "Files quick-look subheading",
         "purpose": "Smallest Markdown heading step in quick look."
+      },
+      "workspace-tab-label": {
+        "displayName": "Workspace tab and vault label",
+        "purpose": "Measured regular inherited shell type, including the vault name; single-class size declarations are overridden by the font reset."
+      },
+      "workspace-tree-label": {
+        "displayName": "Workspace file tree label",
+        "purpose": "Measured desktop file/folder row text."
+      },
+      "workspace-action-label": {
+        "displayName": "Workspace empty-page action",
+        "purpose": "Measured text in the four creation/switcher pills."
+      },
+      "workspace-result-title": {
+        "displayName": "Workspace search/bookmark title",
+        "purpose": "Compact selected-result title."
+      },
+      "workspace-keycap": {
+        "displayName": "Workspace shortcut keycap",
+        "purpose": "Ancillary shortcut labels in actions and help."
+      },
+      "workspace-result-context": {
+        "displayName": "Workspace result context",
+        "purpose": "Folder and content snippet underneath a search/bookmark title."
       }
     }
   },
@@ -474,26 +531,54 @@
       "description": "Inert mint metadata label used in rows and properties; it does not edit the note.",
       "html": "<span class=\"ds-files-tag\">#sql</span>",
       "css": ".ds-files-tag{display:inline-flex;align-items:center;gap:5px;max-width:100%;overflow:hidden;padding:2px 7px;border:1px solid color-mix(in srgb,var(--fs-tag,#74b39a) 18%,transparent);border-radius:4px;background:color-mix(in srgb,var(--fs-tag,#74b39a) 12%,transparent);color:var(--fs-tag,#74b39a);font:11px/18px var(--font-sans,Inter,system-ui,sans-serif);white-space:nowrap;text-overflow:ellipsis}"
+    },
+    {
+      "name": "Workspace empty-page action",
+      "kind": "button",
+      "refersTo": "workspace-empty-action",
+      "description": "One of the four real empty-page actions; illustration uses the existing file switcher label and shortcut.",
+      "html": "<button class=\"ds-workspace-action\" type=\"button\"><svg width=\"19\" height=\"19\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><circle cx=\"11\" cy=\"11\" r=\"8\"></circle><path d=\"m21 21-4.3-4.3\"></path></svg><span>Перейти к файлу</span><kbd>⌘ O</kbd></button>",
+      "css": ".ds-workspace-action{display:flex;align-items:center;gap:11px;width:268px;max-width:100%;min-height:40px;padding:8px 14px;border:1px solid var(--color-border);border-radius:24px;background:transparent;color:var(--color-text-secondary);font-family:var(--font-sans);font-size:14px;font-weight:400;line-height:1.55;text-align:left;cursor:pointer}.ds-workspace-action span{flex:1}.ds-workspace-action svg{flex-shrink:0}.ds-workspace-action kbd{font-family:inherit;font-size:12px;white-space:nowrap;padding:3px 7px;border:0;border-radius:9px;background:var(--color-bg-elevated);color:var(--color-text-secondary)}.ds-workspace-action:hover{background:var(--color-bg-elevated);border-color:var(--color-border-strong);color:var(--color-text-strong)}.ds-workspace-action:focus-visible{outline:2px solid var(--color-accent);outline-offset:-2px;}"
+    },
+    {
+      "name": "Workspace active document tab",
+      "kind": "nav",
+      "refersTo": "workspace-tab-active",
+      "description": "Centered destination tab with readable active link color and a distinct close action; measured font cascade retained.",
+      "html": "<div class=\"ds-workspace-tab\"><button class=\"ds-workspace-tab-select\" type=\"button\" role=\"tab\" aria-selected=\"true\"><span>Новая вкладка</span></button><button class=\"ds-workspace-tab-close\" type=\"button\" aria-label=\"Закрыть вкладку\"><svg width=\"15\" height=\"15\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" aria-hidden=\"true\"><path d=\"m18 6-12 12M6 6l12 12\"></path></svg></button></div>",
+      "css": ".ds-workspace-tab{display:flex;align-items:center;width:248px;max-width:100%;height:38px;border:1px solid var(--color-border-strong);border-radius:6px;background:var(--color-bg-overlay);color:var(--color-link);font-family:var(--font-sans);font-size:16px;font-weight:400;line-height:1.55}.ds-workspace-tab-select{height:100%;flex:1;min-width:0;padding:0 10px;border:0;background:transparent;color:inherit;font:inherit;text-align:left;cursor:pointer}.ds-workspace-tab-select span{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.ds-workspace-tab-close{display:grid;place-items:center;width:24px;height:24px;padding:0;margin-right:3px;border:0;border-radius:4px;background:transparent;color:inherit;cursor:pointer}.ds-workspace-tab-close:hover{background:var(--color-bg-elevated);color:var(--color-text-strong)}.ds-workspace-tab-select:focus-visible,.ds-workspace-tab-close:focus-visible{outline:2px solid var(--color-accent);outline-offset:-2px;}"
+    },
+    {
+      "name": "Workspace sidebar search",
+      "kind": "input",
+      "refersTo": "workspace-search",
+      "description": "Search field in the left Search pane, separate from the file switcher.",
+      "html": "<label class=\"ds-workspace-search\"><svg width=\"19\" height=\"19\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><circle cx=\"11\" cy=\"11\" r=\"8\"></circle><path d=\"m21 21-4.3-4.3\"></path></svg><input aria-label=\"Поиск по заметкам\" placeholder=\"Поиск по заметкам…\" /></label>",
+      "css": ".ds-workspace-search{display:flex;align-items:center;gap:7px;padding:7px 9px;border:1px solid var(--color-border-strong);border-radius:5px;color:var(--color-text-muted);background:transparent}.ds-workspace-search svg{width:15px;height:15px;flex-shrink:0}.ds-workspace-search input{width:100%;min-width:0;border:0;background:transparent;color:var(--color-text-strong);font-family:var(--font-sans);font-size:13px;outline:none}.ds-workspace-search input::placeholder{color:var(--color-text-secondary)}.ds-workspace-search input:focus-visible{outline:2px solid var(--color-accent);outline-offset:-2px;}"
+    },
+    {
+      "name": "Workspace working region",
+      "kind": "custom",
+      "refersTo": "workspace-stage",
+      "description": "The shell working-region silhouette; miniature preview records shape rather than a screen composition.",
+      "html": "<div class=\"ds-workspace-stage\"><div class=\"ds-workspace-stage-empty\">Новая вкладка</div></div>",
+      "css": ".ds-workspace-stage{height:190px;overflow:hidden;border:1px solid var(--color-border);border-radius:30px;background:var(--color-bg);color:var(--color-text-secondary)}.ds-workspace-stage-empty{display:grid;place-items:center;height:100%;background:var(--color-bg-overlay);font-family:var(--font-sans);font-size:14px}@media(max-width:759px){.ds-workspace-stage{border-radius:18px}}"
     }
   ],
   "narrative": {
     "northStar": "Existing Synapse desktop interface",
-    "overview": "This records the incumbent visual system, rather than a new identity. The authority is `src/index.css`, the existing Sidebar, TagsView, NoteCard, and the running desktop interface. New local surfaces inherit this shell; their own layout decisions stay in surface briefs.\n\nThe implemented Tags finder supplies a scoped extension, evidenced by `src/components/TagsView.css` and the approved actual viewport. Its dense rows, mint tag markers and quiet reading area use the incumbent shell and semantic tokens. The `tags-` entries below describe this surface; they do not replace the global type or shape vocabulary.\n\nThe implemented All Notes library supplies a second scoped extension, evidenced by `src/components/NotesGallery.css` and the finished desktop, narrow and reading captures. Its `library-` entries retain the incumbent palette and font family while recording the library's content cards, context contrast and compact controls. Surface composition and acceptance evidence stay in `.impeccable/surfaces/src-components-notesgallery-tsx.md`.\n\nThe implemented Files and Trash workspace supplies a scoped extension, evidenced by `src/components/fileBrowser.css`, the shared `FileBrowser` and the finished dark desktop, narrow and Trash captures. Its `files-` entries record a dense work table, a current-folder route, selection actions and a collapsible properties region. It inherits the same Inter family, dark surfaces and violet interaction states. Surface direction and delegated-choice provenance stay in `.impeccable/surfaces/src-components-filesview-tsx.md`; operation details stay in `docs/FILES_BROWSER.md`.",
+    "overview": "This records the incumbent visual system, rather than a new identity. The authority is `src/index.css`, the existing Sidebar, TagsView, NoteCard, and the running desktop interface. New local surfaces inherit this shell; their own layout decisions stay in surface briefs.\n\nThe implemented Tags finder supplies a scoped extension, evidenced by `src/components/TagsView.css` and the approved actual viewport. Its dense rows, mint tag markers and quiet reading area use the incumbent shell and semantic tokens. The `tags-` entries below describe this surface; they do not replace the global type or shape vocabulary.\n\nThe implemented All Notes library supplies a second scoped extension, evidenced by `src/components/NotesGallery.css` and the finished desktop, narrow and reading captures. Its `library-` entries retain the incumbent palette and font family while recording the library's content cards, context contrast and compact controls. Surface composition and acceptance evidence stay in `.impeccable/surfaces/src-components-notesgallery-tsx.md`.\n\nThe implemented Files and Trash workspace supplies a scoped extension, evidenced by `src/components/fileBrowser.css`, the shared `FileBrowser` and the finished dark desktop, narrow and Trash captures. Its `files-` entries record a dense work table, a current-folder route, selection actions and a collapsible properties region. It inherits the same Inter family, dark surfaces and violet interaction states. Surface direction and delegated-choice provenance stay in `.impeccable/surfaces/src-components-filesview-tsx.md`; operation details stay in `docs/FILES_BROWSER.md`.\n\nThe implemented workspace shell supplies an approved shell extension, evidenced by `src/components/workspace.css`, `WorkspaceChrome`, `Sidebar`, and the finished desktop and narrow captures. It keeps the incumbent palette while adding docked utility chrome, document tabs and a bounded active work region. The `workspace-` entries describe the shell itself; the specific Obsidian reference, pinned composition and quality bar stay in `.impeccable/surfaces/src-app-tsx.md`. Existing local views retain their own scoped systems inside the work region.",
     "keyCharacteristics": [
       "Dark tonal surfaces",
       "Violet selection",
-      "Compact readable controls"
+      "Compact readable controls",
+      "Docked utility chrome around one active work region"
     ],
     "rules": [
       {
         "name": "The Semantic Accent Rule",
         "body": "Within Tags, mint identifies tag membership and tag filters; violet identifies the selected note, active pane, match mode, links and focus. Keep those meanings distinct.",
         "section": "colors"
-      },
-      {
-        "name": "The Dense Context Rule",
-        "body": "Small type carries metadata and compact tag summaries; note titles, search and primary actions remain visually stronger. Preserve the observed small interface steps instead of enlarging every row or flattening the hierarchy.",
-        "section": "typography"
       },
       {
         "name": "The Library Accent Rule",
@@ -504,6 +589,21 @@
         "name": "The Files Accent Rule",
         "body": "Within Files and Trash, violet marks selection, keyboard focus, destinations and primary actions; mint identifies note tags, lavender identifies uncustomized folders, and the local danger role identifies destructive actions. Preserve user-assigned folder colors.",
         "section": "colors"
+      },
+      {
+        "name": "The Workspace Active Label Rule",
+        "body": "In the shell, use the existing link role for small active text and the secondary foreground for context. Keep accent fill and focus distinct from text contrast.",
+        "section": "colors"
+      },
+      {
+        "name": "The Dense Context Rule",
+        "body": "Small type carries metadata and compact tag summaries; note titles, search and primary actions remain visually stronger. Preserve the observed small interface steps instead of enlarging every row or flattening the hierarchy.",
+        "section": "typography"
+      },
+      {
+        "name": "The Active Work Region Rule",
+        "body": "Tabs retain destinations and the shell renders only the active content. Preserve the work area's available width and reachable panel controls when either side pane collapses or overlays it.",
+        "section": "layout"
       },
       {
         "name": "The Files Row Rule",
@@ -530,7 +630,10 @@
       "Do keep Files type, context, folder and corner roles scoped to the shared Files/Trash browser.",
       "Do keep the current folder route and selection actions reachable in narrow Files layouts.",
       "Do preserve fixed row bounds, folders-first ordering and mounted keyboard targets in Files and Trash.",
-      "Do load Files quick look only on request and describe Trash dates as modification dates."
+      "Do load Files quick look only on request and describe Trash dates as modification dates.",
+      "Do keep workspace geometry and shape roles scoped to the shell while retaining each local view's container behavior.",
+      "Do use the existing link and secondary foreground roles for workspace text states.",
+      "Do keep shell controls reachable when panels collapse and preserve save-before-navigation behavior."
     ],
     "donts": [
       "Don't let a local feature silently change the global palette or typography.",
@@ -539,5 +642,5 @@
       "Don't invent file sizes or deletion timestamps in Files and Trash."
     ]
   },
-  "generatedAt": "2026-10-11T01:56:47.245473+00:00"
+  "generatedAt": "2026-10-11T08:34:36.291915+00:00"
 }
