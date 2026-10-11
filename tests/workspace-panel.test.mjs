@@ -23,10 +23,11 @@ test("the active tab renders its own screen while a previously edited note remai
       builder.onLoad({ filter: /.*/, namespace: "panel-component" }, args => ({ contents: args.path === "WorkspaceChrome"
         ? "import React from 'react'; export const WorkspaceChrome=({children})=>React.createElement('main',null,children);"
         : `import React from 'react'; export const ${args.path}=()=>React.createElement('section',{'data-screen':'${args.path}'});`, loader: "js", resolveDir: process.cwd() }));
-      builder.onResolve({ filter: /^\.\/store\/(notes|workspace|templates)$/ }, args => ({ path: args.path.split("/").at(-1), namespace: "panel-store" }));
+      builder.onResolve({ filter: /^\.\/store\/(notes|workspace|templates|iconize)$/ }, args => ({ path: args.path.split("/").at(-1), namespace: "panel-store" }));
       builder.onLoad({ filter: /.*/, namespace: "panel-store" }, args => ({ contents: args.path === "notes"
         ? "export const useNotesStore=s=>s(globalThis.__workspacePanelFixture.notes); export const flushAllPending=async()=>{};"
         : args.path === "workspace" ? "export const useWorkspaceStore=s=>s(globalThis.__workspacePanelFixture.workspace);"
+        : args.path === "iconize" ? "export const useIconizeStore=s=>s({picker:null});"
         : "export const useTemplatesStore={getState:()=>({refresh:async()=>{}})};" }));
       builder.onResolve({ filter: /^@tauri-apps\// }, args => ({ path: args.path, namespace: "panel-helper" }));
       builder.onResolve({ filter: /^\.\/(lib\/(i18n|fullTextSearch|templates)|editor2026\/lib\/assets)$/ }, args => ({ path: args.path, namespace: "panel-helper" }));

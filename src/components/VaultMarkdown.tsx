@@ -7,10 +7,11 @@ import { indexVaultFiles, obsidianMarkdownPreview, resolveVaultReference, wikiTa
 import { useNotesStore } from "../store/notes";
 import { useToastStore } from "../store/toasts";
 import { remarkNoteTags } from "../lib/remarkNoteTags";
+import { useIconizeStore } from "../store/iconize";
+import { InlineIcon, VaultLinkIcon, remarkIconize } from "./IconizeMarkdown";
 
 export const VaultMarkdownContext = createContext<{ files: VaultFileIndex; workspace: string; id: string; navigate: (ref: string, relative?: boolean) => void }>({ files: indexVaultFiles([]), workspace: "", id: "", navigate: () => undefined });
-const plugins = [remarkGfm, remarkNoteTags];
-const urlTransform = (url: string) => /^synapse-(?:note|embed|tag):/.test(url) ? url : defaultUrlTransform(url);
+const urlTransform = (url: string) => /^synapse-(?:note|embed|tag|icon):/.test(url) ? url : defaultUrlTransform(url);
 
 export function scrollToMarkdownHeading(heading: string): void {
   if (!heading) return;
@@ -20,10 +21,13 @@ export function scrollToMarkdownHeading(heading: string): void {
 }
 
 export function VaultMarkdown({ source }: { source: string }) {
+  const iconSettings = useIconizeStore(state => state.data.settings);
+  const plugins = useMemo(() => [remarkGfm, remarkNoteTags, [remarkIconize, { identifier: iconSettings.iconIdentifier, enabled: iconSettings.iconsInNotesEnabled }]] as import("unified").PluggableList, [iconSettings.iconIdentifier, iconSettings.iconsInNotesEnabled]);
   const { files, workspace, id, navigate } = useContext(VaultMarkdownContext);
   const preview = useMemo(() => obsidianMarkdownPreview(source), [source]);
   const components = useMemo(() => ({
     a: ({ href = "", children }: { href?: string; children?: ReactNode }) => {
+      if (href.startsWith("synapse-icon:")) return <InlineIcon id={href.slice("synapse-icon:".length)}>{children}</InlineIcon>;
       if (href.startsWith("synapse-tag:")) {
         const tag = decodeURIComponent(href.slice("synapse-tag:".length));
         return <button type="button" className="note-inline-tag" onClick={() => { const store = useNotesStore.getState(); store.setCurrentTag(tag); store.setView("tags"); }}>{children}</button>;
@@ -38,7 +42,7 @@ export function VaultMarkdown({ source }: { source: string }) {
         const path = resolveVaultReference(target.path, id, files, { relativeFirst: true });
         if (path && workspace) void openPath(`${workspace}/${path}`).catch(e => useToastStore.getState().push(String(e)));
         else useToastStore.getState().push(`Файл не найден: ${href}`);
-      }}>{children}</a>;
+      }}><VaultLinkIcon href={href} noteId={id} files={files} />{children}</a>;
     },
     img: ({ src = "", alt = "", title }: { src?: string; alt?: string; title?: string }) => {
       const embed = src.startsWith("synapse-embed:");

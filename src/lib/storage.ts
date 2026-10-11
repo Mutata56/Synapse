@@ -16,6 +16,7 @@ import {
   writeTextFile,
 } from "@tauri-apps/plugin-fs";
 import { COVER_PREFIX } from "./covers";
+import { coerceIconizeState, emptyIconizeState, rebaseIconAssignments, type IconizeState } from "./iconize";
 import {
   coerceSettings,
   DEFAULT_SETTINGS,
@@ -76,6 +77,9 @@ export type NoteMeta = {
   createdAt: number;
   updatedAt: number;
   icon: string | null;
+  iconColor?: string | null;
+  /** Small scalar frontmatter values allow configurable Iconize field names. */
+  frontmatterIcons?: Record<string, string>;
   cover: string | null;
   preview: string;
   favorite: boolean;
@@ -214,6 +218,8 @@ export function resetStorageCaches(): void {
   refsCacheDirty = false;
   obsidianState = null;
   obsidianLoadPromise = null;
+  iconizeData = undefined;
+  iconizeLoad = undefined;
 }
 
 async function cleanupOrphanedTmpAssets(): Promise<void> {
@@ -393,6 +399,7 @@ function parseFrontmatter(raw: string): {
 
 function parseFrontmatterValue(value: string): FrontmatterValue {
   if (!value) return "";
+  if (value.startsWith("'") && value.endsWith("'")) return value.slice(1, -1).replace(/''/g, "'");
   // Похожее на целое число (сюда же таймстампы и наш `favorite: 1`).
   if (/^-?\d+$/.test(value)) {
     const n = Number(value);
@@ -511,6 +518,8 @@ function metaFromRaw(
     createdAt: asNumber(raw.createdAt, times?.createdAt || now),
     updatedAt: asNumber(raw.updatedAt, times?.updatedAt || now),
     icon: typeof raw.icon === "string" ? raw.icon : null,
+    iconColor: typeof raw.iconColor === "string" ? raw.iconColor : null,
+    frontmatterIcons: Object.fromEntries(Object.entries(raw).filter(([key, value]) => key !== "blocknote" && typeof value === "string" && value.length <= 256)) as Record<string, string>,
     cover: typeof raw.cover === "string" ? raw.cover : null,
     preview: extractPreview(body),
     favorite: asBool(raw.favorite),
@@ -666,8 +675,38 @@ async function atomicWriteTextFile(
 // The manifest records provenance; movable markers and UI overrides live separately.
 const OBSIDIAN_MANIFEST = `${ROOT}/.synapse/obsidian-import.json`;
 const OBSIDIAN_METADATA = `${ROOT}/.synapse/obsidian-metadata.json`;
+const ICONIZE_FILE = `${ROOT}/.synapse/iconize.json`;
+let iconizeData: IconizeState | undefined;
+let iconizeLoad: Promise<IconizeState> | undefined;
+let iconizeWrite: Promise<unknown> = Promise.resolve();
+const iconizeListeners = new Set<(data: IconizeState) => void>();
+export function subscribeIconizeData(listener: (data: IconizeState) => void): () => void {
+  iconizeListeners.add(listener); return () => { iconizeListeners.delete(listener); };
+}
+export async function readIconizeData(): Promise<IconizeState> {
+  if (iconizeData) return iconizeData;
+  if (!iconizeLoad) iconizeLoad = (async () => {
+    if (!(await pathExists(ICONIZE_FILE))) return iconizeData = emptyIconizeState();
+    const raw = JSON.parse(await readTextFile(ICONIZE_FILE, APP_DATA));
+    if (raw?.version !== 1) throw new Error("Неподдерживаемая версия настроек Iconize");
+    return iconizeData = coerceIconizeState(raw);
+  })();
+  try { return await iconizeLoad; } finally { iconizeLoad = undefined; }
+}
+/** Serialize metadata edits and publish only after an atomic successful write. */
+export function updateIconizeData(update: (data: IconizeState) => IconizeState): Promise<IconizeState> {
+  const next = iconizeWrite.then(async () => {
+    const before = await readIconizeData(), data = update(before);
+    if (data === before) return before;
+    await ensureDir(`${ROOT}/.synapse`);
+    await atomicWriteTextFile(ICONIZE_FILE, JSON.stringify(data, null, 2));
+    iconizeData = data; for (const listener of iconizeListeners) listener(data);
+    return data;
+  });
+  iconizeWrite = next.catch(() => undefined); return next;
+}
 type ObsidianOverrides = Partial<Pick<NoteMeta,
-  "title" | "createdAt" | "updatedAt" | "icon" | "cover" | "favorite" | "mood" | "aliases"
+  "title" | "createdAt" | "updatedAt" | "icon" | "iconColor" | "cover" | "favorite" | "mood" | "aliases"
 >> & { markdownSource: boolean; editor?: { blocknote: string; sourceMap: string } };
 type ObsidianState = { version: 1; notes: Record<string, ObsidianOverrides> };
 let obsidianState: ObsidianState | null = null;
@@ -706,7 +745,7 @@ async function loadObsidianState(): Promise<void> {
         for (const key of ["createdAt", "updatedAt"] as const) {
           if (typeof data[key] === "number" && Number.isFinite(data[key])) entry[key] = data[key];
         }
-        for (const key of ["icon", "cover"] as const) {
+        for (const key of ["icon", "iconColor", "cover"] as const) {
           if (data[key] === null || typeof data[key] === "string") entry[key] = data[key];
         }
         if (typeof data.favorite === "boolean") entry.favorite = data.favorite;
@@ -791,7 +830,31 @@ async function relocateWithObsidianMetadata(
     }
     return moved.map(([id]) => to + id.slice(from.length));
   });
-  try { await move(); } catch (e) {
+  // Keep both possible locations staged until the filesystem move commits.
+  const previousIcons = await readIconizeData();
+  const movedIcons = rebaseIconAssignments(previousIcons, from, to, folder);
+  const iconDestinations = new Map<string, IconizeState["assignments"][string] | undefined>();
+  let iconsStaged = false;
+  try {
+    if (movedIcons !== previousIcons) {
+      await updateIconizeData(data => {
+        const rebased = rebaseIconAssignments(data, from, to, folder);
+        const assignments = { ...data.assignments };
+        for (const [key, value] of Object.entries(rebased.assignments)) {
+          if (data.assignments[key] === value) continue;
+          iconDestinations.set(key, data.assignments[key]); assignments[key] = value;
+        }
+        return { ...data, assignments };
+      });
+      iconsStaged = true;
+    }
+    await move();
+  } catch (e) {
+    if (iconsStaged) await updateIconizeData(data => {
+      const assignments = { ...data.assignments };
+      for (const [key, value] of iconDestinations) { if (value) assignments[key] = value; else delete assignments[key]; }
+      return { ...data, assignments };
+    });
     await updateObsidianState((notes) => {
       for (const [id, previous] of destinations) {
         if (previous) notes[id] = previous;
@@ -802,6 +865,7 @@ async function relocateWithObsidianMetadata(
     throw e;
   }
   await rebaseObsidianMetadata(from, to, folder);
+  if (movedIcons !== previousIcons) await updateIconizeData(data => rebaseIconAssignments(data, from, to, folder));
   // Directory renames keep their files unchanged. Source-note moves preserve
   // bytes too. Native individual moves rewrite frontmatter afterward, and a
   // collision can change a filename-derived title: keep both on cache misses.
@@ -826,6 +890,14 @@ async function forgetObsidianMetadata(path: string, folder = false): Promise<voi
       }
     }
     return changed;
+  });
+  await updateIconizeData(data => {
+    const assignments = { ...data.assignments }; let changed = false;
+    for (const key of Object.keys(assignments)) {
+      const iconPath = key.slice(key.indexOf(":") + 1);
+      if (folder ? iconPath === path || iconPath.startsWith(path + "/") : key === "file:" + path + ".md") { delete assignments[key]; changed = true; }
+    }
+    return changed ? { ...data, assignments } : data;
   });
 }
 
@@ -864,7 +936,7 @@ async function writeObsidianNote(note: Note): Promise<void> {
       entry.createdAt = note.createdAt;
       changed = true;
     }
-    for (const key of ["title", "createdAt", "updatedAt", "icon", "cover", "favorite", "mood", "aliases"] as const) {
+    for (const key of ["title", "createdAt", "updatedAt", "icon", "iconColor", "cover", "favorite", "mood", "aliases"] as const) {
       if (JSON.stringify(note[key]) === JSON.stringify(before[key])) continue;
       Object.assign(entry, { [key]: note[key] ?? (key === "aliases" ? [] : null) });
       changed = true;
@@ -965,7 +1037,7 @@ export function newNoteId(folder = ""): string {
 // Это дотфайл, так что обход дерева (skipDotted) его никогда не показывает.
 
 const META_CACHE = `${ROOT}/.meta-cache.json`;
-const META_CACHE_VERSION = 2;
+const META_CACHE_VERSION = 3;
 
 type MetaCacheEntry = { mtime: number; size: number; meta: NoteMeta };
 
@@ -1500,6 +1572,7 @@ export async function writeNote(note: Note): Promise<void> {
     createdAt: note.createdAt,
     updatedAt: note.updatedAt,
     icon: note.icon,
+    iconColor: note.iconColor ?? null,
     cover: note.cover,
     favorite: note.favorite ? 1 : null,
     mood: note.mood ?? null,

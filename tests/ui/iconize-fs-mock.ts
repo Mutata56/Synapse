@@ -1,0 +1,14 @@
+export const BaseDirectory={AppData:1};
+const files=new Map<string,string>();
+export const seedIconizeData=(data:unknown)=>files.set("notes/.synapse/iconize.json",JSON.stringify(data));
+export const exists=async(path:string)=>files.has(path);
+export const mkdir=async()=>{};
+export const readDir=async()=>[];
+export const readFile=async()=>new Uint8Array();
+export const stat=async()=>({birthtime:new Date(),mtime:new Date(),size:0});
+export const readTextFile=async(path:string)=>{if(!files.has(path))throw Error("Fixture file not found");return files.get(path)!;};
+export const writeTextFile=async(path:string,value:string)=>{if((window as unknown as {iconizeFailWrite?:boolean}).iconizeFailWrite)throw Error("Simulated disk failure");files.set(path,value);(window as unknown as {iconizeFixtureFiles:Map<string,string>}).iconizeFixtureFiles=files;};
+export const writeFile=async()=>{};
+export const copyFile=async()=>{};
+export const remove=async(path:string)=>{files.delete(path);};
+export const rename=async(from:string,to:string)=>{files.set(to,files.get(from)!);files.delete(from);};

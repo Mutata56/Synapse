@@ -1,8 +1,9 @@
+import { NoteIcon } from "./NoteIcon";
 import { motion } from "framer-motion";
 import { FileText, Star } from "lucide-react";
 import { useMemo, useState } from "react";
 import { cn } from "../lib/cn";
-import { DEFAULT_NOTE_TITLE, EMOJI_FONT_STACK } from "../lib/format";
+import { DEFAULT_NOTE_TITLE } from "../lib/format";
 import { t } from "../lib/i18n";
 import type { NoteMeta } from "../lib/storage";
 import { flattenNotes } from "../lib/treeUtils";
@@ -11,7 +12,6 @@ import { useNotesStore } from "../store/notes";
 /** Размер инлайнового эмодзи для иконки строки. Остальные мелкие иконки этой
  *  строки (FileText, Star) берут размер из пропа `size` у lucide и живут в
  *  районе 11-13 px. Держим это именованным, чтобы все три двигались вместе. */
-const ROW_EMOJI_PX = 13;
 const ROW_FILE_ICON_PX = 12;
 const HEADER_STAR_PX = 11;
 const UNFAVORITE_STAR_PX = 11;
@@ -131,24 +131,11 @@ function FavoriteRow({
           : "text-zinc-500 hover:bg-white/[0.04] hover:text-zinc-200",
       )}
     >
-      {note.icon ? (
-        <span
-          style={{
-            fontFamily: EMOJI_FONT_STACK,
-            fontSize: ROW_EMOJI_PX,
-            lineHeight: 1,
-          }}
-          className="select-none shrink-0 w-4 text-center"
-        >
-          {note.icon}
-        </span>
-      ) : (
-        <FileText
+      <NoteIcon note={note} size={16} fallback={<FileText
           size={ROW_FILE_ICON_PX}
           strokeWidth={1.8}
           className="shrink-0 text-zinc-600"
-        />
-      )}
+        />} />
       <span className="truncate flex-1">
         {note.title || DEFAULT_NOTE_TITLE}
       </span>

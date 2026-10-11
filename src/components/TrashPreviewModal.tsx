@@ -1,10 +1,11 @@
+import { NoteIcon } from "./NoteIcon";
 import { RotateCcw, Trash2, X } from "lucide-react";
 import { useEffect, useId, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { cn } from "../lib/cn";
 import { gradientClassName, parseCover } from "../lib/covers";
-import { DEFAULT_NOTE_TITLE, EMOJI_FONT_STACK } from "../lib/format";
+import { DEFAULT_NOTE_TITLE } from "../lib/format";
 import { t } from "../lib/i18n";
 import {
   readTrashedNoteBody,
@@ -152,18 +153,7 @@ export function TrashPreviewModal({
             />
 
             <div className="max-w-2xl mx-auto px-10 -mt-10 pb-10">
-              {note.icon && (
-                <div
-                  style={{
-                    fontFamily: EMOJI_FONT_STACK,
-                    fontSize: ICON_FONT_PX,
-                    lineHeight: 1,
-                  }}
-                  className="mb-3 select-none"
-                >
-                  {note.icon}
-                </div>
-              )}
+              <div className="mb-3"><NoteIcon note={note} path={".trash/" + note.id + ".md"} size={ICON_FONT_PX} fallback={null} /></div>
               <h1
                 id={titleId}
                 style={{ fontSize: TITLE_FONT_PX }}

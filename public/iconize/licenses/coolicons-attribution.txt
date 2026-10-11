@@ -1,0 +1,4 @@
+Coolicons 4.1 by Kryston Schwarze.
+Source: https://github.com/krystonschwarze/coolicons/tree/master
+License: https://creativecommons.org/licenses/by/4.0/
+Changes in Synapse: normalized icon names, monochrome currentColor, SVG sprites.

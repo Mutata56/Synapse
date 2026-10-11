@@ -1,0 +1,6 @@
+Icon Brew by Eduardo (elrumo).
+Source: https://github.com/elrumo/icon-brew
+This collection is the icon-brew.zip distributed with Iconize 2.14.7:
+https://github.com/FlorianWoelki/obsidian-iconize/blob/2.14.7/iconPacks/icon-brew.zip
+Iconize MIT license is included separately.
+Changes in Synapse: normalized names, SVG sprites, removed non-image attributes.

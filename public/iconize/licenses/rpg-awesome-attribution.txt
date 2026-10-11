@@ -1,0 +1,5 @@
+RPG Awesome by Daniela Howe and Ivan Montiel.
+Original icons credited to https://game-icons.net/ (multiple artists, CC BY 3.0).
+Collection: https://github.com/nagoshiashumari/Rpg-Awesome
+Iconize bundle: https://github.com/FlorianWoelki/obsidian-iconize/blob/2.14.7/iconPacks/rpg-awesome.zip
+Changes in Synapse: normalized names, SVG sprites, currentColor.

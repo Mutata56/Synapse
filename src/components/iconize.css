@@ -1,0 +1,74 @@
+.iconize-picker-backdrop { padding: 16px; }
+.iconize-picker-panel { width: min(720px, 100%); max-height: calc(100dvh - 32px); }
+.iconize-picker { display: flex; flex-direction: column; max-height: calc(100dvh - 32px); background: var(--color-bg-elevated); color: var(--color-text); border-radius: 12px; overflow: hidden; box-shadow: 0 20px 64px rgba(0,0,0,.48); }
+.iconize-picker-header { display: flex; align-items: center; justify-content: space-between; padding: 18px 20px 10px; }
+.iconize-picker-header h2 { margin: 0; font-size: 18px; font-weight: 600; letter-spacing: -.02em; }
+.iconize-icon-button { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; border-radius: 5px; color: var(--color-text-secondary); background: transparent; border: 0; cursor: pointer; flex-shrink: 0; }
+.iconize-icon-button:hover { background: var(--color-bg-hover); }
+.iconize-picker-controls { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 0 20px 12px; }
+.iconize-tabs { display: flex; gap: 4px; }
+.iconize-tabs button { background: transparent; border: 0; color: var(--color-text-secondary); padding: 7px 10px; border-radius: 5px; cursor: pointer; font-size: 13px; }
+.iconize-tabs [aria-selected=true] { background: var(--color-accent-bg); color: var(--color-link); }
+.iconize-picker select, .iconize-settings select { min-width: 0; max-width: 240px; color: var(--color-text); background: var(--color-bg); border: 1px solid var(--color-border-strong); border-radius: 6px; padding: 7px 9px; font-size: 13px; }
+.iconize-search { display: flex; align-items: center; gap: 9px; margin: 0 20px; padding: 0 11px; border-radius: 6px; border: 1px solid var(--color-border-strong); color: var(--color-text-secondary); background: var(--color-bg); }
+.iconize-search input { width: 100%; min-width: 0; border: 0; outline: 0; padding: 10px 0; color: var(--color-text); background: transparent; font-size: 14px; }
+.iconize-search input::placeholder { color: var(--color-text-secondary); }
+.iconize-search:focus-within { border-color: var(--color-accent); }
+.iconize-recent { display: flex; align-items: center; gap: 4px; padding: 10px 20px 0; flex-wrap: wrap; }
+.iconize-recent > span { color: var(--color-text-secondary); font-size: 12px; margin-right: 6px; }
+.iconize-recent button { width: 34px; height: 34px; display: grid; place-items: center; background: transparent; border: 0; border-radius: 5px; color: var(--color-text-secondary); cursor: pointer; }
+.iconize-grid-summary { color: var(--color-text-secondary); font-size: 12px; padding: 12px 20px 6px; }
+.iconize-grid-scroll { height: min(364px, 40dvh); min-height: 104px; flex: 1 1 auto; overflow-y: auto; overscroll-behavior: contain; margin: 0 16px 10px; scrollbar-color: var(--color-border-strong) transparent; }
+.iconize-grid-row { position: absolute; left: 0; right: 0; display: grid; height: 52px; }
+.iconize-glyph-button { position: relative; display: grid; place-items: center; margin: 3px; border: 0; border-radius: 6px; background: transparent; color: var(--color-text-secondary); cursor: pointer; }
+.iconize-glyph-button:hover, .iconize-recent button:hover { background: var(--color-bg-hover); color: var(--color-text); }
+.iconize-glyph-button[aria-pressed=true], .iconize-recent button[aria-pressed=true] { background: var(--color-accent-bg); color: var(--color-link); }
+.iconize-selected-check { position: absolute; right: 4px; bottom: 4px; }
+.iconize-picker-options { display: flex; align-items: center; gap: 10px; padding: 10px 20px; border-top: 1px solid var(--color-border); font-size: 13px; flex-wrap: wrap; }
+.iconize-picker-options > label { display: flex; align-items: center; gap: 8px; }
+.iconize-picker-options input[type=color], .iconize-settings input[type=color] { width: 28px; height: 28px; padding: 2px; background: transparent; border: 1px solid var(--color-border-strong); border-radius: 5px; cursor: pointer; }
+.iconize-checkbox { margin-left: auto; color: var(--color-text-secondary); }
+.iconize-checkbox input, .iconize-settings input[type=checkbox] { accent-color: var(--color-accent); }
+.iconize-picker-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 20px 16px; }
+.iconize-picker-selected { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.iconize-picker-selected span { max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--color-text-secondary); font-size: 12px; }
+.iconize-picker-actions { display: flex; align-items: center; gap: 10px; }
+.iconize-button, .iconize-text-button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; font-size: 13px; cursor: pointer; border-radius: 6px; border: 0; padding: 8px 11px; background: var(--color-bg-hover); color: var(--color-text); }
+.iconize-text-button { background: transparent; padding: 5px 0; color: var(--color-text-secondary); }
+.iconize-text-button:hover { color: var(--color-link); }
+.iconize-primary { background: var(--color-accent); color: #fff; }
+.iconize-picker button:disabled, .iconize-settings button:disabled { opacity: .5; cursor: default; }
+.iconize-picker :focus-visible, .iconize-settings :focus-visible { outline: 2px solid var(--color-link); outline-offset: 2px; }
+.iconize-empty { padding: 35px 12px; color: var(--color-text-secondary); text-align: center; font-size: 14px; }
+.iconize-error { color: var(--color-danger, #e87983); margin: 6px 20px; font-size: 13px; }
+.iconize-settings { font-size: 14px; }
+.iconize-settings h3 { font-size: 18px; font-weight: 600; margin: 24px 0 6px; }
+.iconize-settings h3:first-child { margin-top: 0; }
+.iconize-settings p { font-size: 13px; line-height: 1.6; color: var(--color-text-secondary); margin: 0 0 14px; }
+.iconize-settings-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 10px 0; border-bottom: 1px solid var(--color-border); }
+.iconize-settings-row > span { min-width: 0; }
+.iconize-settings-row input[type=number], .iconize-settings input[type=text] { width: 80px; background: var(--color-bg); color: var(--color-text); border: 1px solid var(--color-border-strong); border-radius: 5px; padding: 6px 8px; }
+.iconize-settings input[type=text] { width: 160px; max-width: 100%; }
+.iconize-settings-actions { display: flex; gap: 10px; flex-wrap: wrap; margin: 14px 0; }
+.iconize-packs { display: flex; gap: 6px 16px; flex-wrap: wrap; color: var(--color-text-secondary); font-size: 12px; line-height: 1.8; }
+.iconize-rule { display: grid; grid-template-columns: 30px minmax(0,1fr) auto; gap: 10px; align-items: start; border-bottom: 1px solid var(--color-border); padding: 14px 0; }
+.iconize-rule-fields { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.iconize-rule-fields input[type=text] { width: min(100%, 250px); flex: 1 1 180px; }
+.iconize-rule-fields label { display: inline-flex; gap: 5px; align-items: center; font-size: 12px; color: var(--color-text-secondary); }
+.iconize-rule-fields label input[type=number] { width: 56px; }
+.iconize-inline { display: inline-flex; vertical-align: -.15em; line-height: 1; margin-inline: 2px; }
+.iconize-shortcode-source { font-size: 0; }
+.iconize-title-row { display: flex; gap: 14px; align-items: flex-start; justify-content: center; width: 100%; }
+.iconize-margins { display: grid; grid-template-columns: repeat(4,48px); gap: 6px; flex-shrink: 0; }
+.iconize-title-inline { display: flex; justify-content: center; align-items: center; flex-shrink: 0; background: transparent; border: 0; margin-top: 5px; cursor: pointer; border-radius: 5px; }
+@media (max-width: 540px) {
+  .iconize-picker-header, .iconize-picker-controls, .iconize-picker-options, .iconize-picker-footer { padding-left: 12px; padding-right: 12px; }
+  .iconize-picker-controls { align-items: stretch; gap: 8px; }
+  .iconize-picker select { width: 165px; }
+  .iconize-search { margin-inline: 12px; }
+  .iconize-picker-footer { flex-wrap: wrap; }
+  .iconize-picker-actions { margin-left: auto; }
+  .iconize-checkbox { margin-left: 0; }
+  .iconize-settings-row { gap: 8px; }
+  .iconize-settings-row:has(.iconize-margins) { flex-direction: column; align-items: flex-start; }
+}

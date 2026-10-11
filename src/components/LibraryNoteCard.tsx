@@ -1,7 +1,8 @@
+import { NoteIcon } from "./NoteIcon";
 import { Check, Eye, FileText, Star } from "lucide-react";
 import { memo, useEffect, useRef, useState, type KeyboardEvent, type MouseEvent } from "react";
 import { gradientClassName, parseCover } from "../lib/covers";
-import { formatRelativeDate, EMOJI_FONT_STACK } from "../lib/format";
+import { formatRelativeDate } from "../lib/format";
 import { resolveCoverImageUrl, type NoteMeta } from "../lib/storage";
 import { useI18n } from "./LanguageProvider";
 import { libraryExcerpt } from "../lib/noteLibrary";
@@ -35,7 +36,7 @@ export const LibraryNoteCard = memo(function LibraryNoteCard({ note, selected, s
     <button type="button" className="library-card-open" aria-label={`${t("Открыть заметку")}: ${title}`} onClick={click} onKeyDown={event => onNavigate(note.id, event)}>
       <LibraryCover cover={note.cover}/>
       <div className="library-card-content">
-        <div className="library-card-meta"><span>{note.icon ? <span style={{ fontFamily: EMOJI_FONT_STACK }}>{note.icon}</span> : <FileText size={15}/>}</span><time dateTime={iso}>{iso ? formatRelativeDate(note.updatedAt) : t("Без даты")}</time></div>
+        <div className="library-card-meta"><span><NoteIcon note={note} size={15} fallback={<FileText size={15}/>} /></span><time dateTime={iso}>{iso ? formatRelativeDate(note.updatedAt) : t("Без даты")}</time></div>
         <h3>{title}</h3><p className="library-card-excerpt">{excerpt || t("Заметка пока пустая")}</p>
         <span className="library-card-folder" title={folder}>{folder}</span>
       </div>

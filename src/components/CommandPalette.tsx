@@ -1,3 +1,4 @@
+import { NoteIcon } from "./NoteIcon";
 import { AnimatePresence, motion } from "framer-motion";
 import Fuse from "fuse.js";
 import {
@@ -24,7 +25,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { isViewEnabled } from "../lib/modules";
 import { buildGraph } from "../lib/buildGraph";
 import { cn } from "../lib/cn";
-import { DEFAULT_NOTE_TITLE, EMOJI_FONT_STACK } from "../lib/format";
+import { DEFAULT_NOTE_TITLE } from "../lib/format";
 import { requestGraphFocus } from "../lib/graphFocus";
 import { QUICK_SWITCHER_EVENT } from "../lib/workspaceCommands";
 import { useWorkspaceStore } from "../store/workspace";
@@ -76,7 +77,6 @@ const ACTION_FUSE_OPTIONS = {
   threshold: FUSE_THRESHOLD,
 };
 
-const NOTE_ICON_SIZE_PX = 18;
 
 // Детект клавиш независимо от раскладки: ловим и ЙЦУКЕН, где физическая K даёт
 // `л`, а физическая F даёт `а`.
@@ -767,24 +767,11 @@ function NoteRowContent({
 }) {
   return (
     <>
-      {note.icon ? (
-        <span
-          style={{
-            fontFamily: EMOJI_FONT_STACK,
-            fontSize: NOTE_ICON_SIZE_PX,
-            lineHeight: 1,
-          }}
-          className="select-none w-5 text-center shrink-0"
-        >
-          {note.icon}
-        </span>
-      ) : (
-        <FileText
+      <NoteIcon note={note} size={18} fallback={<FileText
           size={14}
           strokeWidth={1.8}
           className="text-zinc-600 shrink-0"
-        />
-      )}
+        />} />
       <div className="min-w-0 flex-1">
         <div className="text-[13px] text-zinc-100 truncate">
           {note.title || DEFAULT_NOTE_TITLE}

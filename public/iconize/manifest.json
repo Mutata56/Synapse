@@ -1,0 +1,110 @@
+{
+  "version": 1,
+  "upstream": "https://github.com/FlorianWoelki/obsidian-iconize/tree/2.14.7",
+  "packs": [
+    {
+      "id": "font-awesome-brands",
+      "name": "Font Awesome \u00b7 Brands",
+      "prefix": "Fab",
+      "version": "6.5.1",
+      "count": 484,
+      "sha256": "a84cbf6d35590400f403171aad9cfedd662c970ea5ab41cea32f272c12b7d0ce"
+    },
+    {
+      "id": "font-awesome-regular",
+      "name": "Font Awesome \u00b7 Regular",
+      "prefix": "Far",
+      "version": "6.5.1",
+      "count": 163,
+      "sha256": "a84cbf6d35590400f403171aad9cfedd662c970ea5ab41cea32f272c12b7d0ce"
+    },
+    {
+      "id": "font-awesome-solid",
+      "name": "Font Awesome \u00b7 Solid",
+      "prefix": "Fas",
+      "version": "6.5.1",
+      "count": 1390,
+      "sha256": "a84cbf6d35590400f403171aad9cfedd662c970ea5ab41cea32f272c12b7d0ce"
+    },
+    {
+      "id": "remix-icons",
+      "name": "Remix Icons",
+      "prefix": "Ri",
+      "version": "4.2.0",
+      "count": 2860,
+      "sha256": "c8ac2030a28d2091f5209b756c9e88a8aa38cce8f60b4490ade6f721083a91fc"
+    },
+    {
+      "id": "icon-brew",
+      "name": "Icon Brew",
+      "prefix": "Ib",
+      "version": "Iconize 2.14.7",
+      "count": 284,
+      "sha256": "56c9b4c6915420ae9d1024e69f2db5237a9ebe51f0dd146a0dfee3be7548bdcb"
+    },
+    {
+      "id": "simple-icons",
+      "name": "Simple Icons \u00b7 Logos",
+      "prefix": "Si",
+      "version": "11.10.0",
+      "count": 3093,
+      "sha256": "61c573fe511bd1e96081aba881a55433d28fcd2b1a84cbebdb31986c5ab2bf84"
+    },
+    {
+      "id": "lucide-icons",
+      "name": "Lucide",
+      "prefix": "Li",
+      "version": "0.363.0 + Synapse native Lucide 0.460.0",
+      "count": 1562,
+      "sha256": "3c66f89496040817fd19a043795b604bcafcaf9051ede34c3273d586d56174bd"
+    },
+    {
+      "id": "tabler-icons",
+      "name": "Tabler Icons",
+      "prefix": "Ti",
+      "version": "3.1.0",
+      "count": 5219,
+      "sha256": "90d695d880cbe8173c99b3e507c622853229fa643647fb3cbe4cbe564bc536ac"
+    },
+    {
+      "id": "boxicons",
+      "name": "Boxicons",
+      "prefix": "Bo",
+      "version": "Iconize 2.14.7",
+      "count": 1634,
+      "sha256": "ecb951d9a5042b4cec55e720749a71cc49f1640d6daf28005e0d4f7942a34f36"
+    },
+    {
+      "id": "rpg-awesome",
+      "name": "RPG Awesome",
+      "prefix": "Ra",
+      "version": "Iconize 2.14.7",
+      "count": 495,
+      "sha256": "e312a08afa0beea2c5df784a88d63ed716995be91d4e384ff1f4329c5f6692d4"
+    },
+    {
+      "id": "coolicons",
+      "name": "Coolicons",
+      "prefix": "Co",
+      "version": "4.1",
+      "count": 442,
+      "sha256": "5311b1b44e345b19007902db55418c3a0b35fac825a38fbb9038bbf3a077e11c"
+    },
+    {
+      "id": "feather-icons",
+      "name": "Feather Icons",
+      "prefix": "Fi",
+      "version": "4.29.1",
+      "count": 287,
+      "sha256": "75ef477d173253afc6f7e985b961fe6f4a219dc1511da7b054a396ae28b6fe99"
+    },
+    {
+      "id": "octicons",
+      "name": "Octicons",
+      "prefix": "Oc",
+      "version": "19.8.0",
+      "count": 617,
+      "sha256": "086cbf16853292ecb0a0552c2fed86a96a7da67948dc4faca87dece6ff3913b9"
+    }
+  ]
+}

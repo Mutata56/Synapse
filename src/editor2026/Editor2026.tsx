@@ -52,6 +52,7 @@ import { importAssetBytes } from "../lib/storage";
 import { tagExtension } from "../lib/tags";
 import { flattenNotes } from "../lib/treeUtils";
 import { refreshWikiLinks, wikiLinkExtension } from "../lib/wikiLink";
+import { iconizeExtension } from "../lib/iconizeExtension";
 import { registerFlusher, useNotesStore } from "../store/notes";
 import { FormattingToolbar2026 } from "./chrome/FormattingToolbar2026";
 import { debugExtension, dlog, E26_DEBUG } from "./lib/debug";
@@ -161,8 +162,8 @@ export function Editor2026({ imported }: { imported?: ImportedEditorBridge } = {
     dropCursor: multiColumnDropCursor,
     dictionary: { ...en, multi_column: multiColumnLocales.en },
     extensions: E26_DEBUG
-      ? [wikiLinkExtension, tagExtension, debugExtension]
-      : [wikiLinkExtension, tagExtension],
+      ? [wikiLinkExtension, tagExtension, iconizeExtension, debugExtension]
+      : [wikiLinkExtension, tagExtension, iconizeExtension],
   });
 
   const scrollRef = useRef<HTMLDivElement>(null);
