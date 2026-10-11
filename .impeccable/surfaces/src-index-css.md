@@ -60,3 +60,10 @@ At760px the wrapped title fitted268px with no page overflow. At200% explicit
 editor zoom, prose52px and title84.136px fitted without page overflow.
 Earlier17px captures above are historical baseline evidence. Inter remains an
 explicit user pin despite the generic overused-font detector warning.
+
+COMBINED SIZE DELIVERY: preserved the latest Iconize, task/callout blocks,
+Cmd-click and Quick Look work from main. Conflict resolution retained the new
+tab geometry while keeping the measured12px/400/1.3 type. The combined suite
+passed188 tests with one optional copied-vault test skipped; production entry
+budgets remained satisfied. Active26px runtime values supersede the historical
+17px font-pass captures.
