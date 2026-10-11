@@ -29,6 +29,7 @@ import { fileCardBlock } from "./blocks/fileCard";
 import { galleryBlock } from "./blocks/gallery";
 import { whiteboardBlock } from "./blocks/whiteboard/whiteboardBlock";
 import { dataTableBlock } from "./dataTable/spec";
+import { sourceMarkdownBlock } from "./blocks/sourceMarkdown";
 
 // ── Сборка схемы ───────────────────────────────────────────────────────────
 
@@ -62,6 +63,7 @@ export function createNotesSchema() {
 
       // Фаза 1:
       callout: calloutBlock(),
+      sourceMarkdown: sourceMarkdownBlock(),
 
       // Фаза 2:
       gallery: galleryBlock(),

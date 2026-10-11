@@ -371,3 +371,45 @@ test("native image metadata matches the filesystem fallback, stays fresh and can
   assert.equal(fallback.images.find(image=>image.id==='picture.png').usedBy.length,0);
   assert.equal(await f.read('picture.png'),'original');
 });
+
+test("imported rich blocks survive restart and moves while metadata stays light and Markdown keeps its original YAML", async (t) => {
+  const raw='---\n# user comment\ncustom: {nested: true}\n---\n\nOriginal.\n';
+  const f=await fixture(t,{"Note.md":raw});
+  const note=await f.storage.readNote('Note');
+  const source=raw.replace('Original.','Edited.');
+  const blocknote=JSON.stringify([{id:'table',type:'dataTable',props:{data:'{"rows":["user data"]}'}}]);
+  const sourceMap=JSON.stringify({version:1,source,prefix:source,suffix:'',chunks:[]});
+  await f.storage.writeNote({...note,sourceText:source,sourceMap,blocknote});
+  assert.equal(await f.read('Note.md'),source);
+  f.storage.resetStorageCaches();
+  const saved=await f.storage.readNote('Note');
+  assert.equal(saved.blocknote,blocknote);
+  assert.equal(saved.sourceMap,sourceMap);
+  const tree=await f.storage.listTree();
+  const meta=tree.find(n=>n.kind==='note').note;
+  assert.equal(meta.editor,undefined);
+  assert.equal(meta.blocknote,undefined);
+  assert.equal(meta.sourceMap,undefined);
+  await f.storage.writeNote({...saved,title:'New title'});
+  assert.equal(await f.read('Note.md'),source);
+  const moved=await f.storage.moveNote('Note','Folder');
+  f.storage.resetStorageCaches();
+  assert.equal((await f.storage.readNote(moved)).blocknote,blocknote);
+  assert.equal(await f.read(moved+'.md'),source);
+});
+
+test("editing imported Markdown directly clears stale block state and an external conflict cannot replace it", async(t)=>{
+  const f=await fixture(t,{'Note.md':'Original.\n'});
+  const note=await f.storage.readNote('Note');
+  await f.storage.writeNote({...note,blocknote:'[{"id":"b","type":"paragraph"}]',sourceMap:JSON.stringify({source:note.sourceRevision})});
+  const cached=await f.storage.readNote('Note');
+  await f.storage.writeNote({...cached,sourceText:'Direct Markdown.\n'});
+  f.storage.resetStorageCaches();
+  const direct=await f.storage.readNote('Note');
+  assert.equal(direct.sourceText,'Direct Markdown.\n');
+  assert.equal(direct.blocknote,null);
+  assert.equal(direct.sourceMap,null);
+  await fs.writeFile(path.join(f.notes,'Note.md'),'External.\n');
+  await assert.rejects(f.storage.writeNote({...direct,sourceText:'Stale blocks.\n',blocknote:'[]',sourceMap:JSON.stringify({source:'Stale blocks.\n'})}),/Файл изменён/);
+  assert.equal(await f.read('Note.md'),'External.\n');
+});

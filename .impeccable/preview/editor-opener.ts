@@ -1,0 +1,1 @@
+export const openUrl=async()=>{};export const openPath=async()=>{};export const revealItemInDir=async()=>{};

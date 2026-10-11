@@ -1,0 +1,1 @@
+export const appDataDir=async()=>'/private/tmp/synapse-imported-editor-review';export const join=async(...parts:string[])=>parts.join('/');

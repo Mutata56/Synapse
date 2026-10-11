@@ -1,0 +1,13 @@
+const call=async(name:string,args:unknown[])=>{const res=await fetch('/__editor-fs',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,args})});const data=await res.json();if(!res.ok)throw Error(data.error);return data;};
+export const BaseDirectory={AppData:1};
+export const exists=(...a:unknown[])=>call('exists',a);
+export const mkdir=(...a:unknown[])=>call('mkdir',a);
+export const readDir=(...a:unknown[])=>call('readDir',a);
+export const readTextFile=(...a:unknown[])=>call('readTextFile',a);
+export const readFile=async(...a:unknown[])=>new Uint8Array(await call('readFile',a));
+export const stat=async(...a:unknown[])=>{const value=await call('stat',a);return {...value,mtime:new Date(value.mtime),birthtime:new Date(value.birthtime)};};
+export const writeTextFile=(...a:unknown[])=>call('writeTextFile',a);
+export const writeFile=(p:string,a:Uint8Array,...rest:unknown[])=>call('writeFile',[p,Array.from(a),...rest]);
+export const rename=(...a:unknown[])=>call('rename',a);
+export const remove=(...a:unknown[])=>call('remove',a);
+export const copyFile=(...a:unknown[])=>call('copyFile',a);

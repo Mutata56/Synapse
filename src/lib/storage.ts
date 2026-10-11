@@ -92,7 +92,7 @@ export type NoteMeta = {
    *  храним либо инлайн-массивом `aliases: ["x", "y"]`, либо многострочным YAML-
    *  списком, читаем обе формы. Пусто, если юзер ничего не задал. */
   aliases?: string[];
-  /** Copied Obsidian Markdown is edited as source, never through BlockNote. */
+  /** Copied Markdown retains its source and provenance in every editor mode. */
   markdownSource?: boolean;
 };
 
@@ -102,6 +102,8 @@ export type Note = NoteMeta & {
   sourceText?: string;
   /** Source read from disk; checked before every source edit to detect conflicts. */
   sourceRevision?: string;
+  /** Exact Markdown chunks and BlockNote IDs for incremental imported edits. */
+  sourceMap?: string | null;
   /** JSON документа BlockNote без потерь, главный источник правды для редактора
    *  при перезагрузке: тогда тогглы, вложенность и блоки кода переживают
    *  (markdown-зеркало `content` лоссёвое). Нет у заметок, созданных или
@@ -666,7 +668,7 @@ const OBSIDIAN_MANIFEST = `${ROOT}/.synapse/obsidian-import.json`;
 const OBSIDIAN_METADATA = `${ROOT}/.synapse/obsidian-metadata.json`;
 type ObsidianOverrides = Partial<Pick<NoteMeta,
   "title" | "createdAt" | "updatedAt" | "icon" | "cover" | "favorite" | "mood" | "aliases"
->> & { markdownSource: boolean };
+>> & { markdownSource: boolean; editor?: { blocknote: string; sourceMap: string } };
 type ObsidianState = { version: 1; notes: Record<string, ObsidianOverrides> };
 let obsidianState: ObsidianState | null = null;
 let obsidianLoadPromise: Promise<void> | null = null;
@@ -710,6 +712,8 @@ async function loadObsidianState(): Promise<void> {
         if (typeof data.favorite === "boolean") entry.favorite = data.favorite;
         if (data.mood === null || (typeof data.mood === "number" && data.mood >= 1 && data.mood <= 5)) entry.mood = data.mood;
         if (Array.isArray(data.aliases) && data.aliases.every((s) => typeof s === "string")) entry.aliases = data.aliases;
+        const cached = data.editor as Record<string, unknown> | undefined;
+        if (cached && typeof cached.blocknote === "string" && typeof cached.sourceMap === "string") entry.editor = { blocknote: cached.blocknote, sourceMap: cached.sourceMap };
         notes[id] = entry;
       }
     }
@@ -720,7 +724,9 @@ async function loadObsidianState(): Promise<void> {
 
 function applyObsidianMetadata(meta: NoteMeta, id = meta.id): NoteMeta {
   const entry = obsidianState?.notes[id];
-  return entry?.markdownSource ? { ...meta, ...entry } : meta;
+  if (!entry?.markdownSource) return meta;
+  const { editor: _editor, ...metadata } = entry;
+  return { ...meta, ...metadata };
 }
 
 /** Serialize sidecar transactions; commit in memory only after a successful disk write. */
@@ -863,6 +869,14 @@ async function writeObsidianNote(note: Note): Promise<void> {
       Object.assign(entry, { [key]: note[key] ?? (key === "aliases" ? [] : null) });
       changed = true;
     }
+    if (note.blocknote && note.sourceMap) {
+      try {
+        if (JSON.parse(note.sourceMap)?.source === nextSource) {
+          const editor = { blocknote: note.blocknote, sourceMap: note.sourceMap };
+          if (JSON.stringify(editor) !== JSON.stringify(entry.editor)) { entry.editor = editor; changed = true; }
+        } else if (nextSource !== revision && entry.editor) { delete entry.editor; changed = true; }
+      } catch { if (nextSource !== revision && entry.editor) { delete entry.editor; changed = true; } }
+    } else if (nextSource !== revision && entry.editor) { delete entry.editor; changed = true; }
     if (changed) notes[note.id] = entry;
     return changed ? [note.id] : [];
   });
@@ -1273,8 +1287,9 @@ export async function readNote(id: string): Promise<Note | null> {
       ...(obsidianState?.notes[id]?.markdownSource ? { sourceText: raw, sourceRevision: raw } : {}),
       // Не держим это в NoteMeta (в дереве), чтобы кэш дерева оставался лёгким:
       // (потенциально большой) JSON редактора тащит только полное чтение заметки здесь.
-      blocknote: typeof meta.blocknote === "string" ? meta.blocknote : null,
+      blocknote: obsidianState?.notes[id]?.editor?.blocknote ?? (typeof meta.blocknote === "string" ? meta.blocknote : null),
       bnHash: typeof meta.bnHash === "number" ? meta.bnHash : null,
+      sourceMap: obsidianState?.notes[id]?.editor?.sourceMap ?? null,
     };
   } catch (e) {
     console.error("readNote failed:", id, e);
