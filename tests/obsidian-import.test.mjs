@@ -19,7 +19,7 @@ const tauriPlugin = { name: "test-tauri-filesystem", setup(builder) {
       if (args.path === "@tauri-apps/api/path") return { contents: `const fs = globalThis.__synapseTestFs;
         export const appDataDir = async () => fs.root;
         export const join = async (...parts) => parts.join('/');` };
-      if (args.path === "@tauri-apps/api/core") return { contents: "export const convertFileSrc = path => 'asset:///' + encodeURIComponent(path); export const invoke = async (name) => { throw new Error('Unexpected invoke: ' + name); };" };
+      if (args.path === "@tauri-apps/api/core") return { contents: "export const convertFileSrc = path => 'asset:///' + encodeURIComponent(path); export const isTauri = () => Boolean(globalThis.__synapseNativeInventory); export const invoke = async (name) => { if (globalThis.__synapseNativeInventory) return globalThis.__synapseNativeInventory(name); throw new Error('Unexpected invoke: ' + name); };" };
       throw new Error(`Unexpected Tauri dependency: ${args.path}`);
     });
   } };
@@ -47,6 +47,7 @@ test("tag finder keeps multi-tag filters across navigation and preserves legacy 
 });
 
 async function fixture(t, sources = {}, existingVault, withStore = false) {
+  globalThis.__synapseNativeInventory = undefined;
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "synapse-import-test-"));
   const notes = path.join(root, "notes");
   await fs.mkdir(path.join(notes, ".synapse"), { recursive: true });
@@ -342,4 +343,31 @@ test("full copied vault: every manifest note loads through the store in source m
   for (const [name, hash] of initialHashes) assert.equal(sha(await fs.readFile(path.join(f.notes, name))), hash, name);
   assert(!f.mutations.some((entry) => entry.slice(1).some((name) => name.endsWith(".md"))));
   console.log(`Verified ${flat.length} copied Markdown notes without source mutations`);
+});
+
+
+test("native image metadata matches the filesystem fallback, stays fresh and cannot hide incomplete scans", async (t) => {
+  const managed='c'.repeat(64)+'.png';
+  const f=await fixture(t,{'note.md':'![[picture.png]]','picture.png':'original',['.assets/'+managed]:'managed','.versions/note/1.md':`![[.assets/${managed}]]`});
+  const before=await f.storage.listImageLibrary();
+  let complete=true;let calls=0;
+  globalThis.__synapseNativeInventory=async command=>{
+    assert.equal(command,'image_inventory');calls++;
+    const item=async name=>{const info=await fs.stat(path.join(f.notes,name));return {path:name,mtime:info.mtime.getTime(),size:info.size};};
+    return {images:await Promise.all(['picture.png','.assets/'+managed].map(item)),notes:await Promise.all(['note.md','.versions/note/1.md'].map(item)),complete};
+  };
+  f.reads.length=0;
+  const bulk=await f.storage.listImageLibrary();
+  assert.equal(calls,1);assert.deepEqual(bulk,before);
+  assert.equal(f.reads.filter(name=>name.endsWith('.md')).length,0);
+  await fs.writeFile(path.join(f.notes,'note.md'),'Reference removed from this changed note.');
+  const fresh=await f.storage.listImageLibrary();
+  assert.equal(fresh.images.find(image=>image.id==='picture.png').usedBy.length,0);
+  assert.equal(fresh.images.find(image=>image.id==='.assets/'+managed).usedBy[0].id,'__versions__');
+  complete=false;assert.equal((await f.storage.listImageLibrary()).complete,false);
+  await assert.rejects(f.storage.deleteUnusedLibraryImages(['.assets/'+managed]));
+  globalThis.__synapseNativeInventory=async()=>{throw Error('Command image_inventory not found');};
+  const fallback=await f.storage.listImageLibrary();assert.equal(fallback.complete,true);
+  assert.equal(fallback.images.find(image=>image.id==='picture.png').usedBy.length,0);
+  assert.equal(await f.read('picture.png'),'original');
 });
