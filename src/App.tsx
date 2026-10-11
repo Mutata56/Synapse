@@ -8,7 +8,6 @@ import { CommandPalette } from "./components/CommandPalette";
 import { ConfirmDialog } from "./components/ConfirmDialog";
 import { PromptDialog } from "./components/PromptDialog";
 import { TemplatePicker } from "./components/TemplatePicker";
-import { Editor2026 } from "./editor2026/Editor2026";
 import { FilesView } from "./components/FilesView";
 const GraphView = lazy(() => import("./components/GraphView").then((module) => ({ default: module.GraphView })));
 import { ImageLightbox } from "./components/ImageLightbox";
@@ -24,6 +23,7 @@ import { TrashView } from "./components/TrashView";
 import { VersionHistory } from "./components/VersionHistory";
 import { WikiLinkPicker } from "./components/WikiLinkPicker";
 const WritingDashboard = lazy(() => import("./components/WritingDashboard").then(module => ({ default: module.WritingDashboard })));
+const Editor2026 = lazy(() => import("./editor2026/Editor2026").then(module => ({ default: module.Editor2026 })));
 import { warmAssetResolver } from "./editor2026/lib/assets";
 import { warmIndex } from "./lib/fullTextSearch";
 import { seedTemplatesIfEmpty } from "./lib/templates";
@@ -282,7 +282,7 @@ function NoteEditor() {
   if (!note) return <div className="flex-1 grid place-items-center text-zinc-500">Заметка не загружена</div>;
   return note.markdownSource
     ? <MarkdownSourceEditor key={`${note.id}:${reloadNonce}`} />
-    : <Editor2026 />;
+    : <Suspense fallback={<div role="status" className="flex-1 grid place-items-center text-sm text-neutral-400">{t("Загрузка…")}</div>}><Editor2026 /></Suspense>;
 }
 
 /**

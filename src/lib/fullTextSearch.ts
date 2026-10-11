@@ -70,6 +70,32 @@ type CachedBody = { updatedAt: number; body: string; bodyLower: string };
 
 /** id это последнее прочитанное тело. Живёт между открытиями палитры всю жизнь приложения. */
 const bodyCache = new Map<string, CachedBody>();
+type PendingBody = { updatedAt: number; request: Promise<CachedBody> };
+const pendingBodies = new Map<string, PendingBody>();
+let bodyListGeneration = 0;
+let wordListGeneration = 0;
+
+/** Share cold IO between startup, search and statistics, retaining the latest version. */
+function bodyFor(note: NoteMeta): Promise<CachedBody> {
+  const cached = bodyCache.get(note.id);
+  if (cached?.updatedAt === note.updatedAt) return Promise.resolve(cached);
+  const current = pendingBodies.get(note.id);
+  if (current?.updatedAt === note.updatedAt) return current.request;
+  const pending: PendingBody = {
+    updatedAt: note.updatedAt,
+    request: Promise.resolve().then(async () => {
+      const full = await readNote(note.id);
+      const body = full?.content ?? "";
+      const value = { updatedAt: note.updatedAt, body, bodyLower: body.toLowerCase() };
+      if (pendingBodies.get(note.id) === pending) bodyCache.set(note.id, value);
+      return value;
+    }).finally(() => {
+      if (pendingBodies.get(note.id) === pending) pendingBodies.delete(note.id);
+    }),
+  };
+  pendingBodies.set(note.id, pending);
+  return pending.request;
+}
 
 /** id это последний посчитанный word count, по тому же `updatedAt`, что и
  *  `bodyCache`. Держит горячий путь дашборда (ряды по дням, суммы за год,
@@ -88,6 +114,7 @@ const wordCountCache = new Map<string, { updatedAt: number; words: number }>();
  * правильно, даже если само тело не менялось.
  */
 export async function buildSearchDocs(notes: NoteMeta[]): Promise<SearchDoc[]> {
+  const generation = ++bodyListGeneration;
   const docs: SearchDoc[] = [];
   const misses: NoteMeta[] = [];
   const present = new Set<string>();
@@ -103,16 +130,13 @@ export async function buildSearchDocs(notes: NoteMeta[]): Promise<SearchDoc[]> {
   }
 
   await pooledForEach(misses, READ_CONCURRENCY, async (note) => {
-    const full = await readNote(note.id);
-    const body = full?.content ?? "";
-    const bodyLower = body.toLowerCase();
-    bodyCache.set(note.id, { updatedAt: note.updatedAt, body, bodyLower });
-    docs.push(toDoc(note, body, bodyLower));
+    const value = await bodyFor(note);
+    docs.push(toDoc(note, value.body, value.bodyLower));
   });
 
   // Выкидываем из кэша удалённые и отправленные в корзину заметки.
-  for (const id of bodyCache.keys()) {
-    if (!present.has(id)) bodyCache.delete(id);
+  if (generation === bodyListGeneration) {
+    for (const id of bodyCache.keys()) if (!present.has(id)) bodyCache.delete(id);
   }
 
   return docs;
@@ -145,6 +169,7 @@ export async function warmIndex(notes: NoteMeta[]): Promise<void> {
  * Возврат на дашборд не делает ничего, пока ни одна заметка не менялась.
  */
 export async function wordCountsFor(notes: NoteMeta[]): Promise<WordEntry[]> {
+  const generation = ++wordListGeneration;
   const out: WordEntry[] = [];
   const misses: NoteMeta[] = [];
   const present = new Set<string>();
@@ -167,19 +192,17 @@ export async function wordCountsFor(notes: NoteMeta[]): Promise<WordEntry[]> {
   }
 
   await pooledForEach(misses, READ_CONCURRENCY, async (note) => {
-    const full = await readNote(note.id);
-    const body = full?.content ?? "";
-    const bodyLower = body.toLowerCase();
-    bodyCache.set(note.id, { updatedAt: note.updatedAt, body, bodyLower });
-    const words = countWords(body);
-    wordCountCache.set(note.id, { updatedAt: note.updatedAt, words });
+    const value = await bodyFor(note);
+    const cached = wordCountCache.get(note.id);
+    const words = cached?.updatedAt === note.updatedAt ? cached.words : countWords(value.body);
+    if (bodyCache.get(note.id)?.updatedAt === note.updatedAt) wordCountCache.set(note.id, { updatedAt: note.updatedAt, words });
     out.push({ createdAt: note.createdAt, words });
   });
 
   // Выкидываем удалённые и отправленные в корзину заметки, так же как чистим
   // body-cache в `buildSearchDocs`, чтобы оба кэша шли нога в ногу.
-  for (const id of wordCountCache.keys()) {
-    if (!present.has(id)) wordCountCache.delete(id);
+  if (generation === wordListGeneration) {
+    for (const id of wordCountCache.keys()) if (!present.has(id)) wordCountCache.delete(id);
   }
 
   return out;

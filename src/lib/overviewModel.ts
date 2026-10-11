@@ -24,6 +24,17 @@ const RECENT_LIMIT = 12;
 const FAVORITE_LIMIT = 5;
 const timestamp = (note: NoteMeta) => Number.isFinite(note.updatedAt) ? note.updatedAt : 0;
 const compare = (a: NoteMeta, b: NoteMeta) => timestamp(b) - timestamp(a) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+type DerivedMeta = { folder: string; updatedAt: number; rawTags: string[]; tags: ReadonlySet<string>; path: string; day: string | null };
+const derivedMetadata = new WeakMap<NoteMeta, DerivedMeta>();
+
+/** Reuse normalization for unchanged notes; no retained Markdown or permanent id cache. */
+function derivedMeta(note: NoteMeta): DerivedMeta {
+  const cached = derivedMetadata.get(note);
+  if (cached && cached.folder === note.folder && cached.updatedAt === note.updatedAt && cached.rawTags.length === note.tags.length && note.tags.every((tag, index) => tag === cached.rawTags[index])) return cached;
+  const value = { folder: note.folder, updatedAt: note.updatedAt, rawTags: [...note.tags], tags: new Set(note.tags.map(normalizeTag).filter(Boolean)), path: note.folder.split("/")[0], day: timestamp(note) > 0 ? dayKey(timestamp(note)) : null };
+  derivedMetadata.set(note, value);
+  return value;
+}
 
 /** Bounded selection instead of sorting the vault for each small widget. */
 function insertRecent(result: NoteMeta[], note: NoteMeta, limit: number) {
@@ -51,15 +62,16 @@ export function buildOverviewModel(source: readonly NoteMeta[]): OverviewModel {
     byId.set(note.id, note); notes.push(note);
     insertRecent(recent, note, RECENT_LIMIT);
     if (note.favorite) { favoriteCount++; insertRecent(favorites, note, FAVORITE_LIMIT); }
-    const path = note.folder.split("/")[0];
+    const derived = derivedMeta(note);
+    const path = derived.path;
     const collection = collections.get(path);
     if (collection) { collection.count++; collection.updatedAt = Math.max(collection.updatedAt, timestamp(note)); }
     else collections.set(path, { path, count: 1, updatedAt: timestamp(note) });
-    const uniqueTags = new Set(note.tags.map(normalizeTag).filter(Boolean));
+    const uniqueTags = derived.tags;
     if (!uniqueTags.size) untaggedCount++;
     for (const tag of uniqueTags) tags.set(tag, (tags.get(tag) ?? 0) + 1);
-    if (timestamp(note) > 0) {
-      const key = dayKey(timestamp(note));
+    if (derived.day) {
+      const key = derived.day;
       days.set(key, (days.get(key) ?? 0) + 1);
     }
   }

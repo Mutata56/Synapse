@@ -1,10 +1,16 @@
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import React from "react";
+import React, { lazy, Suspense } from "react";
 import ReactDOM from "react-dom/client";
-import App from "./App";
 import { CaptureWindow } from "./components/CaptureWindow";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { LanguageProvider } from "./components/LanguageProvider";
+import { t } from "./lib/i18n";
+
+// The hidden capture webview does not need the application/editor module graph.
+const App = lazy(() => import("./App"));
+function StartupLoading() {
+  return <div role="status" className="flex h-screen items-center justify-center text-sm text-neutral-400">{t("Загрузка…")}</div>;
+}
 
 
 /*
@@ -92,7 +98,7 @@ ReactDOM.createRoot(container).render(
   <React.StrictMode>
     <ErrorBoundary>
       <LanguageProvider>
-        {isCaptureWindow ? <CaptureWindow /> : <App />}
+        {isCaptureWindow ? <CaptureWindow /> : <Suspense fallback={<StartupLoading />}><App /></Suspense>}
       </LanguageProvider>
     </ErrorBoundary>
   </React.StrictMode>,
