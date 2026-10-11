@@ -538,7 +538,7 @@
       },
       "note-body": {
         "displayName": "Primary note prose",
-        "purpose": "Inter17px/1.5 at default zoom; reader and block editor share the base."
+        "purpose": "Inter26px/1.5 matching live Obsidian; default editor zoom1."
       },
       "note-title": {
         "displayName": "Inline note title",
@@ -546,11 +546,11 @@
       },
       "note-code": {
         "displayName": "Note code",
-        "purpose": "Local JetBrains Mono at0.875em, preserving fixed-width source and genuine italic."
+        "purpose": "Local JetBrains Mono at0.875em (22.75px at the live26px base)."
       },
       "source-markdown": {
         "displayName": "Source Markdown",
-        "purpose": "Local JetBrains Mono17px/1.5."
+        "purpose": "JetBrains Mono26px/1.5 matching the note base."
       }
     },
     "fontAssets": {
@@ -576,6 +576,16 @@
         "version": "2.304",
         "license": "public/fonts/OFL-JetBrainsMono.txt"
       }
+    },
+    "liveTypeReference": {
+      "source": "Obsidian1.14.4 native Elements/Computed",
+      "textPx": 26,
+      "titlePx": 42.068,
+      "codePx": 22.75,
+      "fileLabelPx": 13,
+      "tabPx": 12,
+      "interfacePx": 15,
+      "scaleVersion": "obsidian-live-26-v1"
     }
   },
   "components": [

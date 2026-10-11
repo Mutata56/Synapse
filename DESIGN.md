@@ -37,7 +37,7 @@ typography:
     fontFamily: "Inter, system-ui, sans-serif"
     fontSize: "15px"
     fontWeight: 400
-    lineHeight: 1.5
+    lineHeight: 1.3
   label:
     fontFamily: "Inter, system-ui, sans-serif"
     fontSize: "12px"
@@ -45,23 +45,23 @@ typography:
     lineHeight: 1.5
   note-body:
     fontFamily: "Inter, system-ui, sans-serif"
-    fontSize: "17px"
+    fontSize: "26px"
     fontWeight: 400
     lineHeight: 1.5
   note-title:
     fontFamily: "Inter, system-ui, sans-serif"
-    fontSize: "27.506px"
+    fontSize: "42.068px"
     fontWeight: 700
     lineHeight: 1.2
     letterSpacing: "-0.015em"
   note-code:
     fontFamily: "JetBrains Mono, ui-monospace, monospace"
-    fontSize: "14.875px"
+    fontSize: "22.75px"
     fontWeight: 400
     lineHeight: 1.5
   source-markdown:
     fontFamily: "JetBrains Mono, ui-monospace, monospace"
-    fontSize: "17px"
+    fontSize: "26px"
     lineHeight: 1.5
   tags-page-title:
     fontSize: "24px"
@@ -69,9 +69,9 @@ typography:
     lineHeight: "30px"
     letterSpacing: "-0.025em"
   tags-reader-title:
-    fontSize: "28px"
-    fontWeight: 650
-    lineHeight: 1.3
+    fontSize: "42.068px"
+    fontWeight: 700
+    lineHeight: 1.2
     letterSpacing: "-0.025em"
   tags-pane-title:
     fontSize: "17px"
@@ -81,8 +81,8 @@ typography:
     fontWeight: 550
     lineHeight: 1.4
   tags-reader-body:
-    fontSize: "14px"
-    lineHeight: 1.75
+    fontSize: "26px"
+    lineHeight: 1.5
   tags-row-label:
     fontSize: "13px"
   tags-control-label:
@@ -167,17 +167,17 @@ typography:
   files-reader-heading:
     fontSize: "16px"
   workspace-tab-label:
-    fontSize: "15px"
+    fontSize: "12px"
     fontWeight: 400
-    lineHeight: 1.5
+    lineHeight: 1.3
   workspace-tree-label:
-    fontSize: "15px"
+    fontSize: "13px"
     fontWeight: 400
-    lineHeight: 1.5
+    lineHeight: 1.3
   workspace-action-label:
     fontSize: "15px"
     fontWeight: 400
-    lineHeight: 1.5
+    lineHeight: 1.3
   workspace-result-title:
     fontSize: "13px"
     fontWeight: 500
@@ -564,11 +564,11 @@ notices ship under `/fonts/`.
 
 `src/typography.css` separates interface, text and monospace roles. Ordinary
 interface text is 15px, compact labels retain 13/12px and existing dense
-previews keep their local 13/14px scale. Primary note prose is 17px/1.5 at the
+previews keep their local 13/14px scale. Primary note prose matches the live Obsidian profile at26px/1.5 at the
 default editor zoom. H1–H6 use the Obsidian ratios 1.618/1.462/1.318/1.188/1.076/1
 relative to that body. The inline note title uses the H1 ratio and the editor's
 text zoom. Its height follows width, zoom and font loading instead of clipping
-wrapped lines. Code uses 0.875em; raw Markdown keeps the readable 17px base.
+wrapped lines. Code uses 0.875em; raw Markdown uses the same26px base.
 
 ### Tags hierarchy
 
@@ -592,9 +592,9 @@ The properties heading becomes (18px) on narrow layouts, while row names become 
 
 ### Workspace hierarchy
 
-The shell uses normal Inter. Tabs, vault name, tree labels and empty-page
-actions share the 15px interface role; ordinary labels are regular (400) with
-line height 1.5. Result titles, context, keycaps and the narrow tab adaptation
+The shell uses normal Inter. Tabs use12px; vault name and tree labels use13px; empty-page
+actions use15px. Ordinary labels are regular (400) with
+line height1.3, matching the computed Obsidian interface. Result titles, context, keycaps and the narrow tab adaptation
 retain compact roles. The generic button font reset was removed in the earlier
 workspace pass, so these explicit role sizes now determine the rendered type.
 
@@ -787,3 +787,17 @@ The connection menu exposes deliberate iCal refresh, configured CalDAV sending, 
 - Don't turn preview tag actions into note edits or load image covers while filtering Tags.
 - Don't invent file sizes or deletion timestamps in Files and Trash.
 - Don't treat Calendar's synthetic light-token capture as a shipped global application light theme.
+
+### Live Obsidian size reference
+
+The working Obsidian1.14.4 window was inspected through native DevTools
+Elements/Computed. Its active body variable was26px while the stored appearance
+file still said17px. The active runtime is authoritative for this user request.
+Computed text was26px/39px, inline title42.068px/50.4816px at700, code22.75px/34.125px,
+file labels13px/16.9px and tabs12px/15.6px. The interface body was15px/19.5px.
+Headings retain the ratios and variable-font weights700/680/660/640/620/600.
+
+The scale profile migrates an old editor zoom to1 once, then retains later user
+zoom. It does not change the root rem size or workspace geometry. Full Tags
+reading shares the26px note base; compact library and Files previews retain
+their local density. The native inspector was closed without editing notes.

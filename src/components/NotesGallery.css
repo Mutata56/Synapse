@@ -549,13 +549,21 @@
 .library-preview .tags-note-header h2 {
   font-size: 23px;
   line-height: 1.3;
+  font-weight: 650;
 }
 .library-preview .tags-note-header {
   padding-bottom: 20px;
 }
 .library-preview .tags-markdown {
   font-size: 13px;
+  line-height: 1.75;
 }
+.library-preview .tags-markdown :is(h1,h2,h3,h4,h5,h6) { font-weight: 600; line-height: 1.35; }
+.library-preview .tags-markdown h1 { font-size: 23px; }
+.library-preview .tags-markdown h2 { font-size: 20px; }
+.library-preview .tags-markdown h3 { font-size: 17px; }
+.library-preview .tags-markdown :is(h4,h5,h6) { font-size: 13px; }
+.library-preview .tags-markdown pre, .library-preview .tags-markdown table { font-size: 12px; }
 .library-preview .tags-reader-folder {
   font-size: 11px;
 }

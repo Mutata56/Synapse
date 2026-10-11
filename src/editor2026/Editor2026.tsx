@@ -45,6 +45,7 @@ import {
 import { Backlinks } from "../components/Backlinks";
 import { LocalGraphWebGL as LocalGraph } from "./LocalGraphWebGL";
 import { NoteHero } from "../components/NoteHero";
+import { persistEditorZoom, readEditorZoom } from "../lib/editorZoom";
 import { UnlinkedMentions } from "../components/UnlinkedMentions";
 import { cn } from "../lib/cn";
 import { t } from "../lib/i18n";
@@ -171,12 +172,9 @@ export function Editor2026({ imported }: { imported?: ImportedEditorBridge } = {
   // см. обертку ниже) без transform, так что всплывающие меню
   // остаются выровненными. Сохраняется в localStorage под тем же ключом,
   // что и в старом редакторе.
-  const [zoom, setZoom] = useState(() => {
-    const raw = Number(localStorage.getItem("editor-zoom"));
-    return Number.isFinite(raw) && raw >= 0.7 && raw <= 2 ? raw : 1;
-  });
+  const [zoom, setZoom] = useState(() => readEditorZoom(localStorage));
   useEffect(() => {
-    localStorage.setItem("editor-zoom", String(zoom));
+    persistEditorZoom(localStorage, zoom);
   }, [zoom]);
   useEffect(() => {
     const el = scrollRef.current;

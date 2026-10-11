@@ -3,7 +3,8 @@
 MODE: Operate for the interface; Read for note content.
 
 USER PIN: use Obsidian's font logic while keeping Synapse's palette and element
-placement. The live appearance profile selects Inter with a 17px note base.
+placement. The working Obsidian renderer uses Inter with an active26px note base;
+the stored appearance file was stale at17px.
 The AnuPpuccin style-settings profile selects JetBrains Mono for source
 Markdown, Inter for live preview/reading and Inter for headings. The user
 explicitly clarified JetBrains Mono for code.
@@ -14,8 +15,8 @@ unchanged packaged Obsidian files; JetBrains Mono normal/italic are official
 2.304 files. Both families' cmap tables contain the complete Russian and Latin
 alphabets. Full SIL OFL notices are included in the built public/fonts folder.
 
-TYPE: interface15px with existing compact13/12px roles; primary note17px/1.5;
-heading ratios1.618/1.462/1.318/1.188/1.076/1; code0.875em; raw Markdown17px.
+TYPE: interface15px/1.3; files/vault13px, tabs12px; primary note26px/1.5;
+heading ratios1.618/1.462/1.318/1.188/1.076/1; code0.875em; raw Markdown26px.
 Dense Tags/library/Files previews retain their local13/14px scales. The inline
 title follows body zoom; width/font changes schedule one guarded resize frame.
 
@@ -49,3 +50,13 @@ bytes of library JavaScript and278168 bytes for quick capture; both editors
 remain deferred. Only the four intended font files and both licenses appear
 in the build. This merge changes no typography selectors or title measurement
 logic validated above.
+
+LIVE SCALE CORRECTION: native Obsidian Elements/Computed confirmed26px/39px
+prose,42.068px/50.4816px title at700,22.75px/34.125px code,13px/16.9px file labels,
+12px/15.6px tabs and15px/19.5px interface body. Synapse browser metrics match
+these values. The renderer uses one-time scale-version migration so an old
+relative zoom cannot multiply the new base; future manual zoom is retained.
+At760px the wrapped title fitted268px with no page overflow. At200% explicit
+editor zoom, prose52px and title84.136px fitted without page overflow.
+Earlier17px captures above are historical baseline evidence. Inter remains an
+explicit user pin despite the generic overused-font detector warning.

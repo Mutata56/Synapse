@@ -4,6 +4,7 @@ import App from "../../src/App";
 import { LanguageProvider } from "../../src/components/LanguageProvider";
 import { useNotesStore, registerFlusher } from "../../src/store/notes";
 import { useWorkspaceStore } from "../../src/store/workspace";
+import { persistEditorZoom } from "../../src/lib/editorZoom";
 import type { Note, TreeNode } from "../../src/lib/storage";
 import "@mantine/core/styles.css";
 
@@ -14,7 +15,7 @@ import "../../src/index.css";
 const parameters = new URLSearchParams(location.search);
 const requestedZoom = Number(parameters.get("zoom"));
 if (parameters.has("zoom") && Number.isFinite(requestedZoom) && requestedZoom >= .7 && requestedZoom <= 2) {
-  localStorage.setItem("editor-zoom", String(requestedZoom));
+  persistEditorZoom(localStorage, requestedZoom);
 }
 const bodies = new Map<string, Note>();
 const makeNote = (id: string, title: string, folder = "", favorite = false): Note => {
