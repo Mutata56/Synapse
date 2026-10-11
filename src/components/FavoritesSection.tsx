@@ -1,8 +1,10 @@
+import { NoteIcon } from "./NoteIcon";
+import { useWorkspaceStore } from "../store/workspace";
 import { motion } from "framer-motion";
 import { FileText, Star } from "lucide-react";
 import { useMemo, useState } from "react";
 import { cn } from "../lib/cn";
-import { DEFAULT_NOTE_TITLE, EMOJI_FONT_STACK } from "../lib/format";
+import { DEFAULT_NOTE_TITLE } from "../lib/format";
 import { t } from "../lib/i18n";
 import type { NoteMeta } from "../lib/storage";
 import { flattenNotes } from "../lib/treeUtils";
@@ -11,7 +13,6 @@ import { useNotesStore } from "../store/notes";
 /** Размер инлайнового эмодзи для иконки строки. Остальные мелкие иконки этой
  *  строки (FileText, Star) берут размер из пропа `size` у lucide и живут в
  *  районе 11-13 px. Держим это именованным, чтобы все три двигались вместе. */
-const ROW_EMOJI_PX = 13;
 const ROW_FILE_ICON_PX = 12;
 const HEADER_STAR_PX = 11;
 const UNFAVORITE_STAR_PX = 11;
@@ -22,8 +23,6 @@ export function FavoritesSection() {
   const tree = useNotesStore((s) => s.tree);
   const activeId = useNotesStore((s) => s.activeId);
   const view = useNotesStore((s) => s.view);
-  const selectNote = useNotesStore((s) => s.selectNote);
-  const setView = useNotesStore((s) => s.setView);
   const toggleFavorite = useNotesStore((s) => s.toggleFavorite);
 
   const favorites = useMemo(
@@ -37,9 +36,8 @@ export function FavoritesSection() {
   // Не занимаем место в сайдбаре, когда показывать нечего.
   if (favorites.length === 0) return null;
 
-  const openNote = (id: string) => {
-    setView("notes");
-    void selectNote(id);
+  const openNote = (id: string, newTab = false) => {
+    void useWorkspaceStore.getState().openNote(id, newTab);
   };
 
   return (
@@ -51,7 +49,7 @@ export function FavoritesSection() {
             key={note.id}
             note={note}
             active={view === "notes" && activeId === note.id}
-            onOpen={() => openNote(note.id)}
+            onOpen={event => openNote(note.id, event?.metaKey === true)}
             onUnfavorite={() => void toggleFavorite(note.id)}
           />
         ))}
@@ -89,7 +87,7 @@ function FadedDivider() {
 type FavoriteRowProps = {
   note: NoteMeta;
   active: boolean;
-  onOpen: () => void;
+  onOpen: (event?: { metaKey: boolean }) => void;
   onUnfavorite: () => void;
 };
 
@@ -109,7 +107,7 @@ function FavoriteRow({
   const onKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
     if (e.key === "Enter" || e.key === " ") {
       e.preventDefault();
-      onOpen();
+      onOpen(e);
     }
   };
 
@@ -131,24 +129,11 @@ function FavoriteRow({
           : "text-zinc-500 hover:bg-white/[0.04] hover:text-zinc-200",
       )}
     >
-      {note.icon ? (
-        <span
-          style={{
-            fontFamily: EMOJI_FONT_STACK,
-            fontSize: ROW_EMOJI_PX,
-            lineHeight: 1,
-          }}
-          className="select-none shrink-0 w-4 text-center"
-        >
-          {note.icon}
-        </span>
-      ) : (
-        <FileText
+      <NoteIcon note={note} size={16} fallback={<FileText
           size={ROW_FILE_ICON_PX}
           strokeWidth={1.8}
           className="shrink-0 text-zinc-600"
-        />
-      )}
+        />} />
       <span className="truncate flex-1">
         {note.title || DEFAULT_NOTE_TITLE}
       </span>

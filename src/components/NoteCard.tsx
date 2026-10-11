@@ -1,3 +1,4 @@
+import { NoteIcon } from "./NoteIcon";
 import { motion } from "framer-motion";
 import { Check, FileText, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -11,7 +12,6 @@ import {
 import { setDragData, type DragItem } from "../lib/dnd";
 import {
   DEFAULT_NOTE_TITLE,
-  EMOJI_FONT_STACK,
   EMPTY_NOTE_PREVIEW,
   formatRelativeDate,
 } from "../lib/format";
@@ -291,18 +291,7 @@ function CardBody({ note }: { note: NoteMeta }) {
   return (
     <div className="p-4">
       <div className="flex items-start gap-2 min-w-0">
-        {note.icon && (
-          <span
-            style={{
-              fontFamily: EMOJI_FONT_STACK,
-              fontSize: ICON_SIZE_PX,
-              lineHeight: 1,
-            }}
-            className="select-none shrink-0"
-          >
-            {note.icon}
-          </span>
-        )}
+        <NoteIcon note={note} size={ICON_SIZE_PX} fallback={null} />
         <h3 className="text-[14px] font-semibold text-zinc-100 truncate flex-1 leading-tight">
           {note.title || DEFAULT_NOTE_TITLE}
         </h3>

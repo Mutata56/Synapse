@@ -1,3 +1,4 @@
+import { useWorkspaceStore } from "../store/workspace";
 import { ArrowDownWideNarrow, Check, ChevronDown, ChevronRight, FileText, Hash, RotateCcw, Search, Tags, CircleMinus, X } from "lucide-react";
 import { lazy, memo, Suspense, useCallback, useDeferredValue, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { indexVaultFiles } from "../lib/obsidianImport";
@@ -20,8 +21,6 @@ export function TagsView({ loadNote = readNote }: { loadNote?: (id: string) => P
   const tree = useNotesStore((s) => s.tree);
   const filter = useNotesStore((s) => s.tagsFilter);
   const setFilter = useNotesStore((s) => s.setTagsFilter);
-  const selectNote = useNotesStore((s) => s.selectNote);
-  const setView = useNotesStore((s) => s.setView);
   const trashNote = useNotesStore((s) => s.trashNote);
   const [tagSearch, setTagSearch] = useState("");
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
@@ -87,12 +86,9 @@ export function TagsView({ loadNote = readNote }: { loadNote?: (id: string) => P
     if (value ?? !next.has(path)) next.add(path); else next.delete(path);
     return next;
   });
-  const open = useCallback((id: string) => {
-    // selectNote flushes existing drafts and rejects stale reads itself.
-    void selectNote(id).then(() => {
-      if (useNotesStore.getState().activeId === id) setView("notes");
-    }).catch(() => useToastStore.getState().push(t("Не удалось открыть заметку")));
-  }, [selectNote, setView, t]);
+  const open = useCallback((id: string, newTab = false) => {
+    void useWorkspaceStore.getState().openNote(id, newTab).catch(() => useToastStore.getState().push(t("Не удалось открыть заметку")));
+  }, [t]);
   const choose = useCallback((id: string) => { setPreviewId(id); setPane("reader"); }, []);
   const onResultsKey = (event: KeyboardEvent<HTMLDivElement>) => {
     if (!results.length) return;
@@ -219,9 +215,9 @@ function SelectedFilters({ tags, onRemove }: { tags: string[]; onRemove: (tag: s
   </div>;
 }
 
-const ResultRow = memo(function ResultRow({ note, selected, id, formatDate, onChoose, onOpen }: { note: NoteMeta; selected: boolean; id: string; formatDate: Intl.DateTimeFormat; onChoose: (id: string) => void; onOpen: (id: string) => void }) {
+const ResultRow = memo(function ResultRow({ note, selected, id, formatDate, onChoose, onOpen }: { note: NoteMeta; selected: boolean; id: string; formatDate: Intl.DateTimeFormat; onChoose: (id: string) => void; onOpen: (id: string, newTab?: boolean) => void }) {
   const tags = [...new Set(note.tags.map(normalizeTag).filter(Boolean))];
-  return <div id={id} className="tags-result-row" role="option" aria-selected={selected} onClick={(event) => { onChoose(note.id); event.currentTarget.closest<HTMLElement>("[role=listbox]")?.focus({ preventScroll: true }); }} onDoubleClick={() => onOpen(note.id)}>
+  return <div id={id} className="tags-result-row" role="option" aria-selected={selected} onClick={(event) => { if (event.metaKey) { event.preventDefault(); onOpen(note.id, true); return; } onChoose(note.id); event.currentTarget.closest<HTMLElement>("[role=listbox]")?.focus({ preventScroll: true }); }} onDoubleClick={event => onOpen(note.id, event.metaKey)}>
     <FileText size={17} className="tags-result-icon" aria-hidden="true" /><div className="tags-result-title" title={note.title}>{note.title}</div>
     <div className="tags-result-folder" title={note.folder || "/"}>{note.folder || "/"}</div>
     <div className="tags-result-bottom"><div className="tags-result-tags">{tags.slice(0, 2).map((tag) => <span key={tag} title={`#${tag}`}><Hash size={10} aria-hidden="true" />{tag}</span>)}{tags.length > 2 && <span>+{tags.length - 2}</span>}</div><time dateTime={new Date(note.updatedAt).toISOString()}>{formatDate.format(note.updatedAt)}</time></div>

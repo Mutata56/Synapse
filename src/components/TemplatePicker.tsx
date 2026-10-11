@@ -1,3 +1,4 @@
+import { IconGlyph } from "./NoteIcon";
 // src/components/TemplatePicker.tsx
 //
 // Одна Modal на два режима: "выбрать шаблон" и "управление шаблонами".
@@ -241,7 +242,7 @@ function TemplateCard({
         <div className="flex items-center gap-2 mb-1.5">
           {meta.icon && (
             <span className="text-base" aria-hidden="true">
-              {meta.icon}
+              <IconGlyph value={meta.icon} size={16} />
             </span>
           )}
           <div className="text-sm font-medium text-zinc-100 truncate flex-1">

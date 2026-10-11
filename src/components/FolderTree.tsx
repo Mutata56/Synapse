@@ -6,6 +6,7 @@ import {
   FileText,
   Folder,
   FolderOpen,
+  Palette,
   FolderPlus,
   History,
   Pencil,
@@ -33,7 +34,11 @@ import {
 import { exportNoteMarkdown } from "../lib/export";
 import { FOLDER_COLORS } from "../lib/folderColors";
 import { DEFAULT_NOTE_TITLE } from "../lib/format";
-import type { TreeNode } from "../lib/storage";
+import type { TreeNode, NoteMeta } from "../lib/storage";
+import { NoteIcon } from "./NoteIcon";
+import { useIconizeStore } from "../store/iconize";
+import { resolveIcon } from "../lib/iconize";
+import { noteClickAction } from "../lib/noteClick";
 import { stableKey } from "../lib/treeKeys";
 import { confirmDialog } from "../store/confirm";
 import { reportError, useNotesStore } from "../store/notes";
@@ -531,6 +536,7 @@ function FolderRow({
         icon: Pencil,
         onClick: () => setRenaming(true),
       },
+      { kind: "item", label: t("Изменить иконку"), icon: Palette, onClick: () => useIconizeStore.getState().openPicker({ targets: [{ kind: "folder", path: node.path }], current: resolveIcon(useIconizeStore.getState().data, "folder", node.path) ?? undefined }) },
       {
         kind: "swatches",
         label: t("Цвет папки"),
@@ -625,7 +631,7 @@ function FolderRow({
         >
           <ChevronRight size={11} strokeWidth={2.4} />
         </motion.div>
-        {expanded ? (
+        <NoteIcon kind="folder" path={node.path} fallback={expanded ? (
           <FolderOpen
             size={13}
             strokeWidth={1.8}
@@ -639,7 +645,7 @@ function FolderRow({
             className="text-zinc-500"
             style={folderColor ? { color: folderColor } : undefined}
           />
-        )}
+        )} />
         {renaming ? (
           <RenameInput
             initial={node.name}
@@ -719,7 +725,7 @@ function NoteRow({
   note,
   depth,
 }: {
-  note: { id: string; title: string; favorite?: boolean };
+  note: NoteMeta;
   depth: number;
 }) {
   // Производный булев селектор: NoteRow перерисовывается, только когда меняется
@@ -781,6 +787,7 @@ function NoteRow({
         icon: Pencil,
         onClick: () => setRenaming(true),
       },
+      { kind: "item", label: t("Изменить иконку"), icon: Palette, onClick: () => useIconizeStore.getState().openPicker({ targets: [{ kind: "file", path: note.id + ".md" }], current: resolveIcon(useIconizeStore.getState().data, "file", note.id + ".md", note) ?? undefined }) },
       {
         kind: "item",
         label: t("История версий"),
@@ -823,12 +830,14 @@ function NoteRow({
 
   const onClick = (e: React.MouseEvent) => {
     if (renaming) return;
-    if (e.ctrlKey || e.metaKey || ctx.selecting) {
+    const action = noteClickAction(e, ctx.selecting);
+    if (action === "select") {
       e.preventDefault();
       ctx.toggleNote(note.id);
       return;
     }
-    void useWorkspaceStore.getState().openNote(note.id);
+    if (action === "new-tab") e.preventDefault();
+    void useWorkspaceStore.getState().openNote(note.id, action === "new-tab");
   };
 
   return (
@@ -862,14 +871,14 @@ function NoteRow({
         )}
         style={{ paddingLeft: NOTE_ROW_PAD_LEFT_PX + depth * DEPTH_INDENT_PX }}
       >
-        <FileText
+        <NoteIcon note={note} fallback={<FileText
           size={12}
           strokeWidth={1.8}
           className={cn(
             "shrink-0 transition-colors",
             active ? "text-[var(--color-accent)]" : "text-zinc-600",
           )}
-        />
+        />} />
         {renaming ? (
           <RenameInput
             initial={note.title}

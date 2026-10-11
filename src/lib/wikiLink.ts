@@ -87,7 +87,7 @@ const wikiLinkPlugin = new Plugin<DecorationSet>({
       );
       const target = el?.getAttribute(DATA_ATTR);
       if (!target) return false;
-      return useNotesStore.getState().openNoteByTitle(target);
+      return useNotesStore.getState().openNoteByTitle(target, event.metaKey);
     },
   },
 });

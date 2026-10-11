@@ -18,14 +18,16 @@ const model = await import(pathToFileURL(pureEntry));
 after(() => rm(directory, { recursive: true, force: true }));
 const note = noteId => ({ kind: "note", noteId });
 
-test("a file replaces the empty tab; another tab remains open and duplicates focus the existing file", () => {
+test("explicit article tabs preserve the current tab and allow the same article twice; plain opening reuses a tab", () => {
   let state = model.emptySession("initial");
   state = model.openWorkspaceTarget(state, note("a"), "ignored", true);
   assert.equal(state.tabs.length, 1); assert.equal(state.activeTabId, "initial");
   state = model.openWorkspaceTarget(state, note("b"), "second", true);
   assert.equal(state.tabs.length, 2); assert.equal(state.activeTabId, "second");
   state = model.openWorkspaceTarget(state, note("a"), "third", true);
-  assert.equal(state.tabs.length, 2); assert.equal(state.activeTabId, "initial");
+  assert.equal(state.tabs.length, 3); assert.equal(state.activeTabId, "third");
+  state = model.openWorkspaceTarget(state, note("a"), "unused");
+  assert.equal(state.tabs.length, 3); assert.equal(state.activeTabId, "initial");
 });
 
 test("closing the current tab chooses its neighbour; closing the last tab leaves a usable empty page", () => {
@@ -159,12 +161,12 @@ test("restored disabled sections fall back to settings and do not hide access to
   await workspace.getState().restore();
   assert.deepEqual(model.activeWorkspaceTab(workspace.getState()).target,{kind:'view',view:'settings'});
 });
-test("disabling new tabs preserves open documents but prevents every additional-tab action", async t => {
+test("disabling the start page blocks empty tabs but explicit article tabs still preserve the current document", async t => {
   const { workspace, notes } = await fixture(t);
   await workspace.getState().openNote('A'); await workspace.getState().openNote('B',true);
   notes.setState(s=>({settings:{...s.settings,modules:{...s.settings.modules,home:false}}}));
   await workspace.getState().newTab(); assert.equal(workspace.getState().tabs.length,2);
-  await workspace.getState().openNote('C',true); assert.equal(workspace.getState().tabs.length,2);
-  await workspace.getState().openView('files'); assert.equal(workspace.getState().tabs.length,2);
+  await workspace.getState().openNote('C',true); assert.equal(workspace.getState().tabs.length,3);
+  await workspace.getState().openView('files'); assert.equal(workspace.getState().tabs.length,3);
   assert(workspace.getState().tabs.some(tab=>tab.target.kind==='note'&&tab.target.noteId==='A'));
 });

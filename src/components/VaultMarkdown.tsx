@@ -12,9 +12,11 @@ import { MarkdownCallout, MarkdownTask } from "./NoteBlockUI";
 import { CALLOUT_LABELS, calloutType } from "../lib/noteBlockTypes";
 import { t } from "../lib/i18n";
 
-export const VaultMarkdownContext = createContext<{ files: VaultFileIndex; workspace: string; id: string; navigate: (ref: string, relative?: boolean) => void }>({ files: indexVaultFiles([]), workspace: "", id: "", navigate: () => undefined });
-const plugins = [remarkGfm, remarkNoteBlocks, remarkNoteTags];
-const urlTransform = (url: string) => /^synapse-(?:note|embed|tag):/.test(url) ? url : defaultUrlTransform(url);
+import { useIconizeStore } from "../store/iconize";
+import { InlineIcon, VaultLinkIcon, remarkIconize } from "./IconizeMarkdown";
+
+export const VaultMarkdownContext = createContext<{ files: VaultFileIndex; workspace: string; id: string; navigate: (ref: string, relative?: boolean, newTab?: boolean) => void }>({ files: indexVaultFiles([]), workspace: "", id: "", navigate: () => undefined });
+const urlTransform = (url: string) => /^synapse-(?:note|embed|tag|icon):/.test(url) ? url : defaultUrlTransform(url);
 
 export function scrollToMarkdownHeading(heading: string): void {
   if (!heading) return;
@@ -24,6 +26,8 @@ export function scrollToMarkdownHeading(heading: string): void {
 }
 
 export function VaultMarkdown({ source, onMarkerChange }: { source: string; onMarkerChange?: (kind: "callout" | "task", index: number, value: string) => void }) {
+  const iconSettings = useIconizeStore(state => state.data.settings);
+  const plugins = useMemo(() => [remarkGfm, remarkNoteBlocks, remarkNoteTags, [remarkIconize, { identifier: iconSettings.iconIdentifier, enabled: iconSettings.iconsInNotesEnabled }]] as import("unified").PluggableList, [iconSettings.iconIdentifier, iconSettings.iconsInNotesEnabled]);
   const { files, workspace, id, navigate } = useContext(VaultMarkdownContext);
   const preview = useMemo(() => obsidianMarkdownPreview(splitMarkdownSource(source).body), [source]);
   const components = useMemo(() => ({
@@ -31,21 +35,22 @@ export function VaultMarkdown({ source, onMarkerChange }: { source: string; onMa
     div: ({ node: _node, children, ...props }: any) => props.className === "note-callout-heading" ? <span>{Array.isArray(children) ? children.length ? children : t(CALLOUT_LABELS[calloutType(props["data-callout-heading"])]) : children || t(CALLOUT_LABELS[calloutType(props["data-callout-heading"])])}</span> : <div {...props}>{children}</div>,
     li: ({ node: _node, children, ...props }: any) => props["data-task-status"] !== undefined ? <MarkdownTask marker={String(props["data-task-status"])} index={Number(props["data-task-index"])} onPick={onMarkerChange}>{children}</MarkdownTask> : <li {...props}>{children}</li>,
     a: ({ href = "", children }: { href?: string; children?: ReactNode }) => {
+      if (href.startsWith("synapse-icon:")) return <InlineIcon id={href.slice("synapse-icon:".length)}>{children}</InlineIcon>;
       if (href.startsWith("synapse-tag:")) {
         const tag = decodeURIComponent(href.slice("synapse-tag:".length));
         return <button type="button" className="note-inline-tag" onClick={() => { const store = useNotesStore.getState(); store.setCurrentTag(tag); store.setView("tags"); }}>{children}</button>;
       }
       return <a href={href || undefined} onClick={event => {
         event.preventDefault();
-        if (href.startsWith("synapse-note:")) { navigate(decodeURIComponent(href.slice("synapse-note:".length))); return; }
+        if (href.startsWith("synapse-note:")) { navigate(decodeURIComponent(href.slice("synapse-note:".length)), false, event.metaKey); return; }
         if (href.startsWith("#")) { scrollToMarkdownHeading(decodeURIComponent(href.slice(1))); return; }
         if (/^(?:https?:|mailto:)/i.test(href)) { void openUrl(href).catch(e => useToastStore.getState().push(String(e))); return; }
         const target = wikiTarget(href);
-        if (/\.md$/i.test(target.path)) { navigate(href, true); return; }
+        if (/\.md$/i.test(target.path)) { navigate(href, true, event.metaKey); return; }
         const path = resolveVaultReference(target.path, id, files, { relativeFirst: true });
         if (path && workspace) void openPath(`${workspace}/${path}`).catch(e => useToastStore.getState().push(String(e)));
         else useToastStore.getState().push(`Файл не найден: ${href}`);
-      }}>{children}</a>;
+      }}><VaultLinkIcon href={href} noteId={id} files={files} />{children}</a>;
     },
     img: ({ src = "", alt = "", title }: { src?: string; alt?: string; title?: string }) => {
       const embed = src.startsWith("synapse-embed:");

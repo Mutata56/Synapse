@@ -6,6 +6,7 @@ import { emptyModel } from "../editor2026/dataTable/model";
 import { hashString } from "../lib/hashString";
 import { exitAfterSaving } from "../lib/applicationExit";
 import { cn } from "../lib/cn";
+import { NoteIcon } from "./NoteIcon";
 import { t } from "../lib/i18n";
 import { flattenNotes } from "../lib/treeUtils";
 import { QUICK_SWITCHER_EVENT, WORKSPACE_COMMAND_EVENT, type WorkspaceCommand } from "../lib/workspaceCommands";
@@ -150,6 +151,7 @@ function WorkspaceTabs() {
   const sidebarVisible = useWorkspaceStore(state => state.sidebarVisible), rightVisible = useWorkspaceStore(state => state.rightVisible);
   const tree = useNotesStore(state => state.tree);
   const labels = useMemo(() => new Map(flattenNotes(tree).map(note => [note.id, note.title || t("Без названия")])), [tree]);
+  const noteIcons = useMemo(() => new Map(flattenNotes(tree).map(note => [note.id, note])), [tree]);
   const [menu, setMenu] = useState(false);
   const menuRoot = useRef<HTMLDivElement>(null);
   const tabStrip = useRef<HTMLDivElement>(null);
@@ -179,7 +181,7 @@ function WorkspaceTabs() {
           <button ref={tab.id === activeId ? activeButton : undefined} className="workspace-tab-select" type="button" role="tab" aria-selected={tab.id === activeId} aria-controls="workspace-active-content" tabIndex={tab.id === activeId ? 0 : -1} title={label(tab.target)} onClick={() => void useWorkspaceStore.getState().activateTab(tab.id)} onKeyDown={event => {
             if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
             event.preventDefault(); keyboardTabFocus.current = true; const index = tabs.indexOf(tab); const next = (index + (event.key === "ArrowRight" ? 1 : -1) + tabs.length) % tabs.length; void useWorkspaceStore.getState().activateTab(tabs[next].id);
-          }}><Icon size={15} strokeWidth={1.7} aria-hidden="true" /><span>{label(tab.target)}</span></button>
+          }}>{tab.target.kind === "note" ? <NoteIcon note={noteIcons.get(tab.target.noteId)} path={tab.target.noteId + ".md"} size={15} surface="tab" /> : <Icon size={15} strokeWidth={1.7} aria-hidden="true" />}<span>{label(tab.target)}</span></button>
           <button className="workspace-tab-close" type="button" aria-label={t("Закрыть вкладку {title}", { title: label(tab.target) })} title={t("Закрыть вкладку")} onClick={() => void useWorkspaceStore.getState().closeTab(tab.id)}><X size={15} aria-hidden="true" /></button>
         </div>;
       })}

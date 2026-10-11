@@ -4,6 +4,8 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { lazy, Suspense, useEffect, type ReactNode } from "react";
 import { MotionConfig } from "framer-motion";
 import { isViewEnabled } from "./lib/modules";
+import { useIconizeStore } from "./store/iconize";
+const IconPicker = lazy(() => import("./components/IconPicker"));
 import { t } from "./lib/i18n";
 const CalendarView = lazy(() => import("./components/CalendarView").then(module => ({ default: module.CalendarView })));
 import { CommandPalette } from "./components/CommandPalette";
@@ -53,6 +55,7 @@ const Z_KEY_CHARS = new Set(["z", "Z", "я", "Я"]);
 // ─── Component ─────────────────────────────────────────────────────────────
 
 export default function App({ bootstrap = true }: { bootstrap?: boolean } = {}) {
+  const iconPickerOpen = useIconizeStore(s => s.picker !== null);
   const refreshTree = useNotesStore((s) => s.refreshTree);
   const loadFolderColors = useNotesStore((s) => s.loadFolderColors);
   const loadSettings = useNotesStore((s) => s.loadSettings);
@@ -94,6 +97,7 @@ export default function App({ bootstrap = true }: { bootstrap?: boolean } = {}) 
       // пользовательский глобальный шорткат применились как можно раньше
       // (до чтения дерева, которое заполняет UI).
       await loadSettings();
+      await useIconizeStore.getState().load();
       await refreshTree();
       await useWorkspaceStore.getState().restore();
       // Создаём встроенные шаблоны, если их нет (идемпотентно, см.
@@ -192,6 +196,7 @@ export default function App({ bootstrap = true }: { bootstrap?: boolean } = {}) 
     <MotionConfig reducedMotion={settings.animations ? "user" : "always"}><div className="app-shell h-screen w-screen overflow-hidden" data-animations={settings.animations ? "on" : "off"}>
       {settings.modules.search ? <CommandPalette /> : null}
       <Toaster />
+      {iconPickerOpen && <Suspense fallback={null}><IconPicker /></Suspense>}
       <WikiLinkPicker />
       <VersionHistory />
       <ConfirmDialog />
