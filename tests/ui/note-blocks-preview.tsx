@@ -8,10 +8,11 @@ import { LanguageProvider } from "../../src/components/LanguageProvider";
 import "@mantine/core/styles.css";
 import "@blocknote/core/fonts/inter.css";
 import "@blocknote/mantine/style.css";
+import "../../src/typography.css";
 import "../../src/index.css";
 
 useNotesStore.setState({ settings: { ...useNotesStore.getState().settings, modules: ALL_MODULES }, tree: await listTree(), view: "notes" });
 await useWorkspaceStore.getState().openNote("Note blocks review");
-useWorkspaceStore.getState().toggleRight();
+useWorkspaceStore.setState({ rightVisible: true });
 useWorkspaceStore.getState().setRightPane("graph");
 createRoot(document.getElementById("root")!).render(<LanguageProvider><App bootstrap={false} /></LanguageProvider>);

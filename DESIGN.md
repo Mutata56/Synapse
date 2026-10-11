@@ -2,6 +2,20 @@
 name: Synapse
 description: Existing desktop note interface extracted from repository components and CSS
 colors:
+  note-info: "#6ea8fe"
+  note-tip: "#5fd08a"
+  note-success: "#4fd1b1"
+  note-warning: "#f0c64e"
+  note-question: "#b699ff"
+  note-danger: "#f38a9e"
+  task-done-ink: "#08291b"
+  task-cancelled-ink: "#38131e"
+  task-important: "#f0df75"
+  task-important-ink: "#322c07"
+  task-question: "#efb273"
+  task-question-ink: "#3e2308"
+  task-forwarded: "#71c3ef"
+  task-scheduled: "#75d9cd"
   primary: "#6366f1"
   link: "#818cf8"
   neutral-bg: "#0a0a0b"
@@ -221,6 +235,7 @@ typography:
   calendar-narrow-hour:
     fontSize: "8px"
 rounded:
+  note-callout: "10px"
   control: "6px"
   card: "12px"
   chip: "999px"
@@ -790,3 +805,10 @@ The connection menu exposes deliberate iCal refresh, configured CalDAV sending, 
 - Don't turn preview tag actions into note edits or load image covers while filtering Tags.
 - Don't invent file sizes or deletion timestamps in Files and Trash.
 - Don't treat Calendar's synthetic light-token capture as a shipped global application light theme.
+
+
+## Note block extension
+
+Callouts and task markers extend the existing editor with the same local fonts and semantic shell tokens. Their scoped implementation is `noteBlocks.css`; body copy inherits the user's text settings. A callout uses a 10px local corner, 12px/15px inset, a thin tinted stroke and tonal fill, with a 14px title and an 18px Lucide icon. The type menu has an 8px corner, 13px labels and a bounded scrolling region. Task marks occupy 21px beside ordinary body text; the supplied state colors distinguish progress, done, cancellation, importance, questions, key items, forwarding and planning. Symbols and readable labels carry state in addition to color. Keyboard focus uses the existing link role. No new entrance animation or background work is introduced.
+
+The right context pane adds an explicit Local graph tab and a draggable left-edge separator. Its initial width remains 270px; preferred width is bounded between 240px and 600px, further constrained by the viewport and the docked work area. UI preferences retain width and selected region. The graph is a static bounded SVG using existing metadata and up to forty nodes; full labels appear in an HTML caption on hover/focus. The surrounding optional-module controls remain authoritative. Same-article split reading/source mode is removed; Blocks, Reading and Markdown remain.
