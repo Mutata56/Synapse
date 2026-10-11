@@ -1,3 +1,4 @@
+import { Profiler } from 'react';
 import { createRoot } from 'react-dom/client';
 import { Sidebar } from '../../src/components/Sidebar';
 import { ImagesView } from '../../src/components/ImagesView';
@@ -27,4 +28,9 @@ async function loadPreview(image:FixtureImage,signal:AbortSignal):Promise<ImageP
 }
 useNotesStore.setState({view:'images',selectNote:async(id:string)=>{const usage=real.images.flatMap(i=>i.usedBy).find(u=>u.id===id);if(usage)useNotesStore.setState({activeId:id,activeNote:{id,title:usage.title,content:'',folder:usage.folder,createdAt:Date.now(),updatedAt:Date.now(),icon:null,cover:null,preview:'',favorite:false,tags:[],links:[]} as Note});}});
 function Fixture(){const view=useNotesStore(s=>s.view);const note=useNotesStore(s=>s.activeNote);return <div className="tags-qa-shell"><Sidebar/><main>{view==='notes'?<div className="tags-qa-opened"><h1>{note?.title}</h1><button onClick={()=>useNotesStore.getState().setView('images')}>Вернуться к изображениям</button></div>:<ImagesView loadLibrary={loadLibrary} previewLoader={loadPreview} revealImage={async()=>{}} deleteImages={async ids=>{items=items.filter(image=>!ids.includes(image.id));document.documentElement.dataset.deletedFixtureImages=String(ids.length);}}/>}</main>{mode==='stress'&&<span style={{position:'fixed',left:8,bottom:8,fontSize:10,color:'#9a9aa6',pointerEvents:'none'}}>Тестовая коллекция: 50 000</span>}<ConfirmDialog/></div>}
-createRoot(document.getElementById('root')!).render(<LanguageProvider><Fixture/></LanguageProvider>);
+let commits=0;
+function profileRender(_id:string,phase:string,actualMs:number){
+ const memory=(performance as Performance & {memory?:{usedJSHeapSize:number}}).memory;
+ document.documentElement.dataset.imageProfile=JSON.stringify({commits:++commits,phase,actualMs,heapBytes:memory?.usedJSHeapSize??null});
+}
+createRoot(document.getElementById('root')!).render(<LanguageProvider><Profiler id="images-review" onRender={profileRender}><Fixture/></Profiler></LanguageProvider>);

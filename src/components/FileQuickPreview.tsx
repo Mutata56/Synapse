@@ -1,5 +1,5 @@
 import { Image, RefreshCw } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { memo, useEffect, useMemo, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { obsidianMarkdownPreview } from "../lib/obsidianImport";
@@ -11,7 +11,7 @@ const plugins = [remarkGfm];
 const components = { img: ({ alt }: { alt?: string }) => <span className="fs-preview-attachment"><Image size={14} />{alt || "Вложение"}</span>, a: ({ children }: { children?: React.ReactNode }) => <span className="fs-preview-link">{children}</span> };
 
 /** Explicit quick look only; never mounts an editor or fetches remote media. */
-export default function FileQuickPreview({ id, revision, read }: { id: string; revision: number; read: (id: string) => Promise<string> }) {
+function FileQuickPreview({ id, revision, read }: { id: string; revision: number; read: (id: string) => Promise<string> }) {
   const { t } = useI18n();
   const [body, setBody] = useState<string | null>(null), [error, setError] = useState(false), [retry, setRetry] = useState(0);
   useEffect(() => {
@@ -31,3 +31,7 @@ export default function FileQuickPreview({ id, revision, read }: { id: string; r
   if (body === null) return <p role="status">{t("Загрузка…")}</p>;
   return <><div className="fs-markdown"><ReactMarkdown remarkPlugins={plugins} components={components}>{markdown || t("Заметка пока пустая")}</ReactMarkdown></div>{body.length > LIMIT && <p className="fs-preview-limit">{t("Показано начало длинной заметки")}</p>}</>;
 }
+
+// Row-window scrolling does not change the reading note. Avoid repeating its
+// Markdown parse and rebuilding the reading DOM for those table commits.
+export default memo(FileQuickPreview);
