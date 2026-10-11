@@ -11,6 +11,7 @@ import { reportError, useNotesStore } from "../store/notes";
 import { useToastStore } from "../store/toasts";
 import { FileBrowserDialog, type FileDialogMode } from "./FileBrowserDialog";
 import { FileProperties } from "./FileProperties";
+import { FileQuickLook } from "./FileQuickLook";
 import { useI18n } from "./LanguageProvider";
 import { useWindowedRows } from "./useWindowedRows";
 import "./fileBrowser.css";
@@ -45,9 +46,15 @@ export function FileBrowser({ mode, readBody, initialSelected = [] }: Props) {
   const rowIndexes = useMemo(() => new Map(keys.map((key, position) => [key, position])), [keys]);
   const selectedItems = useMemo(() => [...selected].map(key => index.byKey.get(key)).filter((item): item is FileEntry => !!item), [selected, index]);
   const shownSelection = busy ? busyItems.current : selectedItems;
+  const previewEntry = rowIndexes.has(previewKey) ? index.byKey.get(previewKey) : undefined;
+  const previewPosition = rowIndexes.get(previewKey) ?? -1;
   const targets = useMemo(() => normalizeFileTargets(selectedItems.map(entryTarget)), [selectedItems]);
   const resetKey = `${mode}:${folder}:${deferredQuery}:${deep}:${kind}`;
   const windowed = useWindowedRows(rows.length, ROW_HEIGHT, resetKey, 52);
+  const returnQuickLookFocus = useCallback(() => {
+    const element = windowed.ref.current;
+    if (element?.isConnected) element.focus({ preventScroll: true });
+  }, [windowed.ref]);
   const blocked = busy || undoBusy;
   const dateFormat = useMemo(() => new Intl.DateTimeFormat(lang === "ru" ? "ru-RU" : "en-GB", { day: "numeric", month: "short" }), [lang]);
   const read = useCallback(async (id: string) => {
@@ -68,7 +75,7 @@ export function FileBrowser({ mode, readBody, initialSelected = [] }: Props) {
     const state = useNotesStore.getState();
     if (state._undoRedoBusy) return;
     if (mode === "files") state.setCurrentFolder(path); else state.setCurrentTrashFolder(path);
-    setSelected(new Set()); setActive(""); anchor.current = ""; setMenu(null);
+    setSelected(new Set()); setActive(""); anchor.current = ""; setMenu(null); setPreviewKey("");
   }, [mode]);
   const refresh = useCallback(async () => {
     if (busyRef.current || useNotesStore.getState()._undoRedoBusy) return;
@@ -86,7 +93,8 @@ export function FileBrowser({ mode, readBody, initialSelected = [] }: Props) {
       return next.size === previous.size ? previous : next;
     });
     if (active && !rowIndexes.has(active)) setActive("");
-  }, [index, rowIndexes, active, busy]);
+    if (previewKey && !rowIndexes.has(previewKey)) setPreviewKey("");
+  }, [index, rowIndexes, active, busy, previewKey]);
   useEffect(() => {
     if (!menu) return;
     const dismiss = (event: PointerEvent) => { if (!menuRef.current?.contains(event.target as Node)) setMenu(null); };
@@ -102,15 +110,26 @@ export function FileBrowser({ mode, readBody, initialSelected = [] }: Props) {
     setActive(keys[position]); if (!range) anchor.current = keys[position];
     windowed.ref.current?.focus({ preventScroll: true });
   };
+  const showQuickLook = () => {
+    if (blocked) return;
+    const entry = selected.has(active) ? index.byKey.get(active) : selectedItems[0];
+    if (entry) { setMenu(null); setPreviewKey(entry.key); }
+  };
+  const stepQuickLook = (delta: number) => {
+    const position = previewPosition + delta, entry = rows[position];
+    if (!entry) return;
+    setPreviewKey(entry.key); setActive(entry.key); anchor.current = entry.key;
+    setSelected(new Set([entry.key])); windowed.reveal(position);
+  };
   const open = (entry: FileEntry) => {
     if (blocked) return;
     if (entry.kind === "folder") navigate(entry.path);
     else if (mode === "files") { const state = useNotesStore.getState(); state.setView("notes"); void state.selectNote(entry.path).catch(error => reportError(t("Не удалось открыть заметку"), "FileBrowser open:", error)); }
-    else { setSelected(new Set([entry.key])); setActive(entry.key); setDetails(true); setPreviewKey(entry.key); }
+    else { setSelected(new Set([entry.key])); setActive(entry.key); setPreviewKey(entry.key); }
   };
   const execute = async (operation: () => Promise<unknown>) => {
     if (busyRef.current || undoBusy) return false;
-    busyRef.current = true; busyItems.current = selectedItems; setBusy(true); setMenu(null);
+    busyRef.current = true; busyItems.current = selectedItems; setBusy(true); setMenu(null); setPreviewKey("");
     try { await operation(); return true; }
     catch (error) { reportError(t("Не удалось выполнить действие"), "FileBrowser operation:", error); return false; }
     finally { busyRef.current = false; setBusy(false); }
@@ -198,7 +217,7 @@ export function FileBrowser({ mode, readBody, initialSelected = [] }: Props) {
           else if (event.key === "F2" && selectedItems.length === 1 && mode === "files") { event.preventDefault(); setDialog({ mode: "rename", entry: selectedItems[0] }); }
           else if (event.key === "F5") { event.preventDefault(); void refresh(); }
           else if (event.key === "F10" && event.shiftKey && activePosition >= 0) { event.preventDefault(); const box = event.currentTarget.getBoundingClientRect(); setMenu({ x: box.left + 64, y: box.top + 32 }); }
-          else if (event.key === " " && activePosition >= 0) { event.preventDefault(); setDetails(true); setPreviewKey(value => value === active ? "" : active); }
+          else if (event.key === " " && !command && !event.altKey) { event.preventDefault(); if (!event.repeat) { if (previewKey) setPreviewKey(""); else showQuickLook(); } }
         }}>
         <div className="fs-table-header" role="row">
           <div role="columnheader" aria-label={t("Выделение")}><button type="button" className="fs-select-all" aria-label={selected.size === rows.length && rows.length ? t("Снять выделение всех") : t("Выбрать все")} aria-pressed={selected.size === rows.length && rows.length > 0} disabled={blocked || !rows.length} onClick={() => setSelected(selected.size === rows.length ? new Set() : new Set(keys))}><span className={selected.size === rows.length && rows.length ? "fs-checked" : "fs-checkbox"}>{selected.size === rows.length && rows.length > 0 && <Check size={13} />}</span></button></div>
@@ -219,10 +238,12 @@ export function FileBrowser({ mode, readBody, initialSelected = [] }: Props) {
           })}</div> : <div className="fs-empty"><Folder size={36} /><h2>{query || kind !== "all" ? t("Ничего не найдено") : mode === "trash" ? t("Корзина пуста") : t("В папке пока нет элементов")}</h2><p>{query || kind !== "all" ? t("Измени поиск или сбрось фильтр типа") : mode === "trash" ? t("Удалённые заметки и папки появятся здесь") : t("Создай заметку или папку")}</p>{(query || kind !== "all") && <button type="button" className="fs-button" onClick={() => { setQuery(""); setKind("all"); }}>{t("Сбросить фильтры")}</button>}</div>}
         </div>
       </div>
-      {details && <FileProperties mode={mode} items={shownSelection} index={index} folder={folder} busy={blocked} onClose={() => setDetails(false)} onOpen={open} onMove={() => setDialog({ mode: "move" })} onTrash={() => void trash()} onRestore={() => void restore()} onDelete={() => void permanentlyDelete()} onCopy={() => void copyPaths()} read={read} previewKey={previewKey} />}
+      {details && <FileProperties mode={mode} items={shownSelection} index={index} folder={folder} busy={blocked} onClose={() => setDetails(false)} onOpen={open} onMove={() => setDialog({ mode: "move" })} onTrash={() => void trash()} onRestore={() => void restore()} onDelete={() => void permanentlyDelete()} onCopy={() => void copyPaths()} />}
     </div>
+    {previewEntry && <FileQuickLook mode={mode} entry={previewEntry} index={index} read={read} position={previewPosition} total={rows.length} onStep={stepQuickLook} onClose={() => setPreviewKey("")} onReturnFocus={returnQuickLookFocus} onOpen={open} />}
     {dialog && <FileBrowserDialog mode={dialog.mode} source={mode} index={index} folder={folder} entry={dialog.entry} targets={targets} busy={blocked} onClose={() => { if (!busyRef.current) setDialog(null); }} onSubmit={submit} />}
     {menu && createPortal(<div role="menu" aria-label={t("Действия с элементами")} className="fs-menu" ref={menuRef} style={{ left: Math.max(8, menu.x), top: Math.max(8, menu.y) }} onKeyDown={event => { if (event.key === "ArrowDown" || event.key === "ArrowUp") { event.preventDefault(); const buttons = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>("button")); const current = buttons.indexOf(document.activeElement as HTMLButtonElement); buttons[(current + (event.key === "ArrowDown" ? 1 : buttons.length - 1)) % buttons.length]?.focus(); } }}>
+      <button type="button" role="menuitem" onClick={showQuickLook}><FileText size={15} />{t("Быстрый просмотр")}<kbd>Space</kbd></button>
       {selectedItems.length === 1 && mode === "files" && <><button type="button" role="menuitem" onClick={() => { setMenu(null); open(selectedItems[0]); }}><FileText size={15} />{t("Открыть")}</button><button type="button" role="menuitem" onClick={() => { setMenu(null); setDialog({ mode: "rename", entry: selectedItems[0] }); }}>{t("Переименовать")}<kbd>F2</kbd></button></>}
       {mode === "files" ? <><button type="button" role="menuitem" onClick={() => { setMenu(null); setDialog({ mode: "move" }); }}><Folder size={15} />{t("Переместить…")}</button><button type="button" role="menuitem" className="fs-danger" onClick={() => { setMenu(null); void trash(); }}><Trash2 size={15} />{t("В корзину")}</button></> : <><button type="button" role="menuitem" onClick={() => { setMenu(null); void restore(); }}><RotateCcw size={15} />{t("Восстановить")}</button><button type="button" role="menuitem" className="fs-danger" onClick={() => { setMenu(null); void permanentlyDelete(); }}><Trash2 size={15} />{t("Удалить навсегда")}</button></>}
       <button type="button" role="menuitem" onClick={() => void copyPaths()}><Copy size={15} />{t("Копировать путь")}</button>
