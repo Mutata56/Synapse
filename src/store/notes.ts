@@ -16,6 +16,7 @@ import { pluralRu } from "../lib/format";
 import { t } from "../lib/i18n";
 import { normalizeTag, type TagMatch } from "../lib/tagExplorer";
 import { rebaseKeys } from "../lib/treeKeys";
+import { extractFileTargets, getFileIndex, movableFileTargets, normalizeFileTargets, targetKey, targetPath, type FileTarget } from "../lib/fileBrowser";
 import {
   findFolderByPath,
   findNotesByTitle,
@@ -115,6 +116,7 @@ type UndoEntry = {
   redo: () => Promise<void>;
   undo: () => Promise<void>;
 };
+type MoveContext = { deferRefresh?: boolean; deferTree?: boolean; history?: UndoEntry[] };
 
 type StackKey = "_undoStack" | "_redoStack";
 
@@ -236,8 +238,9 @@ type Actions = {
   toggleFavorite: (id: string) => Promise<void>;
   renameNote: (id: string, title: string) => Promise<void>;
   renameFolder: (folder: string, newName: string) => Promise<void>;
-  moveNote: (id: string, newFolder: string) => Promise<void>;
-  moveFolder: (folder: string, newParent: string) => Promise<void>;
+  moveNote: (id: string, newFolder: string, context?: MoveContext) => Promise<void>;
+  moveFolder: (folder: string, newParent: string, context?: MoveContext) => Promise<void>;
+  batchMove: (items: FileTarget[], destination: string) => Promise<{ moved: number; failed: string[] }>;
   /** Цвет папки. `setFolderColor(folder, null)` сбрасывает на дефолт,
    *  `loadFolderColors` загружает карту с диска при запуске. */
   setFolderColor: (folder: string, color: string | null) => Promise<void>;
@@ -261,8 +264,8 @@ type Actions = {
   emptyTrash: () => Promise<void>;
   batchTrashNotes: (ids: string[]) => Promise<void>;
   batchTrash: (noteIds: string[], folderPaths: string[]) => Promise<void>;
-  batchRestoreTrash: (ids: string[]) => Promise<void>;
-  batchDeleteForever: (ids: string[]) => Promise<void>;
+  batchRestoreTrash: (ids: (string | FileTarget)[]) => Promise<void>;
+  batchDeleteForever: (ids: (string | FileTarget)[]) => Promise<void>;
 
   // ── Файлы (assets)
   deleteAsset: (name: string) => Promise<void>;
@@ -490,32 +493,6 @@ function removeNoteFromTree(tree: TreeNode[], id: string): TreeNode[] {
 }
 
 /**
- * Возвращает дерево без папки `path` (и всего поддерева). Если не нашли,
- * отдаёт ссылку на вход. Зеркало removeNoteFromTree для массового удаления.
- */
-function removeFolderFromTree(tree: TreeNode[], path: string): TreeNode[] {
-  let changed = false;
-  const walk = (nodes: TreeNode[]): TreeNode[] => {
-    const out: TreeNode[] = [];
-    for (const node of nodes) {
-      if (node.kind === "folder") {
-        if (node.path === path) {
-          changed = true; // drop the folder and everything beneath it
-          continue;
-        }
-        const children = walk(node.children);
-        out.push(children === node.children ? node : { ...node, children });
-      } else {
-        out.push(node);
-      }
-    }
-    return changed ? out : nodes;
-  };
-  const next = walk(tree);
-  return changed ? next : tree;
-}
-
-/**
  * Возвращает дерево с одним патчем заметки. Если ничего не изменилось,
  * отдаёт ссылку на вход (React пропустит ре-рендер).
  */
@@ -674,19 +651,20 @@ function moveFolderInTree(
 function extractNode(
   nodes: TreeNode[],
   path: string,
+  kind?: "note" | "folder",
 ): [TreeNode[], TreeNode | null] {
   let removed: TreeNode | null = null;
   const walk = (ns: TreeNode[]): TreeNode[] => {
     const out: TreeNode[] = [];
     for (const node of ns) {
       if (node.kind === "folder") {
-        if (node.path === path) {
+        if (kind !== "note" && node.path === path) {
           removed = node;
           continue;
         }
         const children = walk(node.children);
         out.push(children === node.children ? node : { ...node, children });
-      } else if (node.note.id === path) {
+      } else if (kind !== "folder" && node.note.id === path) {
         removed = node;
       } else {
         out.push(node);
@@ -827,6 +805,7 @@ let navigatingBack = false;
 // ─── Store ─────────────────────────────────────────────────────────────────
 
 export const useNotesStore = create<Store>((set, get) => {
+  let moveQueue: Promise<unknown> = Promise.resolve();
   // Обновляет оба дерева параллельно и терпит частичные ошибки, чтобы
   // битое основное дерево не блокировало загрузку корзины (и наоборот).
   const refreshAll = async (): Promise<void> => {
@@ -946,7 +925,7 @@ export const useNotesStore = create<Store>((set, get) => {
     reveal = true,
   ): void => {
     const activeId = get().activeId;
-    if (!activeId || !isUnderFolder(activeId, oldFolder)) return;
+    if (!activeId || !activeId.startsWith(`${oldFolder}/`)) return;
     reselectIfActive(activeId, rebaseId(activeId, oldFolder, newFolder), reveal);
   };
 
@@ -980,11 +959,12 @@ export const useNotesStore = create<Store>((set, get) => {
    *  вела на перемещённую заметку, а `goBack` не отбрасывал её как мёртвую
    *  (её старый id больше не в дереве). `rebaseId` обрабатывает и точное
    *  совпадение (move заметки), и префикс поддерева (операция с папкой). */
-  const rebaseBackStack = (oldPath: string, newPath: string): void => {
+  const rebaseBackStack = (oldPath: string, newPath: string, folder = false): void => {
     const cur = get().backStack;
     let changed = false;
     const next = cur.map((id) => {
-      const r = rebaseId(id, oldPath, newPath);
+      const matches = folder ? id.startsWith(`${oldPath}/`) : id === oldPath;
+      const r = matches ? newPath + id.slice(oldPath.length) : id;
       if (r !== id) changed = true;
       return r;
     });
@@ -1026,12 +1006,12 @@ export const useNotesStore = create<Store>((set, get) => {
    * появлялись заново после чтения диска.
    */
   const applyFolderRename = (oldPath: string, newPath: string): void => {
-    rebaseKeys(oldPath, newPath);
+    rebaseKeys(oldPath, newPath, "folder");
     rebaseFolderColors(oldPath, newPath);
     reselectIfUnderFolder(oldPath, newPath, false);
     rebaseExpandedFolders(oldPath, newPath);
     rebaseCurrentFolder(oldPath, newPath);
-    rebaseBackStack(oldPath, newPath);
+    rebaseBackStack(oldPath, newPath, true);
     set({ tree: renameFolderInTree(get().tree, oldPath, newPath) });
   };
 
@@ -1041,13 +1021,14 @@ export const useNotesStore = create<Store>((set, get) => {
    * перемещением поддерева (`moveFolderInTree` вместо `renameFolderInTree`).
    * Без чтения диска, даже тяжёлая папка едет мгновенно.
    */
-  const applyFolderMove = (oldPath: string, newPath: string): void => {
-    rebaseKeys(oldPath, newPath);
+  const applyFolderMove = (oldPath: string, newPath: string, patchTree = true): void => {
+    rebaseKeys(oldPath, newPath, "folder");
     rebaseFolderColors(oldPath, newPath);
     reselectIfUnderFolder(oldPath, newPath);
     rebaseExpandedFolders(oldPath, newPath);
     rebaseCurrentFolder(oldPath, newPath);
-    rebaseBackStack(oldPath, newPath);
+    rebaseBackStack(oldPath, newPath, true);
+    if (!patchTree) return;
     const before = get().tree;
     const next = moveFolderInTree(before, oldPath, newPath);
     // moveFolderInTree отдаёт вход по ссылке, если не смог разместить
@@ -1065,14 +1046,14 @@ export const useNotesStore = create<Store>((set, get) => {
    * (устаревший кэш).
    */
   const applyRestore = (
-    items: { trashPath: string; mainPath: string }[],
+    items: { trashPath: string; mainPath: string; kind?: "note" | "folder" }[],
   ): void => {
     if (items.length === 0) return;
     let tree = get().tree;
     let trashTree = get().trashTree;
     let ok = true;
-    for (const { trashPath, mainPath } of items) {
-      const [nextTrash, node] = extractNode(trashTree, trashPath);
+    for (const { trashPath, mainPath, kind } of items) {
+      const [nextTrash, node] = extractNode(trashTree, trashPath, kind);
       if (!node) {
         ok = false;
         break;
@@ -2142,15 +2123,16 @@ export const useNotesStore = create<Store>((set, get) => {
      * прерывается, так что сохранение во время перетаскивания не запишет
      // в старый путь и не оставит дубликат.
      */
-    moveNote: async (id, newFolder) => {
+    moveNote: async (id, newFolder, context) => {
       const oldFolder = parentOf(id);
+      const originalName = id.slice(id.lastIndexOf("/") + 1);
       // Пропускаем no-op перемещения и не засоряем undo-историю.
       if (oldFolder === newFolder) return;
 
       // Оптимистично: дёргаем карточку со старого места, чтобы move
       // ощущался мгновенным. refreshTree ниже сверит реальное состояние
       // (и при ошибке обновит дерево, откатив спекулятивное удаление).
-      set({ tree: removeNoteFromTree(get().tree, id) });
+      if (!context?.deferTree) set({ tree: removeNoteFromTree(get().tree, id) });
 
       let currentId: string;
       movingNoteIds.add(id);
@@ -2158,7 +2140,7 @@ export const useNotesStore = create<Store>((set, get) => {
         currentId = await moveNoteFs(id, newFolder);
       } catch (e) {
         reportError("Не удалось переместить заметку", "moveNote failed:", e);
-        await get().refreshTree();
+        if (!context?.deferRefresh) await get().refreshTree();
         return;
       } finally {
         // Всегда снимаем guard (успех или ошибка), чтобы следующее
@@ -2166,7 +2148,7 @@ export const useNotesStore = create<Store>((set, get) => {
         movingNoteIds.delete(id);
       }
       if (currentId === id) {
-        await get().refreshTree(); // no-op перемещение, возвращаем карточку
+        if (!context?.deferRefresh) await get().refreshTree(); // no-op перемещение, возвращаем карточку
         return;
       }
 
@@ -2176,32 +2158,34 @@ export const useNotesStore = create<Store>((set, get) => {
       rebaseKeys(id, currentId);
       rebaseBackStack(id, currentId);
       reselectIfActive(id, currentId);
-      await get().refreshTree();
+      if (!context?.deferRefresh) await get().refreshTree();
       if (newFolder) get().expandFolder(newFolder);
 
-      pushUndo({
+      const entry: UndoEntry = {
         label: t("Перемещение заметки"),
         undo: async () => {
-          const restoredId = await moveNoteFs(currentId, oldFolder);
+          const restoredId = await moveNoteFs(currentId, oldFolder, originalName);
           rebaseKeys(currentId, restoredId);
           rebaseBackStack(currentId, restoredId);
           reselectIfActive(currentId, restoredId);
           originalId = restoredId;
-          await get().refreshTree();
+          if (!context?.deferRefresh) await get().refreshTree();
         },
         redo: async () => {
-          const reMovedId = await moveNoteFs(originalId, newFolder);
+          const reMovedId = await moveNoteFs(originalId, newFolder, originalName);
           rebaseKeys(originalId, reMovedId);
           rebaseBackStack(originalId, reMovedId);
           reselectIfActive(originalId, reMovedId);
           currentId = reMovedId;
-          await get().refreshTree();
+          if (!context?.deferRefresh) await get().refreshTree();
         },
-      });
+      };
+      if (context?.history) context.history.push(entry); else pushUndo(entry);
     },
 
-    moveFolder: async (folder, newParent) => {
+    moveFolder: async (folder, newParent, context) => {
       const oldParent = parentOf(folder);
+      const originalName = folder.slice(folder.lastIndexOf("/") + 1);
       if (oldParent === newParent) return;
 
       let currentPath: string;
@@ -2218,13 +2202,13 @@ export const useNotesStore = create<Store>((set, get) => {
       // без полного refreshTree (тот обход и был лаг при перемещении тяжёлых
       // папок). moveFolderFs уже вернул реальный финальный путь, так что
       // это точно.
-      applyFolderMove(folder, currentPath);
+      applyFolderMove(folder, currentPath, !context?.deferTree);
       if (newParent) get().expandFolder(newParent);
 
-      pushUndo({
+      const entry: UndoEntry = {
         label: t("Перемещение папки"),
         undo: async () => {
-          const restoredPath = await moveFolderFs(currentPath, oldParent);
+          const restoredPath = await moveFolderFs(currentPath, oldParent, originalName);
           if (restoredPath === currentPath) {
             // Источник больше не на `currentPath` (перемещён извне),
             // undo невозможен. (Предок мог быть переименован/перемещён
@@ -2239,11 +2223,11 @@ export const useNotesStore = create<Store>((set, get) => {
             );
             return;
           }
-          applyFolderMove(currentPath, restoredPath);
+          applyFolderMove(currentPath, restoredPath, !context?.deferTree);
           originalPath = restoredPath;
         },
         redo: async () => {
-          const reMovedPath = await moveFolderFs(originalPath, newParent);
+          const reMovedPath = await moveFolderFs(originalPath, newParent, originalName);
           if (reMovedPath === originalPath) {
             reportError(
               "Не удалось повторить перемещение папки",
@@ -2252,10 +2236,50 @@ export const useNotesStore = create<Store>((set, get) => {
             );
             return;
           }
-          applyFolderMove(originalPath, reMovedPath);
+          applyFolderMove(originalPath, reMovedPath, !context?.deferTree);
           currentPath = reMovedPath;
         },
+      };
+      if (context?.history) context.history.push(entry); else pushUndo(entry);
+    },
+
+    batchMove: (source, destination) => {
+      const task = moveQueue.then(async () => {
+        if (get()._undoRedoBusy) throw new Error(t("Дождитесь завершения текущей операции"));
+        const index = getFileIndex(get().tree);
+        if (destination && !index.folders.has(destination)) throw new Error(t("Папка назначения больше не существует"));
+        const items = movableFileTargets(source, destination).filter(item => index.byKey.has(targetKey(item)));
+        if (!items.length) return { moved: 0, failed: [] };
+        await flushAllPending();
+        const history: UndoEntry[] = [], failed: string[] = [];
+        const context: MoveContext = { deferRefresh: true, deferTree: true, history };
+        set({ _undoRedoBusy: true });
+        try {
+          // Same-name destinations are reserved serially, including collisions
+          // in the source sidecar. The workspace is scanned only after the batch.
+          for (const item of [...items.filter(item => item.kind === "folder"), ...items.filter(item => item.kind === "note")]) {
+            const before = history.length;
+            try {
+              if (item.kind === "folder") await get().moveFolder(item.path, destination, context);
+              else await get().moveNote(item.id, destination, context);
+            } catch (error) {
+              reportError(t("Не удалось переместить"), "batchMove failed:", targetPath(item), error);
+            }
+            if (history.length === before) failed.push(targetKey(item));
+          }
+          if (history.length) {
+            pushUndo({ label: t("Перемещение {n} элементов", { n: history.length }),
+              undo: async () => { try { for (const entry of [...history].reverse()) await entry.undo(); } finally { await get().refreshTree(); } },
+              redo: async () => { try { for (const entry of history) await entry.redo(); } finally { await get().refreshTree(); } },
+            });
+          }
+          return { moved: history.length, failed };
+        } finally {
+          try { await get().refreshTree(); } finally { set({ _undoRedoBusy: false }); }
+        }
       });
+      moveQueue = task.catch(() => undefined);
+      return task;
     },
 
     trashNote: async (id) => {
@@ -2267,7 +2291,7 @@ export const useNotesStore = create<Store>((set, get) => {
       // Оптимистично: выдергиваем заметку из дерева СЕЙЧАС (захватив,
       // чтобы потом переместить в дерево корзины в памяти, без refreshAll,
       // который и воскрешал элементы при параллельных операциях).
-      const [without, removed] = extractNode(get().tree, id);
+      const [without, removed] = extractNode(get().tree, id, "note");
       if (removed) set({ tree: without });
 
       let currentId = id;
@@ -2330,7 +2354,7 @@ export const useNotesStore = create<Store>((set, get) => {
       // Оптимистично: выдергиваем поддерево папки СЕЙЧАС (захватив,
       // чтобы потом переместить в дерево корзины в памяти, без refreshAll,
       // который воскрешал папки при параллельных удалениях).
-      const [withoutFolder, removed] = extractNode(get().tree, folder);
+      const [withoutFolder, removed] = extractNode(get().tree, folder, "folder");
       if (removed) set({ tree: withoutFolder });
 
       let currentPath = folder;
@@ -2357,9 +2381,9 @@ export const useNotesStore = create<Store>((set, get) => {
       pushUndo({
         label: t("Удаление папки"),
         undo: async () => {
-          const r = await restoreFromTrash(trashedPath);
+          const r = await restoreFromTrash(trashedPath, "folder");
           if (r.kind === RESTORE_FOLDER) {
-            applyRestore([{ trashPath: trashedPath, mainPath: r.path }]);
+            applyRestore([{ trashPath: trashedPath, mainPath: r.path, kind: "folder" }]);
             currentPath = r.path;
           } else {
             await refreshAll();
@@ -2416,7 +2440,7 @@ export const useNotesStore = create<Store>((set, get) => {
       let working = get().tree;
       const captured = new Map<string, TreeNode>();
       for (const id of ids) {
-        const [withoutNote, node] = extractNode(working, id);
+        const [withoutNote, node] = extractNode(working, id, "note");
         if (node) {
           captured.set(id, node);
           working = withoutNote;
@@ -2492,6 +2516,12 @@ export const useNotesStore = create<Store>((set, get) => {
     // FS-операции, затем ОДИН refresh вместо обновления дерева N раз.
     batchTrash: async (noteIds, folderPaths) => {
       if (noteIds.length === 0 && folderPaths.length === 0) return;
+      const normalized = normalizeFileTargets([
+        ...noteIds.map(id => ({ kind: "note" as const, id })),
+        ...folderPaths.map(path => ({ kind: "folder" as const, path })),
+      ]);
+      noteIds = normalized.filter((item): item is Extract<FileTarget, { kind: "note" }> => item.kind === "note").map(item => item.id);
+      folderPaths = normalized.filter((item): item is Extract<FileTarget, { kind: "folder" }> => item.kind === "folder").map(item => item.path);
 
       // Забираем активную, если она из удаляемых или внутри удаляемой
       // папки (та же логика saveNote-гонки, что в trashNote).
@@ -2509,24 +2539,17 @@ export const useNotesStore = create<Store>((set, get) => {
       // чтобы потом переместить в дерево корзины в памяти). Без refreshAll:
       // чтение основного дерева это то, что воскрешало папки при параллельных
       // операциях.
-      let working = get().tree;
+      const extracted = extractFileTargets(get().tree, normalized);
       const capturedNotes = new Map<string, TreeNode>();
       const capturedFolders = new Map<string, TreeNode>();
-      for (const id of noteIds) {
-        const [withoutNote, node] = extractNode(working, id);
+      for (const item of normalized) {
+        const node = extracted.captured.get(targetKey(item));
         if (node) {
-          capturedNotes.set(id, node);
-          working = withoutNote;
+          if (item.kind === "note") capturedNotes.set(item.id, node);
+          else capturedFolders.set(item.path, node);
         }
       }
-      for (const f of folderPaths) {
-        const [withoutFolder, node] = extractNode(working, f);
-        if (node) {
-          capturedFolders.set(f, node);
-          working = withoutFolder;
-        }
-      }
-      set({ tree: working });
+      set({ tree: extracted.tree });
 
       // FS-trash: заметки с ограниченной параллельностью (неограниченный
       // Promise.all на тысячах элементов зальёт мост и повесит UI);
@@ -2537,13 +2560,13 @@ export const useNotesStore = create<Store>((set, get) => {
       type FolderEntry = { path: string; trashPath: string };
       const tNotes: NoteEntry[] = [];
       const tFolders: FolderEntry[] = [];
-      const failed: string[] = [];
+      const failed: FileTarget[] = [];
       await mapPool(noteIds, BATCH_FS_CONCURRENCY, async (id) => {
         try {
           const p = await trashNoteFs(id);
           if (p) tNotes.push({ id, trashPath: p });
         } catch (e) {
-          failed.push(id);
+          failed.push({ kind: "note", id });
           reportError("Не удалось удалить некоторые элементы", "batchTrash note failed:", id, e);
         }
       });
@@ -2552,7 +2575,7 @@ export const useNotesStore = create<Store>((set, get) => {
           const p = await deleteFolderFs(path);
           if (p) tFolders.push({ path, trashPath: p });
         } catch (e) {
-          failed.push(path);
+          failed.push({ kind: "folder", path });
           reportError("Не удалось удалить некоторые элементы", "batchTrash folder failed:", path, e);
         }
       }
@@ -2578,7 +2601,7 @@ export const useNotesStore = create<Store>((set, get) => {
       ]);
       reinsertNodes(
         failed
-          .map((p) => capturedNotes.get(p) ?? capturedFolders.get(p))
+          .map((item) => item.kind === "note" ? capturedNotes.get(item.id) : capturedFolders.get(item.path))
           .filter((n): n is TreeNode => !!n),
       );
       if (tNotes.length === 0 && tFolders.length === 0) return;
@@ -2587,13 +2610,13 @@ export const useNotesStore = create<Store>((set, get) => {
       pushUndo({
         label: `Удаление ${n} ${pluralRu(n, "элемент", "элемента", "элементов")}`,
         undo: async () => {
-          const restored: { trashPath: string; mainPath: string }[] = [];
+          const restored: { trashPath: string; mainPath: string; kind: "note" | "folder" }[] = [];
           for (const e of tNotes) {
             if (!e.trashPath) continue;
             try {
-              const r = await restoreFromTrash(e.trashPath);
+              const r = await restoreFromTrash(e.trashPath, "note");
               if (r.kind === RESTORE_FILE) {
-                restored.push({ trashPath: e.trashPath, mainPath: r.path });
+                restored.push({ trashPath: e.trashPath, mainPath: r.path, kind: "note" });
                 e.id = r.path;
               }
               e.trashPath = "";
@@ -2604,9 +2627,9 @@ export const useNotesStore = create<Store>((set, get) => {
           for (const e of tFolders) {
             if (!e.trashPath) continue;
             try {
-              const r = await restoreFromTrash(e.trashPath);
+              const r = await restoreFromTrash(e.trashPath, "folder");
               if (r.kind === RESTORE_FOLDER) {
-                restored.push({ trashPath: e.trashPath, mainPath: r.path });
+                restored.push({ trashPath: e.trashPath, mainPath: r.path, kind: "folder" });
                 e.path = r.path;
               }
               e.trashPath = "";
@@ -2638,60 +2661,26 @@ export const useNotesStore = create<Store>((set, get) => {
     },
 
     batchRestoreTrash: async (ids) => {
-      if (ids.length === 0) return;
-      // Оптимистично: убираем выбранные элементы из дерева корзины СЕЙЧАС,
-      // чтобы интерфейс (и массовая панель) очистились мгновенно. Один
-      // refreshAll ниже сверит: восстановленные вернутся в основное дерево,
-      // ошибки останутся в корзине. Каждый id это либо id заметки в корзине,
-      // либо путь папки; пробуем удалить как оба (одно сработает).
-      let pruned = get().trashTree;
-      for (const id of ids) {
-        pruned = removeNoteFromTree(pruned, id);
-        pruned = removeFolderFromTree(pruned, id);
-      }
-      set({ trashTree: pruned });
-
-      // Восстанавливаем с ограниченной параллельностью: последовательные
-      // await на сотнях элементов тормозили (по одному IPC-вызову на
-      // элемент), но неограниченный Promise.all на тысячах зальёт мост
-      // и повесит UI. В корзине можно выделить только элементы одного
-      // уровня, так что параллельные restore не конфликтуют по путям.
-      // Ошибки не прерывают пакет.
-      await mapPool(ids, BATCH_FS_CONCURRENCY, (id) =>
-        restoreFromTrash(id).catch((e) =>
-          reportError(
-            "Не удалось восстановить некоторые элементы",
-            "batchRestore failed:",
-            id,
-            e,
-          ),
-        ),
-      );
-      await refreshAll(); // одно обновление на весь пакет
+      const index = getFileIndex(get().trashTree);
+      const targets = normalizeFileTargets(ids.map(item => typeof item !== "string" ? item
+        : index.byKey.has(`note:${item}`) ? { kind: "note" as const, id: item } : { kind: "folder" as const, path: item }));
+      if (!targets.length) return;
+      set({ trashTree: extractFileTargets(get().trashTree, targets).tree });
+      await mapPool(targets, BATCH_FS_CONCURRENCY, item =>
+        restoreFromTrash(targetPath(item), item.kind).catch(error =>
+          reportError("Не удалось восстановить некоторые элементы", "batchRestore failed:", targetPath(item), error)));
+      await refreshAll();
     },
 
     batchDeleteForever: async (ids) => {
-      if (ids.length === 0) return;
-      // Оптимистичная обрезка (мгновенный UI) + удаление с ограниченной
-      // параллельностью: та же логика, что в batchRestoreTrash. refreshTrash
-      // сверит после.
-      let pruned = get().trashTree;
-      for (const id of ids) {
-        pruned = removeNoteFromTree(pruned, id);
-        pruned = removeFolderFromTree(pruned, id);
-      }
-      set({ trashTree: pruned });
-
-      await mapPool(ids, BATCH_FS_CONCURRENCY, (id) =>
-        deleteForeverFs(id).catch((e) =>
-          reportError(
-            "Не удалось удалить некоторые элементы навсегда",
-            "batchDeleteForever failed:",
-            id,
-            e,
-          ),
-        ),
-      );
+      const index = getFileIndex(get().trashTree);
+      const targets = normalizeFileTargets(ids.map(item => typeof item !== "string" ? item
+        : index.byKey.has(`note:${item}`) ? { kind: "note" as const, id: item } : { kind: "folder" as const, path: item }));
+      if (!targets.length) return;
+      set({ trashTree: extractFileTargets(get().trashTree, targets).tree });
+      await mapPool(targets, BATCH_FS_CONCURRENCY, item =>
+        deleteForeverFs(targetPath(item), item.kind).catch(error =>
+          reportError("Не удалось удалить некоторые элементы навсегда", "batchDeleteForever failed:", targetPath(item), error)));
       await get().refreshTrash();
     },
 

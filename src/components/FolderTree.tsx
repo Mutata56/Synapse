@@ -347,8 +347,8 @@ export function FolderTree() {
 // См. lib/treeKeys.ts.
 function nodeKey(node: TreeNode): string {
   return node.kind === "folder"
-    ? stableKey(node.path)
-    : stableKey(node.note.id);
+    ? stableKey(node.path, "folder")
+    : stableKey(node.note.id, "note");
 }
 
 function TreeNodeView({ node, depth }: { node: TreeNode; depth: number }) {

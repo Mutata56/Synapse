@@ -741,7 +741,7 @@ function updateObsidianState(update: (notes: ObsidianState["notes"]) => boolean)
 async function rebaseObsidianMetadata(from: string, to: string, folder = false): Promise<void> {
   await updateObsidianState((notes) => {
     const moved = Object.entries(notes).filter(([id, data]) =>
-      data.markdownSource && (id === from || (folder && id.startsWith(`${from}/`))),
+      data.markdownSource && (folder ? id.startsWith(`${from}/`) : id === from),
     );
     for (const [id, data] of moved) {
       notes[id] = { markdownSource: false }; // shadows the immutable import manifest
@@ -762,7 +762,7 @@ async function relocateWithObsidianMetadata(
   const destinations = new Map<string, ObsidianOverrides | undefined>();
   await updateObsidianState((notes) => {
     const moved = Object.entries(notes).filter(([id, data]) =>
-      data.markdownSource && (id === from || (folder && id.startsWith(`${from}/`))),
+      data.markdownSource && (folder ? id.startsWith(`${from}/`) : id === from),
     );
     for (const [id, data] of moved) {
       const destination = to + id.slice(from.length);
@@ -788,7 +788,7 @@ async function forgetObsidianMetadata(path: string, folder = false): Promise<voi
   await updateObsidianState((notes) => {
     let changed = false;
     for (const id of Object.keys(notes)) {
-      if (id === path || (folder && id.startsWith(`${path}/`))) {
+      if (folder ? id.startsWith(`${path}/`) : id === path) {
         notes[id] = { markdownSource: false };
         changed = true;
       }
@@ -1483,6 +1483,7 @@ export async function writeNote(note: Note): Promise<void> {
 export async function moveNote(
   id: string,
   newFolder: string,
+  destinationName?: string,
 ): Promise<string> {
   await ensureWorkspace();
   const oldPath = idToFilePath(id);
@@ -1491,7 +1492,7 @@ export async function moveNote(
   if (parentOf(id) === newFolder) return id;
   if (newFolder) await ensureDir(`${ROOT}/${newFolder}`);
 
-  const basename = basenameOf(id);
+  const basename = destinationName ?? basenameOf(id);
   const proposedId = newFolder ? `${newFolder}/${basename}` : basename;
   const finalPath = await uniqueDestination(idToFilePath(proposedId));
   const finalId = noteRelFromAbs(finalPath, ROOT);
@@ -1538,6 +1539,7 @@ async function rewriteNoteId(filePath: string, newId: string): Promise<void> {
 export async function moveFolder(
   folderPath: string,
   newParent: string,
+  destinationName?: string,
 ): Promise<string> {
   if (!folderPath) return folderPath;
   if (newParent === folderPath) return folderPath;
@@ -1549,7 +1551,7 @@ export async function moveFolder(
 
   if (newParent) await ensureDir(`${ROOT}/${newParent}`);
 
-  const basename = basenameOf(folderPath);
+  const basename = destinationName ?? basenameOf(folderPath);
   const proposed = newParent ? `${newParent}/${basename}` : basename;
   const proposedAbs = `${ROOT}/${proposed}`;
   const finalAbs = await uniqueDestination(proposedAbs);
@@ -1652,11 +1654,12 @@ export async function trashFolder(folderPath: string): Promise<string> {
  */
 export async function restoreFromTrash(
   trashPath: string,
+  kind?: "note" | "folder",
 ): Promise<RestoreResult> {
   const fileSrc = `${TRASH}/${trashPath}${NOTE_EXT}`;
   const dirSrc = `${TRASH}/${trashPath}`;
 
-  if (await pathExists(fileSrc)) {
+  if (kind !== "folder" && await pathExists(fileSrc)) {
     const proposed = `${ROOT}/${trashPath}${NOTE_EXT}`;
     await ensureDir(parentOf(proposed));
     const finalDst = await uniqueRestoreDestination(proposed, NOTE_EXT);
@@ -1665,7 +1668,7 @@ export async function restoreFromTrash(
     return { kind: "file", path: restoredId };
   }
 
-  if (await pathExists(dirSrc)) {
+  if (kind !== "note" && await pathExists(dirSrc)) {
     const proposed = `${ROOT}/${trashPath}`;
     await ensureDir(parentOf(proposed) || ROOT);
     const finalDst = await uniqueRestoreDestination(proposed, "");
@@ -1677,15 +1680,15 @@ export async function restoreFromTrash(
   return { kind: "missing", path: trashPath };
 }
 
-export async function deleteForever(trashPath: string): Promise<void> {
+export async function deleteForever(trashPath: string, kind?: "note" | "folder"): Promise<void> {
   const filePath = `${TRASH}/${trashPath}${NOTE_EXT}`;
-  if (await pathExists(filePath)) {
+  if (kind !== "folder" && await pathExists(filePath)) {
     await remove(filePath, APP_DATA);
     await forgetObsidianMetadata(`.trash/${trashPath}`);
     return;
   }
   const dirPath = `${TRASH}/${trashPath}`;
-  if (await pathExists(dirPath)) {
+  if (kind !== "note" && await pathExists(dirPath)) {
     await remove(dirPath, { ...APP_DATA, recursive: true });
     await forgetObsidianMetadata(`.trash/${trashPath}`, true);
   }

@@ -15,11 +15,12 @@ let counter = 0;
 const keyByPath = new Map<string, string>();
 
 /** Возвращает стабильный ключ для пути папки / id заметки, назначая его лениво. */
-export function stableKey(path: string): string {
-  let key = keyByPath.get(path);
+export function stableKey(path: string, kind: "note" | "folder" = "note"): string {
+  const identity = `${kind}:${path}`;
+  let key = keyByPath.get(identity);
   if (key === undefined) {
     key = `t${++counter}`;
-    keyByPath.set(path, key);
+    keyByPath.set(identity, key);
   }
   return key;
 }
@@ -30,15 +31,16 @@ export function stableKey(path: string): string {
  * смонтированными при переименовании/перемещении. Зови это в том же тике, в
  * котором патчишь дерево.
  */
-export function rebaseKeys(oldPath: string, newPath: string): void {
+export function rebaseKeys(oldPath: string, newPath: string, kind: "note" | "folder" = "note"): void {
   // Сначала снимок: мы мутируем map прямо во время обхода.
-  for (const [path, key] of [...keyByPath]) {
-    if (path === oldPath) {
-      keyByPath.delete(path);
-      keyByPath.set(newPath, key);
-    } else if (path.startsWith(`${oldPath}/`)) {
-      keyByPath.delete(path);
-      keyByPath.set(`${newPath}${path.slice(oldPath.length)}`, key);
+  for (const [identity, key] of [...keyByPath]) {
+    const colon = identity.indexOf(":"), entryKind = identity.slice(0, colon), path = identity.slice(colon + 1);
+    if (entryKind === kind && path === oldPath) {
+      keyByPath.delete(identity);
+      keyByPath.set(`${entryKind}:${newPath}`, key);
+    } else if (kind === "folder" && path.startsWith(`${oldPath}/`)) {
+      keyByPath.delete(identity);
+      keyByPath.set(`${entryKind}:${newPath}${path.slice(oldPath.length)}`, key);
     }
   }
 }
