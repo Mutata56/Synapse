@@ -7,12 +7,16 @@ import { ConfirmDialog } from "../../src/components/ConfirmDialog";
 import { Toaster } from "../../src/components/Toaster";
 import { useNotesStore } from "../../src/store/notes";
 import { entryTarget, extractFileTargets, getFileIndex, movableFileTargets, normalizeFileTargets, targetPath, type FileTarget } from "../../src/lib/fileBrowser";
+import { measureFrames } from "../performance/probe";
 import type { NoteMeta, TreeNode } from "../../src/lib/storage";
 import "../../src/index.css";
 import "./files-bench.css";
 
 // In-memory demonstration data. No connector or filesystem call is allowed.
 const params = new URLSearchParams(location.search);
+const longPreview = Array.from({ length: 90 }, (_, i) => `## Раздел ${i}\n\n| Поле | Значение |\n| --- | --- |\n| Строка | **Пример** для проверки чтения и прокрутки |\n\n- Пункт списка\n- Ещё один пункт\n`).join("\n");
+if (params.has("large_preview")) for (const event of ["click", "keydown", "scroll"])
+  document.addEventListener(event, measureFrames, { passive: true, capture: true });
 const leaf = "Ascend/RoadMaps/DBA RoadMap/Этап 02 SELECT";
 const titles = ["2.03 WHERE и предикаты", "2.04 NULL и трёхзначная логика", "2.05 LIKE и поиск по шаблону", "2.06 ORDER BY DISTINCT и дедупликация", "2.10 Преобразование типов", "2.10.1 CAST общие основы преобразования", "2.10.2 CAST в PostgreSQL", "2.10.3 CAST в SQL Server", "2.04.1 ISNULL в SQL Server", "2.04.3 SET ANSI_NULLS поведение", "Заметки к занятию", "Практические задания", "Источники и ссылки"];
 const count = Math.max(1, Math.min(50000, Number(params.get("nodes") || titles.length)));
@@ -22,7 +26,7 @@ document.documentElement.dataset.theme = params.get("theme") || "dark";
 const bodies = new Map<string, string>();
 const metrics = { reads: 0, moves: 0, trashed: 0, restored: 0, deleted: 0, opened: "" };
 function note(id: string, title: string): NoteMeta {
-  bodies.set(id, `# ${title}\n\nЭто синтетическая заметка для проверки файлового интерфейса.\n\n- Поиск и выделение\n- Перемещение и восстановление\n\nНикаких файлов на диске этот стенд не изменяет.\n`);
+  bodies.set(id, params.has("large_preview") ? longPreview : `# ${title}\n\nЭто синтетическая заметка для проверки файлового интерфейса.\n\n- Поиск и выделение\n- Перемещение и восстановление\n\nНикаких файлов на диске этот стенд не изменяет.\n`);
   return { id, title, folder: id.slice(0, id.lastIndexOf("/")), updatedAt: Date.UTC(2026, 9, title.startsWith("2.0") ? 5 : 4), createdAt: Date.UTC(2026, 9, 1), preview: "Синтетическая запись", icon: null, cover: null, favorite: false, tags: ["dba", "sql", "этап2"], links: [], mood: null };
 }
 function insert(tree: TreeNode[], node: TreeNode, parent: string): TreeNode[] {
@@ -81,7 +85,7 @@ useNotesStore.setState({ tree, trashTree, currentFolder: leaf, currentTrashFolde
 function App() {
   const view = useNotesStore(state => state.view);
   const [initial] = useState([`note:${leaf}/n-0`, `note:${leaf}/n-1`]);
-  return <LanguageProvider><main className="files-bench-shell"><Sidebar />{view === "files" || view === "trash" ? <FileBrowser key={view} mode={view} initialSelected={params.has("unselected") || view === "trash" ? [] : initial} readBody={async id => { metrics.reads++; const output = document.getElementById("files-bench-metrics"); if (output) output.textContent = JSON.stringify(metrics); return bodies.get(id) || "Синтетический пример"; }} /> : <section className="files-bench-note"><h1>Локальная заметка</h1><button onClick={() => useNotesStore.setState({ view: "files" })}>Вернуться к файлам</button></section>}<ConfirmDialog /><Toaster /><output id="files-bench-metrics" hidden>{JSON.stringify(metrics)}</output></main></LanguageProvider>;
+  return <LanguageProvider><main className="files-bench-shell"><Sidebar />{view === "files" || view === "trash" ? <FileBrowser key={view} mode={view} initialSelected={params.has("unselected") || view === "trash" ? [] : initial} readBody={async id => { metrics.reads++; const output = document.getElementById("files-bench-metrics"); if (output) output.textContent = JSON.stringify(metrics); return bodies.get(id) || "Синтетический пример"; }} /> : <section className="files-bench-note"><h1>Локальная заметка</h1><button onClick={() => useNotesStore.setState({ view: "files" })}>Вернуться к файлам</button></section>}<ConfirmDialog /><Toaster /><output id="files-performance-metrics" hidden /><output id="files-bench-metrics" hidden>{JSON.stringify(metrics)}</output></main></LanguageProvider>;
 }
 useNotesStore.subscribe(() => { const output = document.getElementById("files-bench-metrics"); if (output) output.textContent = JSON.stringify(metrics); });
 createRoot(document.getElementById("root")!).render(<App />);

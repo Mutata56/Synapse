@@ -9,3 +9,5 @@ target/
 /tests/fixtures/overview-vault.json
 /tests/fixtures/library-vault.json
 /.impeccable/review/
+
+/dist-perf/
