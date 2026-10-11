@@ -1,3 +1,4 @@
+import { IconizeSettings } from "./IconizeSettings";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { Archive, ArrowUpRight, Bookmark, CalendarDays, ChartNoAxesCombined, Check, FilePlus2, FileText, FolderOpen, HardDrive, Hash, HelpCircle, Home, Image, Inbox, Keyboard, Network, Palette, PanelRight, RefreshCw, Search, Shapes, SlidersHorizontal, Table2, Trash2, Upload, X, type LucideIcon } from "lucide-react";
@@ -24,6 +25,7 @@ const SECTIONS = [
   { id: "modules", title: "Модули", description: "Собери своё рабочее пространство. Оставь только то, чем пользуешься.", icon: Shapes, keywords: APP_MODULES.map(module => `${module.title} ${module.description}`).join(" ") },
   { id: "graph", title: "Граф", description: "Выбери доступные виды графа и дополнительные элементы.", icon: Network, keywords: "Объёмный Obsidian миникарта дыхание локальный связи volume minimap breathing local graph" },
   { id: "appearance", title: "Внешний вид", description: "Язык, акцентный цвет и движение в интерфейсе.", icon: Palette, keywords: "язык language русский english цвет анимации animations motion accent color HEX" },
+  { id: "icons", title: "Иконки", description: "Iconize: значки, логотипы, правила и импорт Obsidian.", icon: Palette, keywords: "Iconize icons logo emoji SVG PNG значки логотипы правила наследование импорт" },
   { id: "behavior", title: "Поведение", description: "Настрой запуск приложения и быструю запись.", icon: SlidersHorizontal, keywords: "хоткей клавиши заметка дня запуск shortcut startup daily note" },
   { id: "calendar", title: "Подключения", description: "Внешние календари и синхронизация событий.", icon: CalendarDays, keywords: "календарь iCal CalDAV Яндекс пароль password login sync" },
   { id: "data", title: "Данные", description: "Локальное хранилище и резервные копии.", icon: HardDrive, keywords: "папка путь backup бэкап архив восстановить storage restore folder path" },
@@ -81,7 +83,7 @@ export function SettingsView() {
               <LangCard />
               <AccentCard value={settings.accentColor} onChange={accentColor => void save({ accentColor })} />
               <SettingGroup title={t("Движение")}><SettingRow title={t("Анимации интерфейса")} description={t("Переходы и эффекты. Системное ограничение движения учитывается всегда.")}><SettingsSwitch label={t("Анимации интерфейса")} checked={settings.animations} disabled={status === "saving"} onChange={animations => void save({ animations })} /></SettingRow></SettingGroup>
-            </> : item.id === "behavior" ? <>
+            </> : item.id === "icons" ? <IconizeSettings /> : item.id === "behavior" ? <>
               <SettingGroup title={t("При запуске")}><SettingRow title={t("Открывать заметку дня при запуске")} description={t(settings.modules.calendar ? "Сразу перейти к сегодняшней записи." : "Доступно после включения календаря.")}><SettingsSwitch label={t("Открывать заметку дня при запуске")} checked={settings.openDailyOnStartup} disabled={!settings.modules.calendar || status === "saving"} onChange={openDailyOnStartup => void save({ openDailyOnStartup })} /></SettingRow></SettingGroup>
               {settings.modules.newNote ? <ShortcutCard value={settings.captureShortcut} onChange={captureShortcut => void save({ captureShortcut })} /> : <ModuleNotice module="newNote" />}
             </> : item.id === "calendar" ? settings.modules.calendar ? <><CalendarCard /><CaldavCard /></> : <ModuleNotice module="calendar" /> : <StorageCard />}

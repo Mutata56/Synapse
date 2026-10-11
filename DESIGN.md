@@ -2,6 +2,20 @@
 name: Synapse
 description: Existing desktop note interface extracted from repository components and CSS
 colors:
+  note-info: "#6ea8fe"
+  note-tip: "#5fd08a"
+  note-success: "#4fd1b1"
+  note-warning: "#f0c64e"
+  note-question: "#b699ff"
+  note-danger: "#f38a9e"
+  task-done-ink: "#08291b"
+  task-cancelled-ink: "#38131e"
+  task-important: "#f0df75"
+  task-important-ink: "#322c07"
+  task-question: "#efb273"
+  task-question-ink: "#3e2308"
+  task-forwarded: "#71c3ef"
+  task-scheduled: "#75d9cd"
   primary: "#6366f1"
   link: "#818cf8"
   neutral-bg: "#0a0a0b"
@@ -221,6 +235,7 @@ typography:
   calendar-narrow-hour:
     fontSize: "8px"
 rounded:
+  note-callout: "10px"
   control: "6px"
   card: "12px"
   chip: "999px"
@@ -239,6 +254,7 @@ rounded:
   workspace-action: "24px"
   workspace-keycap: "9px"
   workspace-control: "5px"
+  workspace-tab: "8px"
   workspace-detail: "4px"
   workspace-menu: "7px"
   calendar-detail: "4px"
@@ -401,11 +417,11 @@ components:
     height: "33px"
   workspace-tab-active:
     backgroundColor: "var(--color-bg-overlay)"
-    textColor: "{colors.link}"
+    textColor: "{colors.foreground-strong}"
     typography: "{typography.workspace-tab-label}"
-    rounded: "{rounded.control}"
-    height: "38px"
-    width: "248px"
+    rounded: "{rounded.workspace-tab}"
+    height: "36px"
+    width: "max-content, at most 280px or the available tab-strip width"
   workspace-stage:
     backgroundColor: "{colors.neutral-bg}"
     rounded: "{rounded.workspace-stage}"
@@ -535,9 +551,9 @@ The local `files-muted` role carries paths, dates, type labels, counts and quiet
 
 ### Workspace shell
 
-The shell uses existing semantic colors. Active document-tab text, selected search/bookmark labels and active tab-list entries use `link`; contextual text and secondary controls use `foreground-secondary`. `foreground-muted` remains for quiet outline icons. The working region uses the neutral background; its empty page and active tabs use the existing overlay surface. No reference-screenshot palette is introduced.
+The shell uses existing semantic colors. Active document-tab labels use `foreground-strong`; their icons and thin inset underline use `link`. Selected search/bookmark labels and active tab-list entries retain `link`; contextual text and secondary controls use `foreground-secondary`. `foreground-muted` remains for quiet outline icons. The working region uses the neutral background; its empty page and active tabs use the existing overlay surface. No reference-screenshot palette is introduced.
 
-**The Workspace Active Label Rule.** In the shell, use the existing link role for small active text and the secondary foreground for context. Keep accent fill and focus distinct from text contrast.
+**The Workspace Active Label Rule.** Document tabs use a strong foreground label with a link-colored icon and underline. Other active shell labels retain the link role, and context uses the secondary foreground. Keep selection and keyboard focus distinct.
 
 ### Calendar extension
 
@@ -666,7 +682,7 @@ All Notes cards use tonal fill and a thin border at rest, with no card shadow. H
 
 Files and Trash rows are flat at rest, separated by fine rules. Hover changes tone; selected rows gain violet fill and an inset stroke, while the active keyboard row has an inset violet focus outline. Ordinary work regions have no decorative shadow. Structural depth is reserved for the narrow properties overlay (`-12px 0 30px rgba(0,0,0,.25)`), action menu (`0 10px 32px rgba(0,0,0,.42)`) and dialog (`0 18px 60px rgba(0,0,0,.45)`). Files buttons use a short background response (120ms); the reduced-motion preference removes it.
 
-Workspace work regions and rows are flat at rest, using tonal fills and thin borders. Structural depth appears only on the tab-list menu (`0 10px 30px rgba(0,0,0,.3)`), help dialog (`0 14px 45px rgba(0,0,0,.35)`) and overlapping side panes (`6px 4px 22px rgba(0,0,0,.24)` on the left, `-6px 4px 22px rgba(0,0,0,.24)` on the right). Workspace icon background/color responses last (120ms), with transitions removed by the reduced-motion preference. Outline jumps also respect that preference.
+Workspace work regions and rows are flat at rest, using tonal fills and thin borders. Structural depth appears only on the tab-list menu (`0 10px 30px rgba(0,0,0,.3)`), help dialog (`0 14px 45px rgba(0,0,0,.35)`) and overlapping side panes (`6px 4px 22px rgba(0,0,0,.24)` on the left, `-6px 4px 22px rgba(0,0,0,.24)` on the right). Workspace icon and tab state responses last (120ms), with transitions removed by the reduced-motion preference. Outline jumps also respect that preference.
 
 The application shell and top-level workspace content remain visible from their first render. Route changes do not wait for an exit animation or background RAF; the editor key stays stable across note selections. Loading uses the existing readable secondary text token.
 
@@ -682,7 +698,7 @@ All Notes reuses the established card radius. Its search, filters and primary ac
 
 Files reuses the control radius for search, named actions, route buttons and the selection strip, and the card radius for dialogs. The local `files-detail` step bounds checks, tag summaries and small scope controls; `files-icon` bounds icon actions, folder-picker rows and quick-look code blocks; `files-menu` bounds the floating action menu. Table rows keep square aligned edges. Lucide outline folder/note icons remain visible even when secondary columns are hidden.
 
-The workspace has a deliberate nested silhouette: the large working-region radius, its narrow adaptation and the action-pill radius belong to the shell extension. Keycaps use `workspace-keycap`; compact icon/search/result controls use `workspace-control`; tab-close, menu rows and outline rows use `workspace-detail`; the tab-list menu uses `workspace-menu`. Document tabs retain the incumbent control radius, and the help dialog retains the card radius. These shape roles do not enlarge the corners of Tags, Files/Trash or library controls.
+The workspace has a deliberate nested silhouette: the large working-region radius, its narrow adaptation and the action-pill radius belong to the shell extension. Keycaps use `workspace-keycap`; compact icon/search/result and tab-close controls use `workspace-control`; menu rows and outline rows use `workspace-detail`; the tab-list menu uses `workspace-menu`. Document tabs use the local `workspace-tab` radius, and the help dialog retains the card radius. These shape roles do not enlarge the corners of Tags, Files/Trash or library controls.
 
 Calendar reuses the incumbent control radius for named actions, date markers and selected agenda dates. Its scoped detail step bounds checks, editor fields and segmented buttons; the week-chip step bounds compact previews; the popover step bounds the composer, grouped mode control and date popover; the menu step bounds connections. Grid and day-plan edges stay square and aligned behind fine rules. Lucide outlines identify actions and sources; journal mood emoji represent data rather than navigation icons.
 
@@ -735,6 +751,8 @@ Creation and rename dialogs use a labeled name field and inline validation. The 
 ### Workspace chrome and empty page
 
 The ribbon exposes existing sections and working creation/switcher actions with Lucide outline icons (18px, stroke 1.7). Icon-only controls retain translated accessible labels, hover tone and visible inset focus (2px). Left-pane File / Search / Bookmarks controls and right-pane Outline / Backlinks controls show the active state. Document tabs provide selection, close, reorder and overflow-list actions; an empty last-tab replacement retains a reachable path to content.
+
+Document tabs form a content-sized, leading-aligned strip with a (6px) gap. Titles use the local (13px, weight 500) role and (15px) outline icons, including Home for an empty tab. Tabs are (36px) high and cap at (280px), reducing to (240px) in the compact viewport and always fitting the actual strip width. Quiet separators distinguish inactive neighbors; the selected tab gains an overlay fill, accent stroke, strong label and an inset (2px) link-colored underline. Close controls occupy a stable (26px) slot: active, hovered, keyboard-focused and touch tabs expose them. The entire active tab, including Close, reveals after selection, reordering, title changes and strip resizing without animated scrolling. The note and navigation stores remain unchanged.
 
 The empty page contains four real actions: new note, a note with the existing data-table block, a note with the existing whiteboard block, and file switcher. Their pills use the local shape role, thin borders and secondary text; hover raises surface and border contrast. Shortcut keycaps are ancillary labels, not substitutes for action text.
 
@@ -801,3 +819,10 @@ The scale profile migrates an old editor zoom to1 once, then retains later user
 zoom. It does not change the root rem size or workspace geometry. Full Tags
 reading shares the26px note base; compact library and Files previews retain
 their local density. The native inspector was closed without editing notes.
+
+
+## Note block extension
+
+Callouts and task markers extend the existing editor with the same local fonts and semantic shell tokens. Their scoped implementation is `noteBlocks.css`; body copy inherits the user's text settings. A callout uses a 10px local corner, 12px/15px inset, a thin tinted stroke and tonal fill, with a 14px title and an 18px Lucide icon. The type menu has an 8px corner, 13px labels and a bounded scrolling region. Task marks occupy 21px beside ordinary body text; the supplied state colors distinguish progress, done, cancellation, importance, questions, key items, forwarding and planning. Symbols and readable labels carry state in addition to color. Keyboard focus uses the existing link role. No new entrance animation or background work is introduced.
+
+The right context pane adds an explicit Local graph tab and a draggable left-edge separator. Its initial width remains 270px; preferred width is bounded between 240px and 600px, further constrained by the viewport and the docked work area. UI preferences retain width and selected region. The graph is a static bounded SVG using existing metadata and up to forty nodes; full labels appear in an HTML caption on hover/focus. The surrounding optional-module controls remain authoritative. Same-article split reading/source mode is removed; Blocks, Reading and Markdown remain.

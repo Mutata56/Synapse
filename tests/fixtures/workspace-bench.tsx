@@ -6,6 +6,7 @@ import { useNotesStore, registerFlusher } from "../../src/store/notes";
 import { useWorkspaceStore } from "../../src/store/workspace";
 import { persistEditorZoom } from "../../src/lib/editorZoom";
 import type { Note, TreeNode } from "../../src/lib/storage";
+import { ALL_MODULES } from "../../src/lib/modules";
 import "@mantine/core/styles.css";
 
 import "@blocknote/mantine/style.css";
@@ -19,7 +20,7 @@ if (parameters.has("zoom") && Number.isFinite(requestedZoom) && requestedZoom >=
 }
 const bodies = new Map<string, Note>();
 const makeNote = (id: string, title: string, folder = "", favorite = false): Note => {
-  const content = `# ${title}\n\nЭто синтетическая заметка для проверки вкладок и сохранения.\n\n## Проверка\n\nТекст можно редактировать в этом локальном примере.`;
+  const content = `# ${title}\n\nЭто синтетическая заметка для проверки вкладок и сохранения.\n\n## Проверка\n\nТекст можно редактировать в этом локальном примере.` + (new URLSearchParams(location.search).has("cmd-click") ? "\n\n[[Заметка]]\n" : "");
   const note: Note = { id, title, folder, createdAt: 1, updatedAt: 1, icon: null, cover: null, favorite, tags: [], links: [], mood: null, preview: "Заметка для проверки", content, markdownSource: true, sourceText: content, sourceRevision: content };
   bodies.set(id, note); return note;
 };
@@ -35,6 +36,7 @@ const tree: TreeNode[] = [
 const benchCount = Math.min(10000, Math.max(0, Number(parameters.get("nodes")) || 0));
 for (let index = 0; index < benchCount; index++) tree.push({ kind: "note", note: makeNote(`bench-${index}`, `Тест ${String(index).padStart(5, "0")}`) });
 let count = 1;
+if (new URLSearchParams(location.search).has("cmd-click")) useNotesStore.setState(state => ({ settings: { ...state.settings, modules: { ...ALL_MODULES, home: false } } }));
 useNotesStore.setState({ tree, folderColors: {"ВУЗ":"#ee6363","Работа":"#ee6363","Ascend":"#d9a253","Z_Мусорка":"#a9b963"},
   selectNote: async id => { useNotesStore.setState({activeId:id,activeNote:bodies.get(id) ?? null}); },
   closeActiveNote: async () => { useNotesStore.setState({activeId:null,activeNote:null}); },

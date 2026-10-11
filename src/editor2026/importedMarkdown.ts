@@ -1,17 +1,14 @@
-import { unified } from "unified";
-import remarkParse from "remark-parse";
-import remarkGfm from "remark-gfm";
 import { mapMarkdownText, normalizeSourceEdit, splitMarkdownSource } from "../lib/obsidianImport";
+import { blocksToNoteMarkdown, noteMarkers, parseCallout, parseNoteAst, patchBlockStyles, type MarkdownNode } from "../lib/noteBlockMarkdown";
 
 export type ImportedBlock = { id: string; type: string; props?: Record<string, unknown>; content?: unknown; children?: ImportedBlock[] };
 type Chunk = { ids: string[]; fingerprints: string[]; text: string; gap: string };
-export type ImportedSourceMap = { version: 1; source: string; prefix: string; suffix: string; chunks: Chunk[] };
+export type ImportedSourceMap = { version: 1; blockSyntax?: 1; source: string; prefix: string; suffix: string; chunks: Chunk[] };
 type MarkdownEditor = {
   tryParseMarkdownToBlocks: (text: string) => Promise<unknown[]> | unknown[];
   blocksToMarkdownLossy: (blocks: any) => Promise<string> | string;
 };
-type AstNode = { type: string; lang?: string; children?: AstNode[]; position?: { start: { offset?: number }; end: { offset?: number } } };
-const parser = unified().use(remarkParse).use(remarkGfm);
+type AstNode = MarkdownNode;
 const supported = new Set(["heading", "paragraph", "list", "listItem", "text", "strong", "emphasis", "delete", "inlineCode", "break", "link", "image", "code", "thematicBreak", "table", "tableRow", "tableCell"]);
 
 export function importedFingerprint(block: ImportedBlock): string {
@@ -20,6 +17,37 @@ export function importedFingerprint(block: ImportedBlock): string {
 }
 function editable(node: AstNode): boolean {
   return supported.has(node.type) && node.lang !== "mermaid" && (node.children ?? []).every(editable);
+}
+async function parseBlocks(editor: MarkdownEditor, node: AstNode, raw: string): Promise<ImportedBlock[]> {
+  const callout = node.type === "blockquote" ? parseCallout(raw) : null;
+  if (callout) {
+    const bodyAst = parseNoteAst(callout.body);
+    const body: ImportedBlock[] = [];
+    for (const child of bodyAst.children ?? []) {
+      const part = callout.body.slice(child.position!.start.offset!, child.position!.end.offset!);
+      const parsed = await parseBlocks(editor, child, part);
+      body.push(...(parsed.length ? parsed : [{ id: crypto.randomUUID(), type: "sourceMarkdown", props: { markdown: part }, children: [] }]));
+    }
+    const first = body[0]?.type === "paragraph" ? body.shift() : undefined;
+    return [{ id: crypto.randomUUID(), type: "callout", props: { variant: callout.variant, calloutType: callout.rawType, fold: callout.fold, title: callout.title, emoji: "" }, content: first?.content ?? [], children: body }];
+  }
+  if (!editable(node) || /!\[\[/.test(raw)) return [];
+  try {
+    const markers = node.type === "list" ? noteMarkers(raw).filter(marker => marker.kind === "task") : [];
+    let compatible = raw;
+    for (const marker of [...markers].reverse()) compatible = compatible.slice(0, marker.start) + (/[xX]/.test(marker.value) ? "x" : " ") + compatible.slice(marker.end);
+    const parsed = await editor.tryParseMarkdownToBlocks(compatible) as ImportedBlock[];
+    if (markers.length) {
+      let index = 0;
+      const walk = (block: ImportedBlock) => {
+        if (block.type === "checkListItem") { const marker = markers[index++]?.value; block.props = { ...block.props, taskStatus: marker, checked: marker?.toLowerCase() === "x" }; }
+        block.children?.forEach(walk);
+      };
+      parsed.forEach(walk);
+      if (index !== markers.length) return [];
+    }
+    return parsed;
+  } catch { return []; }
 }
 export function decodeImportedMap(value: string | null | undefined): ImportedSourceMap | null {
   try {
@@ -37,13 +65,19 @@ export async function loadImportedMarkdown(editor: MarkdownEditor, source: strin
   if (cached?.source === source && blocknote) {
     try {
       const blocks = JSON.parse(blocknote);
-      if (Array.isArray(blocks) && blocks.length && blocks.every(b => typeof b.id === "string" && typeof b.type === "string") && new Set(blocks.map(b => b.id)).size === blocks.length) return { blocks, map: cached, cached: true };
+      if (Array.isArray(blocks) && blocks.length && blocks.every(b => typeof b.id === "string" && typeof b.type === "string") && new Set(blocks.map(b => b.id)).size === blocks.length) {
+        // Upgrade only pristine old caches. Recovered dirty drafts retain their
+        // edits even when they were created before callout/status support.
+        const fingerprints = cached.chunks.flatMap(chunk => chunk.fingerprints);
+        const pristine = fingerprints.length === blocks.length && blocks.every((block, index) => importedFingerprint(block) === fingerprints[index]);
+        if (cached.blockSyntax === 1 || !pristine || !noteMarkers(source).length) return { blocks, map: cached, cached: true };
+      }
     } catch { /* Reconstruct from the unchanged Markdown when a cache is malformed. */ }
   }
   const parts = splitMarkdownSource(source);
   const bom = !parts.frontmatter && parts.body.startsWith("\uFEFF") ? "\uFEFF" : "";
   const body = parts.body.slice(bom.length);
-  const ast = parser.parse(body) as AstNode;
+  const ast = parseNoteAst(body);
   const nodes = ast.children ?? [];
   const chunks: Chunk[] = [];
   const blocks: ImportedBlock[] = [];
@@ -53,10 +87,7 @@ export async function loadImportedMarkdown(editor: MarkdownEditor, source: strin
     const end = node.position?.end.offset;
     if (start === undefined || end === undefined) throw new Error("Не удалось определить границы Markdown. Откройте режим Markdown.");
     const raw = body.slice(start, end);
-    let parsed: ImportedBlock[] = [];
-    if (editable(node) && !/!\[\[/.test(raw)) {
-      try { parsed = await editor.tryParseMarkdownToBlocks(raw) as ImportedBlock[]; } catch { /* Unsupported syntax stays in an editable source block. */ }
-    }
+    let parsed = await parseBlocks(editor, node, raw);
     if (!parsed.length) parsed = [{ id: crypto.randomUUID(), type: "sourceMarkdown", props: { markdown: raw }, children: [] }];
     for (const block of parsed) block.id ||= crypto.randomUUID();
     chunks.push({ ids: parsed.map(b => b.id), fingerprints: parsed.map(importedFingerprint), text: raw, gap: body.slice(cursor, start) });
@@ -64,7 +95,7 @@ export async function loadImportedMarkdown(editor: MarkdownEditor, source: strin
     cursor = end;
   }
   if (!blocks.length) blocks.push({ id: crypto.randomUUID(), type: "paragraph", content: [] });
-  return { blocks, map: { version: 1, source, prefix: parts.frontmatter + bom, suffix: body.slice(cursor), chunks } };
+  return { blocks, map: { version: 1, blockSyntax: 1, source, prefix: parts.frontmatter + bom, suffix: body.slice(cursor), chunks } };
 }
 
 /** Bind generated defaults and the editor's trailing empty paragraph without touching source. */
@@ -99,7 +130,7 @@ export async function saveImportedMarkdown(editor: MarkdownEditor, map: Imported
     if (same) text = owner.text;
     else if (run.length === 1 && first.type === "sourceMarkdown") text = normalizeSourceEdit(String(first.props?.markdown ?? ""), map.source);
     else {
-      text = await editor.blocksToMarkdownLossy(run);
+      text = (owner && patchBlockStyles(owner.text, owner.fingerprints, run)) ?? await blocksToNoteMarkdown(editor, run);
       // BlockNote escapes the plain-text wiki syntax; restore it outside code only.
       text = mapMarkdownText(text, prose => prose.replace(/\\\[\\\[([^\n]*?)\\\]\\\]/g, "[[$1]]"));
       text = normalizeSourceEdit(text.replace(/\r?\n$/, ""), map.source);

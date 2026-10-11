@@ -10,6 +10,7 @@ import { confirmDialog } from "../store/confirm";
 import { useNotesStore } from "../store/notes";
 import { useToastStore } from "../store/toasts";
 import { BulkActionBar } from "./BulkActionBar";
+import { useWorkspaceStore } from "../store/workspace";
 import { useI18n } from "./LanguageProvider";
 import { LibraryNoteCard } from "./LibraryNoteCard";
 import { useLibraryWindow } from "./useLibraryWindow";
@@ -92,10 +93,8 @@ export function NotesGallery({ loadNote = readNote }: {
         window.addEventListener("keydown", escape);
         return () => window.removeEventListener("keydown", escape);
     }, [previewId, closePreview, sel.isSelecting]);
-    const open = useCallback((id: string) => {
-        const store = useNotesStore.getState();
-        store.setView("notes");
-        void store.selectNote(id).catch(() => useToastStore.getState().push(t("Не удалось открыть заметку")));
+    const open = useCallback((id: string, newTab = false) => {
+        void useWorkspaceStore.getState().openNote(id, newTab).catch(() => useToastStore.getState().push(t("Не удалось открыть заметку")));
     }, [t]);
     const peek = useCallback((id: string, trigger: HTMLButtonElement) => { previewTrigger.current = trigger; setPreviewId(id); }, []);
     const onFavorite = useCallback((id: string) => { void useNotesStore.getState().toggleFavorite(id); }, []);

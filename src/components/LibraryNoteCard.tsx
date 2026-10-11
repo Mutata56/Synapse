@@ -1,16 +1,18 @@
+import { NoteIcon } from "./NoteIcon";
 import { Check, Eye, FileText, Star } from "lucide-react";
 import { memo, useEffect, useRef, useState, type KeyboardEvent, type MouseEvent } from "react";
 import { gradientClassName, parseCover } from "../lib/covers";
-import { formatRelativeDate, EMOJI_FONT_STACK } from "../lib/format";
+import { formatRelativeDate } from "../lib/format";
 import { resolveCoverImageUrl, type NoteMeta } from "../lib/storage";
 import { useI18n } from "./LanguageProvider";
+import { noteClickAction } from "../lib/noteClick";
 import { libraryExcerpt } from "../lib/noteLibrary";
 type Props = {
     note: NoteMeta;
     selected: boolean;
     selecting: boolean;
     previewing: boolean;
-    onOpen: (id: string) => void;
+    onOpen: (id: string, newTab?: boolean) => void;
     onPreview: (id: string, trigger: HTMLButtonElement) => void;
     onSelect: (id: string) => void;
     onFavorite: (id: string) => void;
@@ -21,10 +23,13 @@ export const LibraryNoteCard = memo(function LibraryNoteCard({ note, selected, s
     const { t } = useI18n();
     const title = note.title || t("Без названия"), folder = note.folder || t("Без папки");
     const click = (event: MouseEvent<HTMLButtonElement>) => {
-        if (selecting || event.ctrlKey || event.metaKey)
+        const action = noteClickAction(event, selecting);
+        if (action === "select")
             onSelect(note.id);
-        else
-            onOpen(note.id);
+        else {
+            if (action === "new-tab") event.preventDefault();
+            onOpen(note.id, action === "new-tab");
+        }
     };
     const tags = [...new Set(note.tags)].slice(0, 2);
     const excerpt = libraryExcerpt(note), date = new Date(note.updatedAt);
@@ -35,7 +40,7 @@ export const LibraryNoteCard = memo(function LibraryNoteCard({ note, selected, s
     <button type="button" className="library-card-open" aria-label={`${t("Открыть заметку")}: ${title}`} onClick={click} onKeyDown={event => onNavigate(note.id, event)}>
       <LibraryCover cover={note.cover}/>
       <div className="library-card-content">
-        <div className="library-card-meta"><span>{note.icon ? <span style={{ fontFamily: EMOJI_FONT_STACK }}>{note.icon}</span> : <FileText size={15}/>}</span><time dateTime={iso}>{iso ? formatRelativeDate(note.updatedAt) : t("Без даты")}</time></div>
+        <div className="library-card-meta"><span><NoteIcon note={note} size={15} fallback={<FileText size={15}/>} /></span><time dateTime={iso}>{iso ? formatRelativeDate(note.updatedAt) : t("Без даты")}</time></div>
         <h3>{title}</h3><p className="library-card-excerpt">{excerpt || t("Заметка пока пустая")}</p>
         <span className="library-card-folder" title={folder}>{folder}</span>
       </div>

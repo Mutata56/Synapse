@@ -2,6 +2,7 @@ import { createReactBlockSpec } from "@blocknote/react";
 import { FileCode2, Check } from "lucide-react";
 import { useLayoutEffect, useRef, useState } from "react";
 import { VaultMarkdown } from "../../components/VaultMarkdown";
+import { changeNoteMarker } from "../../lib/noteBlockMarkdown";
 
 function SourceMarkdownView({ block, editor }: { block: any; editor: any }) {
   const [editing, setEditing] = useState(false);
@@ -19,7 +20,7 @@ function SourceMarkdownView({ block, editor }: { block: any; editor: any }) {
     {editing ? <textarea ref={input} autoFocus className="source-markdown-text" aria-label="Markdown этого блока" value={markdown} spellCheck={false}
       onKeyDown={event => { event.stopPropagation(); if (event.key === "Escape") setEditing(false); }}
       onChange={event => editor.updateBlock(block, { props: { markdown: event.target.value } })} />
-      : <div className="md-content"><VaultMarkdown source={markdown} /></div>}
+      : <div className="md-content"><VaultMarkdown source={markdown} onMarkerChange={(kind, index, value) => editor.updateBlock(block, { props: { markdown: changeNoteMarker(block.props.markdown, kind, index, value) } })} /></div>}
   </div>;
 }
 export const sourceMarkdownBlock = createReactBlockSpec({ type: "sourceMarkdown", content: "none", propSchema: { markdown: { default: "" } } }, {

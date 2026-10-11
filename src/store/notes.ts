@@ -166,7 +166,7 @@ type State = {
   settingsSaveState: "idle" | "saving" | "saved" | "error";
   /** Выбор при неоднозначном `[[wiki-link]]`: ставится когда кликнутая ссылка
    *  матчит больше одной заметки по заголовку. null = закрыто. */
-  linkPicker: { title: string; matches: NoteMeta[] } | null;
+  linkPicker: { title: string; matches: NoteMeta[]; newTab?: boolean } | null;
   /** id заметки, для которой открыт модал истории версий, null = закрыто. */
   versionHistoryFor: string | null;
   /** Инкрементируется чтобы заставить редактор перезагрузить документ,
@@ -198,14 +198,14 @@ type Actions = {
   goBack: () => void;
   /** Резолвит `[[title]]` wiki-ссылку: переходит при одном совпадении, открывает
    *  пикер неоднозначности при нескольких, false при отсутствии/ссылке на себя. */
-  openNoteByTitle: (title: string) => boolean;
+  openNoteByTitle: (title: string, newTab?: boolean) => boolean;
   /** Создаёт заметку с указанным заголовком в корне (или переходит к
    *  существующей, если такая уже есть где-либо).
    *  Используется в попапе `[[` wiki-ссылки. */
   createNoteByTitle: (title: string) => Promise<void>;
   /** Открывает одну заметку, выбранную из пикера `[[wiki-link]]` (и закрывает
    *  его). `closeLinkPicker` закрывает пикер без навигации. */
-  openLinkMatch: (id: string) => void;
+  openLinkMatch: (id: string, newTab?: boolean) => void;
   closeLinkPicker: () => void;
   /** Открывает заметку дня для `date` (`Дневник/<year>/<YYYY-MM-DD>`), создаёт
    *  её при первом открытии, переключает на вид заметок. */
@@ -1346,10 +1346,11 @@ export const useNotesStore = create<Store>((set, get) => {
       void get().selectNote(prevId);
     },
 
-    openNoteByTitle: (title) => {
+    openNoteByTitle: (title, newTab = false) => {
       const matches = findNotesByTitle(get().tree, title);
       if (matches.length === 0) return false;
       if (matches.length === 1) {
+        if (newTab) { get().openLinkMatch(matches[0].id, true); return true; }
         // Одна подсказка , переходим, если это не текущая заметка (ссылка
         // на саму себя попадает в обычное редактирование, чтобы курсор
         // мог сесть).
@@ -1359,7 +1360,7 @@ export const useNotesStore = create<Store>((set, get) => {
         return true;
       }
       // Несколько подсказок , пусть пользователь выбирает.
-      set({ linkPicker: { title: title.trim(), matches } });
+      set({ linkPicker: { title: title.trim(), matches, newTab } });
       return true;
     },
 
@@ -1381,7 +1382,12 @@ export const useNotesStore = create<Store>((set, get) => {
       await get().createNote("", t);
     },
 
-    openLinkMatch: (id) => {
+    openLinkMatch: (id, newTab = false) => {
+      if (newTab) {
+        set({ linkPicker: null });
+        void import("./workspace").then(({ useWorkspaceStore }) => useWorkspaceStore.getState().openNote(id, true));
+        return;
+      }
       set({ view: "notes", linkPicker: null });
       void get().selectNote(id);
     },

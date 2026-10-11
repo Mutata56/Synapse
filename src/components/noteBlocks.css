@@ -1,0 +1,54 @@
+.note-callout,.e26-callout { --note-block-accent:var(--color-text-secondary); }
+.note-callout--info,.note-callout--abstract,.note-callout--todo { --note-block-accent:#6ea8fe; }
+.note-callout--tip { --note-block-accent:#5fd08a; }
+.note-callout--success { --note-block-accent:#4fd1b1; }
+.note-callout--warning { --note-block-accent:#f0c64e; }
+.note-callout--question,.note-callout--example { --note-block-accent:#b699ff; }
+.note-callout--failure,.note-callout--danger,.note-callout--bug { --note-block-accent:#f38a9e; }
+.note-callout { margin:16px 0; padding:12px 15px; border:1px solid color-mix(in srgb,var(--note-block-accent) 30%,transparent); border-radius:10px; background:color-mix(in srgb,var(--note-block-accent) 8%,var(--color-bg)); color:var(--color-text); font-style:normal; overflow-wrap:anywhere; }
+.note-callout-head { display:flex; align-items:center; gap:9px; color:var(--note-block-accent); font-size:14px; font-weight:600; line-height:1.5; }
+.note-callout-head>svg { flex:0 0 auto; }
+.note-callout-head>span { min-width:0; flex:1; }
+.note-callout-heading { display:inline; }
+.note-callout-body { margin-top:8px; line-height:1.7; }
+.note-callout-body>:first-child { margin-top:0; }
+.note-callout-body>:last-child { margin-bottom:0; }
+.note-callout details>summary { cursor:pointer; list-style:none; }
+.note-callout details>summary::-webkit-details-marker { display:none; }
+.note-callout details:not([open])>summary>svg:last-child { transform:rotate(-90deg); }
+.note-task-row { list-style:none; margin:7px 0; }
+.note-task-line,.e26-task-line { display:flex; gap:10px; align-items:flex-start; }
+.note-task-text,.e26-task-text { min-width:0; flex:1; }
+.note-task-text>p { margin:0; }
+.note-task--done .note-task-text,.note-task--cancelled .note-task-text,.e26-task--done .e26-task-text,.e26-task--cancelled .e26-task-text { text-decoration:line-through; color:var(--color-text-secondary); }
+.note-task-symbol { width:21px; height:21px; flex:0 0 auto; display:inline-flex; align-items:center; justify-content:center; margin-top:2px; padding:0; border:1px solid var(--color-text-secondary); border-radius:5px; color:var(--color-text-secondary); background:transparent; }
+button.note-task-symbol { cursor:pointer; }
+.note-task--done>.note-task-symbol,.note-task--done .note-task-line>.note-task-symbol,.e26-task--done>.note-task-symbol { background:#5fd08a; color:#08291b; border-color:#5fd08a; }
+.note-task--cancelled>.note-task-symbol,.note-task--cancelled .note-task-line>.note-task-symbol,.e26-task--cancelled>.note-task-symbol { background:#f38a9e; color:#38131e; border-color:#f38a9e; }
+.note-task--progress>.note-task-symbol,.note-task--progress .note-task-line>.note-task-symbol,.e26-task--progress>.note-task-symbol { background:var(--color-bg-overlay); }
+.note-task--important>.note-task-symbol,.note-task--important .note-task-line>.note-task-symbol,.e26-task--important>.note-task-symbol { background:#f0df75; color:#322c07; border-color:#f0df75; }
+.note-task--question>.note-task-symbol,.note-task--question .note-task-line>.note-task-symbol,.e26-task--question>.note-task-symbol { background:#efb273; color:#3e2308; border-color:#efb273; border-radius:50%; }
+.note-task--star>.note-task-symbol,.note-task--star .note-task-line>.note-task-symbol,.e26-task--star>.note-task-symbol { border-color:transparent; color:#f0df75; }
+.note-task--forwarded>.note-task-symbol,.note-task--forwarded .note-task-line>.note-task-symbol,.e26-task--forwarded>.note-task-symbol { border-color:transparent; color:#71c3ef; }
+.note-task--scheduled>.note-task-symbol,.note-task--scheduled .note-task-line>.note-task-symbol,.e26-task--scheduled>.note-task-symbol { border-color:transparent; color:#75d9cd; }
+.note-style-menu { position:fixed; z-index:350; width:244px; max-width:calc(100vw - 16px); max-height:min(430px,75dvh); overflow:auto; padding:5px; border:1px solid var(--color-border-strong); border-radius:8px; background:var(--color-bg-elevated); box-shadow:0 10px 30px rgba(0,0,0,.3); color:var(--color-text); }
+.note-style-menu-title { padding:7px 9px; font-size:12px; font-weight:600; color:var(--color-text-secondary); }
+.note-style-menu button { display:flex; align-items:center; gap:9px; width:100%; min-height:32px; padding:5px 9px; border:0; border-radius:5px; color:var(--color-text); background:transparent; font:13px/1.4 var(--font-sans); text-align:left; cursor:pointer; }
+.note-style-menu button>span:nth-child(2) { flex:1; }
+.note-style-menu button:hover,.note-style-menu button[aria-checked=true] { background:var(--color-accent-bg); }
+.note-style-menu .note-task-symbol { width:21px; height:21px; margin:0; }
+.note-callout-symbol { display:inline-flex; width:21px; color:var(--note-block-accent); }
+.note-style-menu button:focus-visible,.note-task-symbol:focus-visible,.note-callout summary:focus-visible { outline:2px solid var(--color-link); outline-offset:1px; }
+.e26-task-line { width:100%; min-width:0; align-items:center; }
+.e26-task-line>.note-task-symbol { margin-top:0; }
+.e26-task-text { margin:0; }
+.e26-callout__title-input { flex:1; min-width:0; padding:0; border:0; outline:none; color:var(--note-block-accent); background:transparent; font:600 14px/1.5 var(--font-sans); }
+.e26-callout__title-input::placeholder { color:var(--note-block-accent); opacity:1; }
+.note-callout.e26-callout { background:color-mix(in srgb,var(--note-block-accent) 8%,var(--color-bg)); border-color:color-mix(in srgb,var(--note-block-accent) 30%,transparent); }
+.note-task-symbol.note-task--done { background:#5fd08a; color:#08291b; border-color:#5fd08a; }
+.note-task-symbol.note-task--cancelled { background:#f38a9e; color:#38131e; border-color:#f38a9e; }
+.note-task-symbol.note-task--important { background:#f0df75; color:#322c07; border-color:#f0df75; }
+.note-task-symbol.note-task--question { background:#efb273; color:#3e2308; border-color:#efb273; border-radius:50%; }
+.note-task-symbol.note-task--star { color:#f0df75; border-color:transparent; }
+.note-task-symbol.note-task--forwarded { color:#71c3ef; border-color:transparent; }
+.note-task-symbol.note-task--scheduled { color:#75d9cd; border-color:transparent; }

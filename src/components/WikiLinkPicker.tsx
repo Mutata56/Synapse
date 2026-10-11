@@ -1,7 +1,8 @@
+import { NoteIcon } from "./NoteIcon";
 import { AnimatePresence, motion } from "framer-motion";
 import { FileText, Folder } from "lucide-react";
 import { useEffect } from "react";
-import { EMOJI_FONT_STACK, formatRelativeDate } from "../lib/format";
+import { formatRelativeDate } from "../lib/format";
 import { useNotesStore } from "../store/notes";
 
 // Выше поповеров редактора и hero (z 100), на одном уровне с командной палитрой
@@ -71,24 +72,15 @@ export function WikiLinkPicker() {
                 <button
                   key={note.id}
                   type="button"
-                  onClick={() => openLinkMatch(note.id)}
+                  onClick={event => openLinkMatch(note.id, linkPicker.newTab || event.metaKey)}
                   className="w-full flex items-center gap-2.5 px-4 py-2 text-left hover:bg-white/[0.05] transition-colors"
                 >
                   <span className="shrink-0 w-5 flex justify-center">
-                    {note.icon ? (
-                      <span
-                        style={{ fontFamily: EMOJI_FONT_STACK }}
-                        className="text-base leading-none select-none"
-                      >
-                        {note.icon}
-                      </span>
-                    ) : (
-                      <FileText
+                    <NoteIcon note={note} size={16} fallback={<FileText
                         size={15}
                         strokeWidth={1.8}
                         className="text-zinc-500"
-                      />
-                    )}
+                      />} />
                   </span>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-1 text-[13px] text-zinc-200 min-w-0">

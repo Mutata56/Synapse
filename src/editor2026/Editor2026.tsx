@@ -28,7 +28,6 @@ import {
   ArrowLeft,
   FileText,
   Images,
-  Info,
   Paperclip,
   PenTool,
   Table,
@@ -53,6 +52,7 @@ import { importAssetBytes } from "../lib/storage";
 import { tagExtension } from "../lib/tags";
 import { flattenNotes } from "../lib/treeUtils";
 import { refreshWikiLinks, wikiLinkExtension } from "../lib/wikiLink";
+import { iconizeExtension } from "../lib/iconizeExtension";
 import { registerFlusher, useNotesStore } from "../store/notes";
 import { FormattingToolbar2026 } from "./chrome/FormattingToolbar2026";
 import { debugExtension, dlog, E26_DEBUG } from "./lib/debug";
@@ -64,6 +64,9 @@ import {
 } from "./loadDocument";
 import { getNotesSchema } from "./schema";
 import { bindImportedMap, loadImportedMarkdown, saveImportedMarkdown, type ImportedBlock, type ImportedSourceMap } from "./importedMarkdown";
+import { blocksToNoteMarkdown } from "../lib/noteBlockMarkdown";
+import { CALLOUT_LABELS, CALLOUT_TYPES, TASK_STATES } from "../lib/noteBlockTypes";
+import { calloutIcon, TaskIcon } from "../components/NoteBlockUI";
 import { TemplateChipRow } from "./TemplateChipRow";
 import { buildWikiLinkItems } from "./wikiLink2026";
 import { tryHandleImagePaste } from "./lib/pasteImages";
@@ -162,8 +165,8 @@ export function Editor2026({ imported }: { imported?: ImportedEditorBridge } = {
     dropCursor: multiColumnDropCursor,
     dictionary: { ...en, multi_column: multiColumnLocales.en },
     extensions: E26_DEBUG
-      ? [wikiLinkExtension, tagExtension, debugExtension]
-      : [wikiLinkExtension, tagExtension],
+      ? [wikiLinkExtension, tagExtension, iconizeExtension, debugExtension]
+      : [wikiLinkExtension, tagExtension, iconizeExtension],
   });
 
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -286,7 +289,7 @@ export function Editor2026({ imported }: { imported?: ImportedEditorBridge } = {
         // путь и бэкап не переедет на другую ОС.
         if (importedRef.current) { await persistImported(); return; }
         const blocks = portablizeBlocks(editor.document);
-        const md = await editor.blocksToMarkdownLossy(blocks as never);
+        const md = await blocksToNoteMarkdown(editor, blocks as never);
         if (loadedIdRef.current !== activeId) return;
         await saveNote({
           content: md,
@@ -343,7 +346,7 @@ export function Editor2026({ imported }: { imported?: ImportedEditorBridge } = {
           // См. flush выше: портабилизируем ссылки на ассеты до сохранения.
           if (importedRef.current) { await persistImported(); return; }
           const blocks = portablizeBlocks(editor.document);
-          const md = await editor.blocksToMarkdownLossy(blocks as never);
+          const md = await blocksToNoteMarkdown(editor, blocks as never);
           if (loadedIdRef.current !== editingId) return;
           await saveNote({
             content: md,
@@ -426,14 +429,17 @@ export function Editor2026({ imported }: { imported?: ImportedEditorBridge } = {
   // добавляем getDefaultReactSlashMenuItems обратно.
   const getSlashItems = useCallback(
     async (query: string): Promise<DefaultReactSuggestionItem[]> => {
-      const calloutItem: DefaultReactSuggestionItem = {
-        title: "Выноска",
-        subtext: "Цветной блок: инфо / важно / совет",
-        aliases: ["callout", "выноска", "врезка", "инфо", "info", "note"],
-        group: "Блоки",
-        icon: <Info size={18} />,
-        onItemClick: () => insertCustomBlock("callout"),
-      };
+      const calloutItems: DefaultReactSuggestionItem[] = CALLOUT_TYPES.map(kind => {
+        const Icon = calloutIcon(kind);
+        return { title: `${t("Выноска")}: ${t(CALLOUT_LABELS[kind])}`, subtext: t("Цветной блок с заголовком. Тип меняется через ПКМ."), aliases: ["callout", "выноска", "врезка", kind, CALLOUT_LABELS[kind].toLowerCase()], group: t("Выноски"), icon: <Icon size={18} />, onItemClick: () => {
+          const block = insertOrUpdateBlockForSlashMenu(editor, { type: "callout", props: { variant: kind } });
+          editor.setTextCursorPosition(block, "start"); editor.focus();
+        } };
+      });
+      const taskItems: DefaultReactSuggestionItem[] = TASK_STATES.map(state => ({ title: `${t("Задача")}: ${t(state.label)}`, subtext: t("Статус меняется через ПКМ."), aliases: ["task", "checkbox", "задача", state.id, state.label.toLowerCase()], group: t("Задачи"), icon: <TaskIcon marker={state.marker} />, onItemClick: () => {
+        const block = insertOrUpdateBlockForSlashMenu(editor, { type: "checkListItem", props: { taskStatus: state.marker, checked: state.marker === "x" } });
+        editor.setTextCursorPosition(block, "start"); editor.focus();
+      } }));
       const galleryItem: DefaultReactSuggestionItem = {
         title: "Галерея",
         subtext: "Несколько изображений: сетка или карусель",
@@ -471,7 +477,7 @@ export function Editor2026({ imported }: { imported?: ImportedEditorBridge } = {
       // клики ломаются. Сначала все "Блоки", потом все "Медиа".
       const items = [
         ...getDefaultReactSlashMenuItems(editor),
-        calloutItem, ...(modules.database ? [dataTableItem] : []), galleryItem, fileItem, ...(modules.canvas ? [whiteboardItem] : []),
+        ...calloutItems, ...taskItems, ...(modules.database ? [dataTableItem] : []), galleryItem, fileItem, ...(modules.canvas ? [whiteboardItem] : []),
         ...getMultiColumnSlashMenuItems(editor),
       ];
       const groups = new Map<string, DefaultReactSuggestionItem[]>();

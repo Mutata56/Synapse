@@ -13,7 +13,8 @@ test('opening and unchanged saves retain exact BOM, commented YAML, CRLF, whites
   const {ed,blocks,map}=await loaded(source);
   assert.equal((await saveImportedMarkdown(ed,map,blocks)).source,source);
   assert.equal(decodeImportedMap(JSON.stringify(map)).source,source);
-  assert.equal(blocks.filter(b=>b.type==='sourceMarkdown').length,4);
+  assert.equal(blocks.filter(b=>b.type==='sourceMarkdown').length,3);
+  assert.equal(blocks.find(b=>b.type==='callout').props.variant,'info');
 });
 test('editing one paragraph changes only that chunk and preserves unsupported Markdown and YAML', async () => {
   const source='---\ncustom: true # keep\n---\n\n# Heading\n\nOriginal paragraph.\n\n> [!tip] untouched\n> [[Target|label]]\n\n[^a]: a footnote\n';
@@ -46,9 +47,9 @@ test('a recovered block draft keeps baseline fingerprints, so edited text is exp
   assert.equal((await saveImportedMarkdown(ed,draft.map,draft.blocks)).source,'Draft.\n');
 });
 test('source blocks normalize edited newlines to the original CRLF convention', async () => {
-  const {ed,blocks,map}=await loaded('> [!info] Original\r\n> text\r\n');
-  blocks[0].props.markdown='> [!info] Changed\n> text';
-  assert.equal((await saveImportedMarkdown(ed,map,blocks)).source,'> [!info] Changed\r\n> text\r\n');
+  const {ed,blocks,map}=await loaded('> Original\r\n> text\r\n');
+  blocks[0].props.markdown='> Changed\n> text';
+  assert.equal((await saveImportedMarkdown(ed,map,blocks)).source,'> Changed\r\n> text\r\n');
 });
 test('moving and deleting chunks preserve syntax, do not duplicate source, and maintain valid mappings', async () => {
   const {ed,blocks,map}=await loaded('First.\n\n> [!info] Second\n\nThird.\n');

@@ -1,14 +1,12 @@
 import { Network } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  buildAdjacency,
-  buildLocalGraph,
-  EMPTY_GRAPH,
   type GraphNode,
 } from "../editor2026/graphModel";
 import { cn } from "../lib/cn";
 import { DEFAULT_NOTE_TITLE } from "../lib/format";
-import { flattenNotes } from "../lib/treeUtils";
+import { useLocalGraph } from "../editor2026/useLocalGraph";
+import { t } from "../lib/i18n";
 import { useNotesStore } from "../store/notes";
 
 // ─── Layout constants (SVG viewBox units) ───────────────────────────────────
@@ -80,9 +78,8 @@ function layout(
  * up to 1–2 hops, drawn as a light SVG (no PixiJS). Click a node to navigate.
  * Hidden when the note has no connections.
  */
-export function LocalGraph({ compact = false }: { compact?: boolean }) {
+export function LocalGraph({ compact = false, sidebar = false }: { compact?: boolean; sidebar?: boolean }) {
   const activeId = useNotesStore((s) => s.activeId);
-  const tree = useNotesStore((s) => s.tree);
   const selectNote = useNotesStore((s) => s.selectNote);
   const [hops, setHops] = useState(1);
 
@@ -98,33 +95,8 @@ export function LocalGraph({ compact = false }: { compact?: boolean }) {
     vy: number;
   } | null>(null);
 
-  const notes = useMemo(() => flattenNotes(tree), [tree]);
-  // Adjacency depends ONLY on the fields buildAdjacency reads (id + body links
-  // serialized in `preview`). Other autosave-bumped fields (icon, cover,
-  // favorite, updatedAt, mood) flip `tree` identity , `notes` identity but
-  // don't change the link graph. A content signature collapses those into a
-  // single string so the heavy buildAdjacency walk only re-runs on actual
-  // link changes.
-  const adjSig = useMemo(
-    () => notes.map((n) => `${n.id}|${n.preview ?? ""}`).join("\n"),
-    [notes],
-  );
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const adj = useMemo(() => buildAdjacency(notes), [adjSig]);
-  // Compute the full 2-hop neighbourhood once so we know whether a 2nd level
-  // even exists (used to enable/disable that toggle). The displayed graph is
-  // just this, filtered to the selected depth. Delegates to the shared
-  // graphModel , same BFS one source of truth for SVG / future WebGL / tests.
-  const full = useMemo(
-    () =>
-      activeId
-        ? buildLocalGraph(notes, activeId, 2, {
-            adjacency: adj,
-            maxNodes: MAX_NODES,
-          })
-        : EMPTY_GRAPH,
-    [notes, adj, activeId],
-  );
+  const full = useLocalGraph(activeId, 2, { maxNodes: MAX_NODES });
+  const [hovered, setHovered] = useState<string | null>(null);
   const hasLevel2 = useMemo(() => full.nodes.some((n) => n.level === 2), [full]);
   // Fall back to depth 1 when there's nothing at depth 2, so the toggle never
   // sits on a "2 уровня" that looks identical to "1 уровень".
@@ -146,6 +118,7 @@ export function LocalGraph({ compact = false }: { compact?: boolean }) {
   // Reset zoom/pan when switching notes (the new graph has a fresh layout).
   useEffect(() => {
     setView({ x: 0, y: 0, k: 1 });
+    setHovered(null);
   }, [activeId]);
 
   // Wheel-zoom around the cursor. Attached as a non-passive native listener so
@@ -175,7 +148,7 @@ export function LocalGraph({ compact = false }: { compact?: boolean }) {
   }, [showGraph]);
 
   // Nothing to show if the note has no links/backlinks.
-  if (!showGraph) return null;
+  if (!showGraph) return sidebar ? <div className="workspace-localgraph-empty">{t("У этой заметки пока нет связей. Добавь [[ссылку]] на другую заметку.")}</div> : null;
 
   // ── Pan by dragging empty canvas (nodes stopPropagation, so a click still
   // navigates) ──
@@ -217,14 +190,14 @@ export function LocalGraph({ compact = false }: { compact?: boolean }) {
   return (
     <div
       className={
-        compact ? "w-full" : "max-w-3xl mx-auto w-full px-5 sm:px-12 pb-10 pt-4"
+        compact ? "w-full workspace-localgraph" : "max-w-3xl mx-auto w-full px-5 sm:px-12 pb-10 pt-4"
       }
     >
       <div className={compact ? "" : "border-t border-[var(--color-border)] pt-6"}>
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-[11px] uppercase tracking-wider font-semibold text-zinc-600 flex items-center gap-1.5">
             <Network size={12} strokeWidth={2} />
-            Локальный граф · {nodes.length - 1}
+            {sidebar ? `${nodes.length} ${t("узлов")}` : `Локальный граф · ${nodes.length - 1}`}
           </h3>
           <div className="flex items-center gap-1.5 text-[11px]">
             {dirty && (
@@ -298,8 +271,8 @@ export function LocalGraph({ compact = false }: { compact?: boolean }) {
                   x2={b.x}
                   y2={b.y}
                   stroke="var(--color-border-strong)"
-                  strokeWidth={1}
-                  opacity={0.6}
+                  strokeWidth={sidebar ? 2 : 1}
+                  opacity={sidebar ? 0.8 : 0.6}
                 />
               );
             })}
@@ -307,7 +280,7 @@ export function LocalGraph({ compact = false }: { compact?: boolean }) {
               const p = pos.get(n.id);
               if (!p) return null;
               const isCenter = n.level === 0;
-              const r = isCenter ? CENTER_R : NODE_R;
+              const r = sidebar ? isCenter ? 12 : 8 : isCenter ? CENTER_R : NODE_R;
               // Full title, no truncation (по запросу). Long labels may extend
               // past the node; the hover tooltip still shows the same text.
               const label = n.note.title || DEFAULT_NOTE_TITLE;
@@ -315,6 +288,14 @@ export function LocalGraph({ compact = false }: { compact?: boolean }) {
               return (
                 <g
                   key={n.id}
+                  role={isCenter ? "img" : "button"}
+                  tabIndex={isCenter ? -1 : 0}
+                  aria-label={label}
+                  onMouseEnter={() => setHovered(n.id)}
+                  onMouseLeave={() => setHovered(null)}
+                  onFocus={() => setHovered(n.id)}
+                  onBlur={() => setHovered(null)}
+                  onKeyDown={event => { if (!isCenter && (event.key === "Enter" || event.key === " ")) { event.preventDefault(); void selectNote(n.id); } }}
                   className={isCenter ? undefined : "cursor-pointer"}
                   // A press on a node must not start a canvas pan; a plain
                   // click (no drag) still navigates.
@@ -336,7 +317,7 @@ export function LocalGraph({ compact = false }: { compact?: boolean }) {
                     stroke="var(--color-bg-elevated)"
                     strokeWidth={2}
                   />
-                  <text
+                  {!sidebar ? <text
                     x={compact ? p.x : labelRight ? p.x + r + 4 : p.x - r - 4}
                     y={compact ? p.y + r + 22 : p.y + 4}
                     textAnchor={compact ? "middle" : labelRight ? "start" : "end"}
@@ -345,7 +326,7 @@ export function LocalGraph({ compact = false }: { compact?: boolean }) {
                     fill={isCenter ? "#e4e4e7" : "#a1a1aa"}
                   >
                     {label}
-                  </text>
+                  </text> : null}
                 </g>
               );
             })}
@@ -353,6 +334,7 @@ export function LocalGraph({ compact = false }: { compact?: boolean }) {
           </svg>
         </div>
       </div>
+      {sidebar ? <p className="workspace-localgraph-caption">{nodes.find(node => node.id === (hovered ?? activeId))?.title || DEFAULT_NOTE_TITLE}</p> : null}
     </div>
   );
 }
