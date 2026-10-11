@@ -87,7 +87,9 @@ function bodyFor(note: NoteMeta): Promise<CachedBody> {
       const full = await readNote(note.id);
       const body = full?.content ?? "";
       const value = { updatedAt: note.updatedAt, body, bodyLower: body.toLowerCase() };
-      if (pendingBodies.get(note.id) === pending) bodyCache.set(note.id, value);
+      // A temporarily missing file is not a valid empty revision. Keep the
+      // retry path available to both search and statistics.
+      if (full && pendingBodies.get(note.id) === pending) bodyCache.set(note.id, value);
       return value;
     }).finally(() => {
       if (pendingBodies.get(note.id) === pending) pendingBodies.delete(note.id);
