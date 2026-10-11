@@ -41,7 +41,9 @@ export const useCalendarStore = create<CalendarState>((set, get) => ({
   lastSync: null,
 
   syncNow: async () => {
-    const url = useNotesStore.getState().settings.calendarIcsUrl.trim();
+    const settings = useNotesStore.getState().settings;
+    if (!settings.modules.calendar) return;
+    const url = settings.calendarIcsUrl.trim();
     if (!url) {
       set({ events: [], status: "idle", error: null, lastSync: null });
       return;
@@ -49,6 +51,7 @@ export const useCalendarStore = create<CalendarState>((set, get) => ({
     set({ status: "loading", error: null });
     try {
       const text = await invoke<string>("fetch_ics", { url });
+      if (!useNotesStore.getState().settings.modules.calendar || useNotesStore.getState().settings.calendarIcsUrl.trim() !== url) { set({ status: "idle" }); return; }
       // Проверка на самую частую ошибку: вставлена ссылка "встроить на сайт"
       // из Яндекса (/embed/...) или обычная страница календаря вместо ссылки
       // экспорта iCal. Они возвращают HTML, а не iCalendar-фид.
@@ -67,6 +70,7 @@ export const useCalendarStore = create<CalendarState>((set, get) => ({
         lastSync: Date.now(),
       });
     } catch (e) {
+      if (!useNotesStore.getState().settings.modules.calendar) { set({ status: "idle" }); return; }
       // `fetch_ics` отклоняется простой строкой (Result<_, String>).
       set({ status: "error", error: typeof e === "string" ? e : String(e) });
     }

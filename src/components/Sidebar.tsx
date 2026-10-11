@@ -16,7 +16,9 @@ import { WorkspaceIconButton } from "./WorkspaceChrome";
 export function Sidebar() {
   const visible = useWorkspaceStore(state => state.sidebarVisible);
   const width = useWorkspaceStore(state => state.sidebarWidth);
-  const pane = useWorkspaceStore(state => state.sidebarPane);
+  const requestedPane = useWorkspaceStore(state => state.sidebarPane);
+  const modules = useNotesStore(state => state.settings.modules);
+  const pane = modules[requestedPane] ? requestedPane : (["files", "search", "bookmarks"] as const).find(key => modules[key]) ?? "files";
   const label = useWorkspaceStore(state => state.vaultLabel);
   const sort = useWorkspaceStore(state => state.fileSort);
   const tree = useNotesStore(state => state.tree);
@@ -28,7 +30,7 @@ export function Sidebar() {
     if (dragging.current) { dragging.current = false; document.body.style.cursor = ""; document.body.style.userSelect = ""; }
   }, [visible]);
   const paneTabs: Array<{ id: "files" | "search" | "bookmarks"; icon: LucideIcon; title: string }> = [{ id: "files", icon: Folder, title: "Файлы" }, { id: "search", icon: Search, title: "Поиск" }, { id: "bookmarks", icon: Bookmark, title: "Закладки" }];
-  if (!visible) return null;
+  if (!visible || !modules.files && !modules.search && !modules.bookmarks) return null;
   const collapseAll = () => {
     const notes = useNotesStore.getState();
     const expandedFolders = new Set<string>();
@@ -45,14 +47,14 @@ export function Sidebar() {
   return <aside className="workspace-sidebar" ref={root} style={{ width }} aria-label={t("Левая панель")}>
     <header className="workspace-sidebar-header" data-tauri-drag-region>
       <div className="workspace-sidebar-tabs" role="tablist" aria-label={t("Панели хранилища")}>
-        {paneTabs.map(tab => <WorkspaceIconButton key={tab.id} icon={tab.icon} label={t(tab.title)} active={pane === tab.id} role="tab" aria-selected={pane === tab.id} aria-controls={`workspace-side-${tab.id}`} onClick={() => showPane(tab.id)} />)}
+        {paneTabs.filter(tab => modules[tab.id]).map(tab => <WorkspaceIconButton key={tab.id} icon={tab.icon} label={t(tab.title)} active={pane === tab.id} role="tab" aria-selected={pane === tab.id} aria-controls={`workspace-side-${tab.id}`} onClick={() => showPane(tab.id)} />)}
       </div>
       <WorkspaceIconButton icon={PanelLeft} label={t("Свернуть левую панель")} onClick={() => useWorkspaceStore.getState().toggleSidebar()} />
     </header>
     <div className="workspace-sidebar-body" id={`workspace-side-${pane}`} role="tabpanel" aria-label={t(paneTabs.find(tab => tab.id === pane)!.title)}>
       {pane === "files" ? <>
         <div className="workspace-file-actions" aria-label={t("Действия с файлами")}>
-          <WorkspaceIconButton icon={FilePlus2} label={t("Новая заметка")} onClick={() => useNotesStore.getState().startCreateNote(useNotesStore.getState().currentFolder)} />
+          {modules.newNote ? <WorkspaceIconButton icon={FilePlus2} label={t("Новая заметка")} onClick={() => useNotesStore.getState().startCreateNote(useNotesStore.getState().currentFolder)} /> : null}
           <WorkspaceIconButton icon={FolderPlus} label={t("Новая папка")} onClick={() => useNotesStore.getState().startCreateFolder(useNotesStore.getState().currentFolder)} />
           <WorkspaceIconButton icon={SortAsc} label={t("Порядок файлов")} onClick={event => sortMenu(event.currentTarget)} />
           <WorkspaceIconButton icon={PanelTop} label={t("Показать активный файл")} onClick={() => {
@@ -69,7 +71,7 @@ export function Sidebar() {
       <button className="workspace-vault-name" type="button" title={t("Переименовать хранилище")} onClick={() => {
         void promptDialog(t("Название хранилища"), { defaultValue: label }).then(value => { if (value !== null) useWorkspaceStore.getState().setVaultLabel(value); });
       }}><ChevronsUpDown size={15} aria-hidden="true" /><span>{label}</span></button>
-      <WorkspaceIconButton icon={HelpCircle} label={t("Помощь и сочетания клавиш")} onClick={() => useWorkspaceStore.getState().showHelp(true)} />
+      {modules.help ? <WorkspaceIconButton icon={HelpCircle} label={t("Помощь и сочетания клавиш")} onClick={() => useWorkspaceStore.getState().showHelp(true)} /> : null}
       <WorkspaceIconButton icon={Settings2} label={t("Настройки")} onClick={() => void useWorkspaceStore.getState().openView("settings")} />
     </footer>
     <div role="separator" tabIndex={0} aria-orientation="vertical" aria-label={t("Изменить ширину панели")} aria-valuenow={Math.round(width)} aria-valuemin={220} aria-valuemax={Math.max(240, window.innerWidth - 368)} className="workspace-sidebar-resize" title={t("Потяните, чтобы изменить ширину (двойной клик , сброс)")}

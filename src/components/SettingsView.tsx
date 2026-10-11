@@ -1,540 +1,174 @@
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
-import { motion, useReducedMotion } from "framer-motion";
-import {
-  Archive,
-  CalendarDays,
-  Check,
-  FolderOpen,
-  Globe,
-  HardDrive,
-  Keyboard,
-  Palette,
-  RefreshCw,
-  Settings,
-  Sparkles,
-  Upload,
-  type LucideIcon,
-} from "lucide-react";
-import { useEffect, useState, type ReactNode } from "react";
+import { Archive, ArrowUpRight, Bookmark, CalendarDays, ChartNoAxesCombined, Check, FilePlus2, FileText, FolderOpen, HardDrive, Hash, HelpCircle, Home, Image, Inbox, Keyboard, Network, Palette, PanelRight, RefreshCw, Search, Shapes, SlidersHorizontal, Table2, Trash2, Upload, X, type LucideIcon } from "lucide-react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { backupWorkspace, restoreWorkspace } from "../lib/backup";
 import { confirmDialog } from "../store/confirm";
 import { cn } from "../lib/cn";
 import { t } from "../lib/i18n";
 import { useI18n } from "./LanguageProvider";
-import {
-  ACCENT_PRESETS,
-  accelFromKeyboardEvent,
-  DEFAULT_SETTINGS,
-  isValidHex,
-  isValidIcsUrl,
-  normalizeHex,
-  prettyAccelerator,
-} from "../lib/settings";
+import { ACCENT_PRESETS, accelFromKeyboardEvent, DEFAULT_SETTINGS, isValidHex, isValidIcsUrl, normalizeHex, prettyAccelerator } from "../lib/settings";
+import { ALL_MODULES, APP_MODULES, MINIMAL_MODULES, type GraphFeatures, type ModuleId } from "../lib/modules";
 import { getWorkspaceDir } from "../lib/storage";
 import { useCalendarStore } from "../store/calendar";
-import { useNotesStore } from "../store/notes";
+import { flushAllPending, useNotesStore } from "../store/notes";
 import { useToastStore } from "../store/toasts";
 import { discover, yandexHome, type CalCollection } from "../lib/caldav";
+import "./SettingsView.css";
 
 const LONE_MODIFIERS = new Set(["Shift", "Control", "Alt", "Meta"]);
-const EASE = [0.22, 1, 0.36, 1] as const;
-
-const inputCls =
-  "w-full px-3.5 py-2.5 rounded-xl bg-white/[0.04] border border-[var(--color-border-strong)] text-[13px] text-zinc-200 font-mono outline-none focus:border-[var(--color-accent-border)] focus:bg-white/[0.06] transition-colors duration-200 placeholder:text-zinc-600";
-const btnCls =
-  "inline-flex items-center gap-2 px-4 py-2 rounded-xl text-[13px] font-medium border border-[var(--color-border-strong)] bg-white/[0.04] text-zinc-200 hover:bg-white/[0.08] hover:border-[var(--color-accent-border)] active:scale-[0.98] transition-all duration-200 disabled:opacity-40 disabled:cursor-default disabled:hover:bg-white/[0.04] disabled:hover:border-[var(--color-border-strong)]";
+const inputCls = "settings-input";
+const btnCls = "settings-button";
+const MODULE_ICONS: Record<ModuleId, LucideIcon> = { notes: FileText, files: FolderOpen, search: Search, inbox: Inbox, graph: Network, calendar: CalendarDays, tags: Hash, images: Image, overview: ChartNoAxesCombined, trash: Trash2, home: Home, newNote: FilePlus2, canvas: Shapes, database: Table2, bookmarks: Bookmark, context: PanelRight, help: HelpCircle };
+const SECTIONS = [
+  { id: "modules", title: "Модули", description: "Собери своё рабочее пространство. Оставь только то, чем пользуешься.", icon: Shapes, keywords: APP_MODULES.map(module => `${module.title} ${module.description}`).join(" ") },
+  { id: "graph", title: "Граф", description: "Выбери доступные виды графа и дополнительные элементы.", icon: Network, keywords: "Объёмный Obsidian миникарта дыхание локальный связи volume minimap breathing local graph" },
+  { id: "appearance", title: "Внешний вид", description: "Язык, акцентный цвет и движение в интерфейсе.", icon: Palette, keywords: "язык language русский english цвет анимации animations motion accent color HEX" },
+  { id: "behavior", title: "Поведение", description: "Настрой запуск приложения и быструю запись.", icon: SlidersHorizontal, keywords: "хоткей клавиши заметка дня запуск shortcut startup daily note" },
+  { id: "calendar", title: "Подключения", description: "Внешние календари и синхронизация событий.", icon: CalendarDays, keywords: "календарь iCal CalDAV Яндекс пароль password login sync" },
+  { id: "data", title: "Данные", description: "Локальное хранилище и резервные копии.", icon: HardDrive, keywords: "папка путь backup бэкап архив восстановить storage restore folder path" },
+] as const;
+type SectionId = typeof SECTIONS[number]["id"];
+let lastSettingsSection: SectionId = "modules";
 
 export function SettingsView() {
-  const settings = useNotesStore((s) => s.settings);
-  const updateSettings = useNotesStore((s) => s.updateSettings);
-  const reduced = useReducedMotion() ?? false;
+  const settings = useNotesStore(state => state.settings);
+  const updateSettings = useNotesStore(state => state.updateSettings);
+  const [section, setSection] = useState<SectionId>(lastSettingsSection);
+  const [query, setQuery] = useState("");
+  const status = useNotesStore(state => state.settingsSaveState);
+  const scroll = useRef<HTMLDivElement>(null);
+  const search = query.trim().toLocaleLowerCase();
+  const matches = (text: string) => !search || text.toLocaleLowerCase().includes(search);
+  const visible = search ? SECTIONS.filter(item => matches(`${t(item.title)} ${t(item.description)} ${item.keywords} ${item.id === "modules" ? APP_MODULES.map(module => t(module.title)).join(" ") : ""}`)) : SECTIONS.filter(item => item.id === section);
+  const enabledCount = APP_MODULES.filter(module => settings.modules[module.id]).length;
+  const save = (patch: Parameters<typeof updateSettings>[0]) => updateSettings(patch).catch(() => {});
+  const chooseSection = (id: SectionId) => { lastSettingsSection = id; setSection(id); setQuery(""); scroll.current?.scrollTo(0, 0); };
 
-  // `@container` на корне: вложенные сетки реагируют на ШИРИНУ самой панели, а не
-  // окна. Это важно, потому что слева сидит сайдбар, и обычные viewport-брейкпоинты
-  // (md:/lg:) переоценили бы доступное место. Так карточки честно встают в одну
-  // колонку, когда панель ужимается.
-  return (
-    <div className="@container flex-1 flex flex-col overflow-hidden">
-      {/* ── Шапка ── */}
-      <header className="relative shrink-0 overflow-hidden px-6 pt-8 pb-6 @2xl:px-10">
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-[var(--color-accent-bg)] via-transparent to-transparent opacity-70" />
-        <div className="pointer-events-none absolute -top-24 right-6 h-48 w-48 rounded-full bg-[var(--color-accent)] opacity-[0.06] blur-3xl" />
-        <motion.div
-          initial={reduced ? false : { opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, ease: EASE }}
-          className="relative flex items-center gap-4"
-        >
-          {/* Шестерёнка слегка проворачивается при наведении, маленькая радость */}
-          <motion.div
-            whileHover={reduced ? undefined : { rotate: 90 }}
-            transition={{ type: "spring", stiffness: 200, damping: 15 }}
-            className="grid place-items-center p-2.5 rounded-2xl bg-[var(--color-accent-bg)] ring-1 ring-[var(--color-accent-border)]"
-          >
-            <Settings size={22} className="text-[var(--color-accent)]" />
-          </motion.div>
-          <div>
-            <h2 className="text-[26px] font-bold tracking-tight text-zinc-50">
-              {t("Настройки")}
-            </h2>
-            <p className="text-[13px] text-zinc-500 mt-0.5">
-              {t("Внешний вид, быстрая заметка и хранилище")}
-            </p>
-          </div>
-        </motion.div>
-      </header>
-
-      {/* ── Прокручиваемое тело, разбитое на смысловые секции ── */}
-      <div className="flex-1 overflow-y-auto px-6 pb-12 pt-2 @2xl:px-10">
-        <div className="mx-auto w-full max-w-[920px]">
-          <Section icon={Palette} title={t("Внешний вид")} index={0} reduced={reduced}>
-            <div className="grid grid-cols-1 gap-4 @3xl:grid-cols-[minmax(0,280px)_minmax(0,1fr)] items-start">
-              <LangCard reduced={reduced} delay={1} />
-              <AccentCard
-                value={settings.accentColor}
-                onChange={(hex) => void updateSettings({ accentColor: hex })}
-                reduced={reduced}
-                delay={2}
-              />
-            </div>
-          </Section>
-
-          <Section icon={Sparkles} title={t("Поведение")} index={1} reduced={reduced}>
-            <div className="grid grid-cols-1 gap-4 @2xl:grid-cols-2 items-start">
-              <DailyCard
-                value={settings.openDailyOnStartup}
-                onChange={(v) => void updateSettings({ openDailyOnStartup: v })}
-                reduced={reduced}
-                delay={3}
-              />
-              <ShortcutCard
-                value={settings.captureShortcut}
-                onChange={(accel) =>
-                  void updateSettings({ captureShortcut: accel })
-                }
-                reduced={reduced}
-                delay={4}
-              />
-            </div>
-          </Section>
-
-          <Section icon={CalendarDays} title={t("Календарь")} index={2} reduced={reduced}>
-            <div className="grid grid-cols-1 gap-4 @2xl:grid-cols-2 items-start">
-              <CalendarCard reduced={reduced} delay={5} />
-              <CaldavCard reduced={reduced} delay={6} />
-            </div>
-          </Section>
-
-          <Section icon={HardDrive} title={t("Данные")} index={3} reduced={reduced}>
-            <StorageCard reduced={reduced} delay={7} />
-          </Section>
+  return <section className="settings-view" aria-label={t("Настройки")}>
+    <header className="settings-header">
+      <div><h1>{t("Настройки")}</h1><p>{t("Synapse под твой способ работы")}</p></div>
+      <span className={cn("settings-save-state", status === "error" && "is-error")} role="status" aria-live="polite">
+        {status === "saving" ? <RefreshCw size={14} aria-hidden="true" /> : status === "error" ? <X size={14} aria-hidden="true" /> : <Check size={14} aria-hidden="true" />}
+        {t(status === "saving" ? "Сохранение…" : status === "error" ? "Не удалось сохранить" : status === "saved" ? "Сохранено" : "Сохраняется автоматически")}
+      </span>
+    </header>
+    <div className="settings-layout">
+      <aside className="settings-navigation">
+        <label className="settings-search"><Search size={16} aria-hidden="true" /><input value={query} onChange={event => { setQuery(event.target.value); scroll.current?.scrollTo(0, 0); }} placeholder={t("Поиск настроек…")} aria-label={t("Поиск настроек")} />{query ? <button type="button" onClick={() => setQuery("")} aria-label={t("Очистить поиск")}><X size={14} /></button> : null}</label>
+        <nav aria-label={t("Разделы настроек")}>
+          {SECTIONS.map(({ id, title, icon: Icon }) => <button type="button" key={id} aria-current={!search && section === id ? "page" : undefined} onClick={() => chooseSection(id)}><Icon size={17} strokeWidth={1.7} aria-hidden="true" /><span>{t(title)}</span>{id === "modules" ? <span className="settings-nav-count">{enabledCount}</span> : null}</button>)}
+        </nav>
+        <p className="settings-navigation-note">{t("Настройки хранятся вместе с твоими заметками.")}</p>
+      </aside>
+      <div className="settings-content" ref={scroll}>
+        <div className="settings-content-inner">
+          {visible.length ? visible.map(item => <section className="settings-page-section" key={item.id} aria-labelledby={`settings-${item.id}-title`}>
+            <div className="settings-section-heading"><h2 id={`settings-${item.id}-title`}>{t(item.title)}</h2><p>{t(item.description)}</p></div>
+            {item.id === "modules" ? <>
+              <div className="settings-preset-row"><span>{t("Быстрый набор")}</span><div><button type="button" className={btnCls} disabled={status === "saving"} onClick={() => void save({ modules: { ...MINIMAL_MODULES } })}>{t("Минимальный")}</button><button type="button" className={btnCls} disabled={status === "saving"} onClick={() => void save({ modules: { ...ALL_MODULES } })}>{t("Все модули")}</button></div></div>
+              <p className="settings-info">{t("Отключённый модуль исчезает из меню и команд. Его данные остаются в хранилище.")}</p>
+              {(["navigation", "tools"] as const).map(group => {
+                const modules = APP_MODULES.filter(module => module.group === group && matches(`${t(module.title)} ${t(module.description)}`));
+                return modules.length ? <SettingGroup key={group} title={t(group === "navigation" ? "Разделы приложения" : "Инструменты и панели")}>
+                  {modules.map(module => <SettingRow key={module.id} icon={MODULE_ICONS[module.id]} title={t(module.title)} description={t(module.description)}>
+                    <SettingsSwitch label={t(module.title)} checked={settings.modules[module.id]} disabled={status === "saving"} onChange={value => void save({ modules: { ...useNotesStore.getState().settings.modules, [module.id]: value } })} />
+                  </SettingRow>)}
+                </SettingGroup> : null;
+              })}
+              <p className="settings-footnote">{t("Редактирование заметок и настройки доступны всегда.")}</p>
+            </> : item.id === "graph" ? <GraphSettings busy={status === "saving"} save={save} /> : item.id === "appearance" ? <>
+              <LangCard />
+              <AccentCard value={settings.accentColor} onChange={accentColor => void save({ accentColor })} />
+              <SettingGroup title={t("Движение")}><SettingRow title={t("Анимации интерфейса")} description={t("Переходы и эффекты. Системное ограничение движения учитывается всегда.")}><SettingsSwitch label={t("Анимации интерфейса")} checked={settings.animations} disabled={status === "saving"} onChange={animations => void save({ animations })} /></SettingRow></SettingGroup>
+            </> : item.id === "behavior" ? <>
+              <SettingGroup title={t("При запуске")}><SettingRow title={t("Открывать заметку дня при запуске")} description={t(settings.modules.calendar ? "Сразу перейти к сегодняшней записи." : "Доступно после включения календаря.")}><SettingsSwitch label={t("Открывать заметку дня при запуске")} checked={settings.openDailyOnStartup} disabled={!settings.modules.calendar || status === "saving"} onChange={openDailyOnStartup => void save({ openDailyOnStartup })} /></SettingRow></SettingGroup>
+              {settings.modules.newNote ? <ShortcutCard value={settings.captureShortcut} onChange={captureShortcut => void save({ captureShortcut })} /> : <ModuleNotice module="newNote" />}
+            </> : item.id === "calendar" ? settings.modules.calendar ? <><CalendarCard /><CaldavCard /></> : <ModuleNotice module="calendar" /> : <StorageCard />}
+          </section>) : <div className="settings-no-results"><Search size={24} aria-hidden="true" /><h2>{t("Настройки не найдены")}</h2><p>{t("Попробуй другое название или открой раздел слева.")}</p><button type="button" className={btnCls} onClick={() => setQuery("")}>{t("Очистить поиск")}</button></div>}
         </div>
       </div>
     </div>
-  );
+  </section>;
 }
 
-// ─── Заголовок секции ──────────────────────────────────────────────────────
-// Тонкая полоска с лейблом капсом и затухающей линией: задаёт группировку, но
-// не спорит по весу с самими карточками.
-
-function Section({
-  icon: Icon,
-  title,
-  index,
-  reduced,
-  children,
-}: {
-  icon: LucideIcon;
-  title: string;
-  index: number;
-  reduced: boolean;
-  children: ReactNode;
-}) {
-  return (
-    <section className="mb-9 last:mb-0">
-      <motion.div
-        initial={reduced ? false : { opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4, delay: reduced ? 0 : index * 0.08, ease: EASE }}
-        className="flex items-center gap-2.5 mb-3.5 px-0.5"
-      >
-        <Icon size={14} strokeWidth={2.2} className="text-[var(--color-accent)] shrink-0" />
-        <h3 className="text-[11.5px] font-semibold uppercase tracking-[0.1em] text-zinc-400">
-          {title}
-        </h3>
-        <div className="flex-1 h-px bg-gradient-to-r from-[var(--color-border-strong)] via-[var(--color-border)] to-transparent" />
-      </motion.div>
-      {children}
-    </section>
-  );
+function SettingGroup({ title, children }: { title: string; children: ReactNode }) {
+  return <section className="settings-group"><h3>{title}</h3><div className="settings-rows">{children}</div></section>;
 }
-
-// ─── Обёртка-карточка ──────────────────────────────────────────────────────
-
-function Card({
-  icon: Icon,
-  title,
-  description,
-  children,
-  delay,
-  reduced,
-  className,
-}: {
-  icon: LucideIcon;
-  title: string;
-  description?: string;
-  children: ReactNode;
-  delay: number;
-  reduced: boolean;
-  className?: string;
-}) {
-  return (
-    <motion.section
-      initial={reduced ? false : { opacity: 0, y: 16 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.45, delay: reduced ? 0 : delay * 0.05, ease: EASE }}
-      whileHover={reduced ? undefined : { y: -2, transition: { duration: 0.18, ease: EASE } }}
-      // Лёгкое возвышение: своя поверхность + рамка, на ховере рамка теплеет до
-      // акцента и подъезжает мягкая тень. transition сознательно НЕ трогает
-      // transform, иначе он дрался бы с подъёмом по y от framer-motion.
-      style={{
-        background:
-          "radial-gradient(130% 130% at 100% 0%, color-mix(in oklab, var(--color-accent) 7%, transparent) 0%, transparent 55%), var(--surface-1)",
-      }}
-      className={cn(
-        "group relative overflow-hidden rounded-2xl p-5 border border-[var(--color-border)]",
-        "transition-[border-color,box-shadow] duration-200",
-        "hover:border-[var(--color-accent-border)] hover:shadow-[0_12px_34px_-16px_rgba(0,0,0,0.7)]",
-        className,
-      )}
-    >
-      {/* Акцентное свечение в углу, проявляется только при наведении */}
-      <div className="pointer-events-none absolute -top-16 -right-16 h-32 w-32 rounded-full bg-[var(--color-accent)] opacity-0 blur-3xl transition-opacity duration-500 group-hover:opacity-[0.08]" />
-
-      <div className="relative flex items-center gap-3 mb-4">
-        <span className="grid place-items-center w-9 h-9 rounded-xl bg-[var(--color-accent-bg)] text-[var(--color-accent)] shrink-0">
-          <Icon size={16} strokeWidth={2} />
-        </span>
-        <div className="min-w-0">
-          <h3 className="text-[14px] font-semibold text-zinc-200 leading-tight">{title}</h3>
-          {description && (
-            <p className="text-[12px] text-zinc-500 mt-0.5 leading-snug">{description}</p>
-          )}
-        </div>
-      </div>
-      <div className="relative">{children}</div>
-    </motion.section>
-  );
+function SettingRow({ title, description, children, icon: Icon }: { title: string; description?: string; children: ReactNode; icon?: LucideIcon }) {
+  return <div className="settings-row">{Icon ? <Icon className="settings-row-icon" size={18} strokeWidth={1.7} aria-hidden="true" /> : null}<div className="settings-row-copy"><span className="settings-row-title">{title}</span>{description ? <p>{description}</p> : null}</div><div className="settings-row-control">{children}</div></div>;
 }
-
-// ─── Язык ──────────────────────────────────────────────────────────────────
-
-function LangCard({ reduced, delay }: { reduced: boolean; delay: number }) {
+function SettingsSwitch({ label, checked, disabled, onChange }: { label: string; checked: boolean; disabled?: boolean; onChange: (value: boolean) => void }) {
+  return <label className="settings-switch"><input type="checkbox" role="switch" aria-label={label} checked={checked} disabled={disabled} onChange={event => onChange(event.target.checked)} /><span aria-hidden="true" /></label>;
+}
+function Card({ icon: Icon, title, description, children }: { icon: LucideIcon; title: string; description?: string; children: ReactNode }) {
+  return <section className="settings-group settings-form"><h3><Icon size={16} aria-hidden="true" />{title}</h3>{description ? <p className="settings-form-description">{description}</p> : null}<div className="settings-controls">{children}</div></section>;
+}
+function ModuleNotice({ module }: { module: ModuleId }) {
+  const entry = APP_MODULES.find(item => item.id === module)!;
+  return <div className="settings-module-notice"><p>{t("Модуль «{name}» отключён.", { name: t(entry.title) })}</p><p>{t("Включи его в разделе «Модули», чтобы настроить функции.")}</p><button type="button" className={btnCls} onClick={() => void useNotesStore.getState().updateSettings({ modules: { ...useNotesStore.getState().settings.modules, [module]: true } })}>{t("Включить модуль")}<ArrowUpRight size={14} aria-hidden="true" /></button></div>;
+}
+function GraphSettings({ busy, save }: { busy: boolean; save: (patch: Partial<typeof DEFAULT_SETTINGS>) => Promise<void> }) {
+  const modules = useNotesStore(state => state.settings.modules);
+  const graph = useNotesStore(state => state.settings.graph);
+  const change = (key: keyof GraphFeatures, value: boolean) => void save({ graph: { ...useNotesStore.getState().settings.graph, [key]: value } });
+  const lastMode = graph.volume !== graph.obsidian;
+  return <>
+    {!modules.graph ? <ModuleNotice module="graph" /> : null}
+    <fieldset className="settings-fieldset" disabled={!modules.graph || busy}>
+      <SettingGroup title={t("Доступные виды")}>
+        <SettingRow title={t("Объёмный")} description={t("Острова папок, глубина и пространственная раскладка.")}><SettingsSwitch label={t("Объёмный вид")} checked={graph.volume} disabled={lastMode && graph.volume} onChange={value => change("volume", value)} /></SettingRow>
+        <SettingRow title="Obsidian" description={t("Плоский граф ссылок между заметками.")}><SettingsSwitch label={t("Вид Obsidian")} checked={graph.obsidian} disabled={lastMode && graph.obsidian} onChange={value => change("obsidian", value)} /></SettingRow>
+      </SettingGroup>
+      <p className="settings-footnote">{t("Хотя бы один вид должен оставаться включённым.")}</p>
+      <SettingGroup title={t("Дополнительные элементы")}>
+        <SettingRow title={t("Миникарта")} description={t("Обзор графа и быстрый переход к его части.")}><SettingsSwitch label={t("Миникарта")} checked={graph.minimap} onChange={value => change("minimap", value)} /></SettingRow>
+        <SettingRow title={t("Дыхание узлов")} description={t("Пульсация в объёмном виде. Не влияет на симуляцию связей.")}><SettingsSwitch label={t("Дыхание узлов")} checked={graph.breathing} disabled={!graph.volume} onChange={value => change("breathing", value)} /></SettingRow>
+        <SettingRow title={t("Локальный граф")} description={t("Связи текущей заметки в редакторе.")}><SettingsSwitch label={t("Локальный граф")} checked={graph.localGraph} onChange={value => change("localGraph", value)} /></SettingRow>
+      </SettingGroup>
+    </fieldset>
+  </>;
+}
+function LangCard() {
   const { lang, setLang } = useI18n();
-
-  return (
-    <Card icon={Globe} title="Language" description="Interface language" reduced={reduced} delay={delay}>
-      <div className="flex gap-2">
-        {(["ru", "en"] as const).map((l) => (
-          <motion.button
-            key={l}
-            type="button"
-            whileTap={{ scale: 0.95 }}
-            onClick={() => setLang(l)}
-            className={cn(
-              "flex-1 py-2.5 rounded-xl text-[13px] font-semibold border transition-all duration-200",
-              lang === l
-                ? "border-[var(--color-accent-border)] bg-[var(--color-accent-bg)] text-[var(--color-accent)]"
-                : "border-[var(--color-border-strong)] bg-white/[0.03] text-zinc-400 hover:bg-white/[0.06] hover:text-zinc-200",
-            )}
-          >
-            {l === "ru" ? "Русский" : "English"}
-          </motion.button>
-        ))}
-      </div>
-    </Card>
-  );
+  return <SettingGroup title={t("Язык")}><SettingRow title={t("Язык интерфейса")}><select className="settings-input" aria-label={t("Язык интерфейса")} value={lang} onChange={event => setLang(event.target.value as "ru" | "en")}><option value="ru">Русский</option><option value="en">English</option></select></SettingRow></SettingGroup>;
 }
-
-// ─── Акцентный цвет ────────────────────────────────────────────────────────
-
-function AccentCard({
-  value,
-  onChange,
-  reduced,
-  delay,
-}: {
-  value: string;
-  onChange: (hex: string) => void;
-  reduced: boolean;
-  delay: number;
-}) {
+function AccentCard({ value, onChange }: { value: string; onChange: (hex: string) => void }) {
   const [custom, setCustom] = useState(value);
-  useEffect(() => setCustom(value), [value]);
-
-  const commit = (raw: string) => {
-    if (isValidHex(raw)) onChange(normalizeHex(raw));
-    else setCustom(value);
-  };
-
-  return (
-    <Card
-      icon={Palette}
-      title={t("Акцентный цвет")}
-      description={t("Цвет выделения, ссылок и активных элементов")}
-      reduced={reduced}
-      delay={delay}
-    >
-      <div className="flex flex-wrap items-end gap-x-5 gap-y-3">
-        {/* Плашки-пресеты */}
-        <div className="flex flex-wrap gap-2.5 flex-1">
-          {ACCENT_PRESETS.map((p) => {
-            const active = normalizeHex(value) === normalizeHex(p.hex);
-            return (
-              <div key={p.hex} className="relative w-9 h-9">
-                {active && (
-                  <motion.div
-                    layoutId="accent-ring"
-                    className="absolute -inset-1.5 rounded-full border-2 border-white/50 pointer-events-none"
-                    transition={{ type: "spring", stiffness: 380, damping: 26 }}
-                  />
-                )}
-                <motion.button
-                  type="button"
-                  title={p.label}
-                  aria-label={p.label}
-                  aria-pressed={active}
-                  whileHover={{ scale: 1.12 }}
-                  whileTap={{ scale: 0.92 }}
-                  onClick={() => onChange(normalizeHex(p.hex))}
-                  className="w-9 h-9 rounded-full flex items-center justify-center"
-                  style={{ backgroundColor: p.hex }}
-                >
-                  {active && (
-                    <Check size={14} strokeWidth={3} className="text-white drop-shadow" />
-                  )}
-                </motion.button>
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Свой hex */}
-        <div className="flex items-center gap-2 shrink-0 pb-0.5">
-          <input
-            type="color"
-            aria-label={t("Выбрать свой цвет")}
-            value={isValidHex(custom) ? normalizeHex(custom) : value}
-            onChange={(e) => onChange(e.target.value)}
-            className="w-8 h-8 rounded-lg bg-transparent border border-[var(--color-border-strong)] cursor-pointer p-0.5"
-          />
-          <input
-            type="text"
-            value={custom}
-            spellCheck={false}
-            placeholder="#6366f1"
-            onChange={(e) => setCustom(e.target.value)}
-            onBlur={() => commit(custom)}
-            onKeyDown={(e) => e.key === "Enter" && commit(custom)}
-            className="w-24 px-2.5 py-1.5 rounded-lg bg-white/[0.04] border border-[var(--color-border-strong)] text-[12px] text-zinc-300 font-mono outline-none focus:border-[var(--color-accent-border)] transition-colors"
-          />
-        </div>
-      </div>
-
-      {/* Живое превью: показываем цвет «в деле», а не только как кружок. Тянем
-          применённые токены (--color-link уже пересчитан под акцент). */}
-      <div className="mt-4 flex items-center gap-3 rounded-xl border border-[var(--color-border)] bg-black/20 px-3.5 py-2.5">
-        <span className="text-[10.5px] uppercase tracking-wider text-zinc-600 shrink-0">
-          {t("Превью")}
-        </span>
-        <span
-          className="px-2.5 py-1 rounded-full text-[12px] font-medium text-white shadow-sm"
-          style={{ backgroundColor: value }}
-        >
-          {t("Кнопка")}
-        </span>
-        <span
-          className="text-[12.5px] font-medium underline underline-offset-2"
-          style={{ color: "var(--color-link)" }}
-        >
-          {t("Ссылка")}
-        </span>
-        <span className="ml-auto font-mono text-[11px] text-zinc-500 shrink-0">
-          {normalizeHex(value)}
-        </span>
-      </div>
-    </Card>
-  );
+  const [invalid, setInvalid] = useState(false);
+  const errorId = useId();
+  useEffect(() => { setCustom(value); setInvalid(false); }, [value]);
+  const commit = () => { if (isValidHex(custom)) { setInvalid(false); onChange(normalizeHex(custom)); } else setInvalid(true); };
+  return <Card icon={Palette} title={t("Акцентный цвет")} description={t("Цвет выделения, ссылок и активных элементов")}>
+    <div className="settings-accent-presets">{ACCENT_PRESETS.map(preset => <button type="button" key={preset.hex} style={{ background: preset.hex }} aria-label={t(preset.label)} title={t(preset.label)} aria-pressed={value === preset.hex} onClick={() => onChange(preset.hex)}>{value === preset.hex ? <Check size={16} aria-hidden="true" /> : null}</button>)}<input type="color" aria-label={t("Выбрать свой цвет")} value={value} onChange={event => onChange(event.target.value)} /><input className="settings-input settings-hex" aria-label={t("Цвет в формате HEX")} aria-invalid={invalid} aria-describedby={invalid ? errorId : undefined} value={custom} spellCheck={false} onChange={event => setCustom(event.target.value)} onBlur={commit} onKeyDown={event => { if (event.key === "Enter") commit(); }} /></div>
+    {invalid ? <p className="settings-field-error" id={errorId}>{t("Введите цвет в формате #RRGGBB.")}</p> : null}
+    <div className="settings-accent-preview"><span>{t("Превью")}</span><span className="settings-accent-sample" style={{ background: value }}>{t("Кнопка")}</span><span style={{ color: "var(--color-link)" }}>{t("Ссылка")}</span></div>
+  </Card>;
 }
-
-// ─── Тумблер «заметка дня» ─────────────────────────────────────────────────
-
-function DailyCard({
-  value,
-  onChange,
-  reduced,
-  delay,
-}: {
-  value: boolean;
-  onChange: (v: boolean) => void;
-  reduced: boolean;
-  delay: number;
-}) {
-  return (
-    <Card
-      icon={Sparkles}
-      title={t("Заметка дня")}
-      description={t("Поведение при запуске приложения")}
-      reduced={reduced}
-      delay={delay}
-    >
-      <Toggle
-        checked={value}
-        onChange={onChange}
-        label={t("Открывать заметку дня при запуске")}
-      />
-    </Card>
-  );
-}
-
-function Toggle({
-  checked,
-  onChange,
-  label,
-}: {
-  checked: boolean;
-  onChange: (v: boolean) => void;
-  label: string;
-}) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      onClick={() => onChange(!checked)}
-      className="flex items-center gap-3 group py-1 w-full text-left"
-    >
-      <span
-        className={cn(
-          "relative w-10 h-[22px] rounded-full transition-colors duration-300 shrink-0",
-          checked ? "bg-[var(--color-accent)]" : "bg-white/[0.12]",
-        )}
-      >
-        <motion.span
-          layout
-          transition={{ type: "spring", stiffness: 500, damping: 30 }}
-          className="absolute top-[3px] left-[3px] w-4 h-4 rounded-full bg-white shadow-md"
-          style={{ x: checked ? 18 : 0 }}
-        />
-      </span>
-      <span className="text-[13px] text-zinc-300 group-hover:text-zinc-100 transition-colors duration-200">
-        {label}
-      </span>
-    </button>
-  );
-}
-
-// ─── Запись хоткея ─────────────────────────────────────────────────────────
-
-function ShortcutCard({
-  value,
-  onChange,
-  reduced,
-  delay,
-}: {
-  value: string;
-  onChange: (accel: string) => void;
-  reduced: boolean;
-  delay: number;
-}) {
+function ShortcutCard({ value, onChange }: { value: string; onChange: (accel: string) => void }) {
   const [recording, setRecording] = useState(false);
   const [hint, setHint] = useState<string | null>(null);
-
   useEffect(() => {
     if (!recording) return;
-    const onKey = (e: KeyboardEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
-      if (e.key === "Escape") {
-        setRecording(false);
-        setHint(null);
-        return;
-      }
-      if (LONE_MODIFIERS.has(e.key)) return;
-      const accel = accelFromKeyboardEvent(e);
-      if (!accel) {
-        setHint(
-          t("Нужен модификатор (Ctrl / Alt / Shift) + буква, цифра или F-клавиша"),
-        );
-        return;
-      }
-      onChange(accel);
-      setRecording(false);
-      setHint(null);
+    const onKey = (event: KeyboardEvent) => {
+      event.preventDefault(); event.stopPropagation();
+      if (event.key === "Escape") { setRecording(false); setHint(null); return; }
+      if (LONE_MODIFIERS.has(event.key)) return;
+      const accel = accelFromKeyboardEvent(event);
+      if (!accel) { setHint(t("Нужен модификатор (Ctrl / Alt / Shift) + буква, цифра или F-клавиша")); return; }
+      onChange(accel); setRecording(false); setHint(null);
     };
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
   }, [recording, onChange]);
-
-  const isDefault = value === DEFAULT_SETTINGS.captureShortcut;
-
-  return (
-    <Card
-      icon={Keyboard}
-      title={t("Хоткей быстрой заметки")}
-      description={t("Глобальная комбинация для окна быстрой записи")}
-      reduced={reduced}
-      delay={delay}
-    >
-      <div className="flex items-center gap-3">
-        <motion.button
-          type="button"
-          whileTap={{ scale: 0.97 }}
-          onClick={() => {
-            setRecording((r) => !r);
-            setHint(null);
-          }}
-          className={cn(
-            "min-w-[160px] px-4 py-2.5 rounded-xl text-[13px] font-mono font-medium border transition-all duration-200 text-center",
-            recording
-              ? "border-[var(--color-accent-border)] bg-[var(--color-accent-bg)] text-[var(--color-accent)]"
-              : "border-[var(--color-border-strong)] bg-white/[0.04] text-zinc-200 hover:bg-white/[0.08]",
-          )}
-        >
-          {recording && (
-            <span className="inline-block w-2 h-2 rounded-full bg-[var(--color-accent)] mr-2 animate-pulse" />
-          )}
-          {recording ? t("Нажмите комбинацию...") : prettyAccelerator(value)}
-        </motion.button>
-        {!isDefault && !recording && (
-          <motion.button
-            type="button"
-            whileTap={{ scale: 0.95 }}
-            onClick={() => onChange(DEFAULT_SETTINGS.captureShortcut)}
-            className="text-[12px] text-zinc-500 hover:text-[var(--color-accent)] transition-colors duration-200"
-          >
-            {t("Сбросить")}
-          </motion.button>
-        )}
-      </div>
-      {hint && (
-        <motion.p
-          initial={{ opacity: 0, y: -4 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="text-[12px] text-amber-400/80 mt-2"
-        >
-          {hint}
-        </motion.p>
-      )}
-    </Card>
-  );
+  return <Card icon={Keyboard} title={t("Хоткей быстрой заметки")} description={t("Глобальная комбинация для окна быстрой записи")}>
+    <div className="settings-shortcut"><button type="button" className={cn(btnCls, recording && "is-recording")} aria-pressed={recording} onClick={() => { setRecording(value => !value); setHint(null); }}>{recording ? t("Нажмите комбинацию...") : prettyAccelerator(value)}</button>{value !== DEFAULT_SETTINGS.captureShortcut && !recording ? <button type="button" className={btnCls} onClick={() => onChange(DEFAULT_SETTINGS.captureShortcut)}>{t("Сбросить")}</button> : null}</div>
+    {recording ? <p className="settings-footnote">{t("Escape отменяет запись комбинации.")}</p> : null}
+    {hint ? <p className="settings-field-error" role="alert">{hint}</p> : null}
+  </Card>;
 }
 
-// ─── Календарь ICS ─────────────────────────────────────────────────────────
-
-function CalendarCard({ reduced, delay }: { reduced: boolean; delay: number }) {
+function CalendarCard() {
   const url = useNotesStore((s) => s.settings.calendarIcsUrl);
   const updateSettings = useNotesStore((s) => s.updateSettings);
   const status = useCalendarStore((s) => s.status);
@@ -555,7 +189,7 @@ function CalendarCard({ reduced, delay }: { reduced: boolean; delay: number }) {
     }
     void updateSettings({ calendarIcsUrl: next }).then(() => {
       if (next) void syncNow();
-    });
+    }).catch(() => {});
   };
 
   return (
@@ -563,23 +197,24 @@ function CalendarCard({ reduced, delay }: { reduced: boolean; delay: number }) {
       icon={CalendarDays}
       title={t("Подписка iCal")}
       description={t("Подключить внешний календарь по ссылке iCalendar (.ics)")}
-      reduced={reduced}
-      delay={delay}
+
+
     >
       <div className="flex gap-2">
         <input
           type="text"
           value={draft}
           spellCheck={false}
+          aria-label={t("Ссылка iCal")}
           placeholder="https://calendar.yandex.ru/export/ics.xml?..."
           onChange={(e) => setDraft(e.target.value)}
           onBlur={commit}
           onKeyDown={(e) => e.key === "Enter" && commit()}
-          className="flex-1 min-w-0 px-3 py-2 rounded-xl bg-white/[0.04] border border-[var(--color-border-strong)] text-[13px] text-zinc-200 font-mono outline-none focus:border-[var(--color-accent-border)] focus:bg-white/[0.06] transition-colors duration-200 placeholder:text-zinc-600"
+          className="settings-input"
         />
-        <motion.button
+        <button
           type="button"
-          whileTap={{ scale: 0.96 }}
+
           disabled={!url || status === "loading"}
           onClick={() => void syncNow()}
           title={t("Синхронизировать")}
@@ -590,12 +225,12 @@ function CalendarCard({ reduced, delay }: { reduced: boolean; delay: number }) {
             className={cn(status === "loading" && "animate-spin")}
           />
           {t("Обновить")}
-        </motion.button>
+        </button>
       </div>
 
       <div className="mt-2 min-h-[16px] text-[12px]">
         {status === "loading" && (
-          <span className="text-zinc-500">{t("Синхронизация...")}</span>
+          <span className="text-[var(--settings-muted)]">{t("Синхронизация...")}</span>
         )}
         {status === "error" && (
           <span className="text-red-400/90 break-words">
@@ -603,7 +238,7 @@ function CalendarCard({ reduced, delay }: { reduced: boolean; delay: number }) {
           </span>
         )}
         {status === "ok" && (
-          <span className="text-zinc-500">
+          <span className="text-[var(--settings-muted)]">
             {eventCount} {t("событий")}
             {lastSync != null
               ? ` · ${new Date(lastSync).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })}`
@@ -612,18 +247,14 @@ function CalendarCard({ reduced, delay }: { reduced: boolean; delay: number }) {
         )}
       </div>
 
-      <p className="text-[11px] text-zinc-600 mt-2 leading-relaxed">
-        В Яндекс.Календаре: «Настройки» → нужный календарь →
-        скопируйте приватную ссылку (iCal). Ссылка содержит токен, не делитесь
-        ей.
-      </p>
+      <p className="settings-footnote">{t("В настройках календаря скопируй приватную ссылку iCal. Она содержит токен доступа.")}</p>
     </Card>
   );
 }
 
 // ─── Пуш CalDAV ────────────────────────────────────────────────────────────
 
-function CaldavCard({ reduced, delay }: { reduced: boolean; delay: number }) {
+function CaldavCard() {
   const login = useNotesStore((s) => s.settings.caldavLogin);
   const password = useNotesStore((s) => s.settings.caldavPassword);
   const url = useNotesStore((s) => s.settings.caldavUrl);
@@ -647,17 +278,18 @@ function CaldavCard({ reduced, delay }: { reduced: boolean; delay: number }) {
     const l = loginDraft.trim();
     const p = pwDraft;
     if (!l || !p) {
-      useToastStore.getState().push("Укажите логин и пароль приложения", "error");
+      useToastStore.getState().push(t("Укажите логин и пароль приложения"), "error");
       return;
     }
-    await updateSettings({ caldavLogin: l, caldavPassword: p });
     setFinding(true);
     setCollections(null);
     try {
+      await updateSettings({ caldavLogin: l, caldavPassword: p });
+      if (!useNotesStore.getState().settings.modules.calendar) return;
       const list = await discover(yandexHome(l), l, p);
       setCollections(list);
       if (list.length === 0)
-        useToastStore.getState().push("Календари не найдены", "info");
+        useToastStore.getState().push(t("Календари не найдены"), "info");
     } catch (e) {
       useToastStore.getState().push(`CalDAV: ${String(e)}`, "error");
     } finally {
@@ -670,14 +302,16 @@ function CaldavCard({ reduced, delay }: { reduced: boolean; delay: number }) {
       icon={Upload}
       title={t("Пуш в Яндекс.Календарь (CalDAV)")}
       description={t("Отправлять задачи как события. Нужен пароль приложения.")}
-      reduced={reduced}
-      delay={delay}
+
+
     >
       <div className="space-y-2">
         <input
           type="text"
           value={loginDraft}
           spellCheck={false}
+          aria-label={t("Логин CalDAV")}
+          autoComplete="username"
           placeholder="логин@yandex.ru"
           onChange={(e) => setLoginDraft(e.target.value)}
           onBlur={saveCreds}
@@ -687,56 +321,58 @@ function CaldavCard({ reduced, delay }: { reduced: boolean; delay: number }) {
           type="password"
           value={pwDraft}
           spellCheck={false}
+          aria-label={t("Пароль приложения CalDAV")}
+          autoComplete="off"
           placeholder={t("пароль приложения")}
           onChange={(e) => setPwDraft(e.target.value)}
           onBlur={saveCreds}
           className={inputCls}
         />
-        <motion.button
+        <button
           type="button"
-          whileTap={{ scale: 0.97 }}
+
           disabled={finding}
           onClick={() => void find()}
           className={btnCls}
         >
           <RefreshCw size={14} className={cn(finding && "animate-spin")} />
           {t("Найти календари")}
-        </motion.button>
+        </button>
       </div>
 
       {collections && collections.length > 0 && (
         <div className="mt-2.5 space-y-1.5">
-          <div className="text-[11px] text-zinc-500 uppercase tracking-wider font-medium">
+          <div className="text-[11px] text-[var(--settings-muted)] uppercase tracking-wider font-medium">
             {t("Куда отправлять")}
           </div>
           {collections.map((c) => (
-            <motion.button
+            <button
               key={c.href}
               type="button"
-              whileTap={{ scale: 0.98 }}
+
               onClick={() => void updateSettings({ caldavUrl: c.href })}
               className={cn(
                 "w-full text-left px-3 py-2 rounded-xl border text-[12.5px] transition-all duration-200",
                 c.href === url
                   ? "border-[var(--color-accent-border)] bg-[var(--color-accent-bg)] text-zinc-100"
-                  : "border-[var(--color-border)] text-zinc-400 hover:bg-white/[0.04] hover:text-zinc-200",
+                  : "border-[var(--color-border)] text-[var(--settings-muted)] hover:bg-white/[0.04] hover:text-zinc-200",
               )}
             >
               <span className="font-medium">{c.name || t("(без имени)")}</span>
               {c.href === url && (
                 <Check size={12} className="inline ml-1.5 text-[var(--color-accent)]" />
               )}
-              <div className="text-[10px] text-zinc-600 font-mono truncate mt-0.5">
+              <div className="text-[10px] text-[var(--settings-muted)] font-mono truncate mt-0.5">
                 {c.href}
               </div>
-            </motion.button>
+            </button>
           ))}
         </div>
       )}
 
       {url && !collections && (
-        <p className="mt-2 text-[11px] text-zinc-500 break-all">
-          {t("Выбран")}: <span className="font-mono text-zinc-400">{url}</span>
+        <p className="mt-2 text-[11px] text-[var(--settings-muted)] break-all">
+          {t("Выбран")}: <span className="font-mono text-[var(--settings-muted)]">{url}</span>
         </p>
       )}
     </Card>
@@ -745,7 +381,7 @@ function CaldavCard({ reduced, delay }: { reduced: boolean; delay: number }) {
 
 // ─── Хранилище и бэкап ─────────────────────────────────────────────────────
 
-function StorageCard({ reduced, delay }: { reduced: boolean; delay: number }) {
+function StorageCard() {
   const [path, setPath] = useState<string | null>(null);
   const [backing, setBacking] = useState(false);
   const [restoring, setRestoring] = useState(false);
@@ -772,7 +408,7 @@ function StorageCard({ reduced, delay }: { reduced: boolean; delay: number }) {
       picked = await openDialog({
         multiple: false,
         directory: false,
-        filters: [{ name: "Архив", extensions: ["zip"] }],
+        filters: [{ name: t("Архив"), extensions: ["zip"] }],
       });
     } catch (e) {
       console.error("restore: open dialog failed:", e);
@@ -789,20 +425,22 @@ function StorageCard({ reduced, delay }: { reduced: boolean; delay: number }) {
 
     setRestoring(true);
     try {
+      await flushAllPending();
       const { backupDir, filesRestored } = await restoreWorkspace(picked);
       useNotesStore.setState({ activeId: null, activeNote: null });
       await Promise.all([refreshTree(), refreshTrash(), refreshAssets()]);
+      await useNotesStore.getState().loadSettings();
       useToastStore
         .getState()
         .push(
-          t(`Восстановлено · ${filesRestored} файлов · старая папка: ${backupDir}`),
+          t("Восстановлено: {n} файлов. Старая папка: {path}", { n: filesRestored, path: backupDir }),
           "success",
         );
     } catch (e) {
       console.error("restore failed:", e);
       useToastStore
         .getState()
-        .push(t(`Ошибка: ${(e as Error)?.message ?? String(e)}`), "error");
+        .push(t("Ошибка: {message}", { message: (e as Error)?.message ?? String(e) }), "error");
     } finally {
       setRestoring(false);
     }
@@ -821,18 +459,18 @@ function StorageCard({ reduced, delay }: { reduced: boolean; delay: number }) {
       icon={HardDrive}
       title={t("Хранилище")}
       description={t("Где лежат все заметки, изображения и корзина")}
-      reduced={reduced}
-      delay={delay}
+
+
     >
       <div className="mb-3 px-3.5 py-2.5 rounded-xl bg-black/20 border border-[var(--color-border)]">
-        <code className="text-[12px] text-zinc-400 font-mono break-all">
+        <code className="text-[12px] text-[var(--settings-muted)] font-mono break-all">
           {path ?? "…"}
         </code>
       </div>
       <div className="flex flex-wrap gap-2">
-        <motion.button
+        <button
           type="button"
-          whileTap={{ scale: 0.97 }}
+
           disabled={!path}
           onClick={() => {
             if (path)
@@ -844,31 +482,30 @@ function StorageCard({ reduced, delay }: { reduced: boolean; delay: number }) {
         >
           <FolderOpen size={14} />
           {t("Открыть папку")}
-        </motion.button>
-        <motion.button
+        </button>
+        <button
           type="button"
-          whileTap={{ scale: 0.97 }}
+
           disabled={backing || restoring}
           onClick={() => void runBackup()}
           className={btnCls}
         >
           <Archive size={14} />
           {backing ? t("Создаю бэкап...") : t("Создать бэкап (.zip)")}
-        </motion.button>
-        <motion.button
+        </button>
+        <button
           type="button"
-          whileTap={{ scale: 0.97 }}
+
           disabled={backing || restoring}
           onClick={() => void runRestore()}
           className={btnCls}
         >
           <Upload size={14} />
           {restoring ? t("Восстанавливаю...") : t("Восстановить из бэкапа")}
-        </motion.button>
+        </button>
       </div>
-      <p className="text-[11px] text-zinc-600 mt-2.5 leading-relaxed">
-        Бэкап собирает заметки в .zip. Восстановление заменит папку; старая
-        сохранится в <code className="font-mono text-zinc-500">notes.bak-&lt;дата&gt;</code>.
+      <p className="text-[11px] text-[var(--settings-muted)] mt-2.5 leading-relaxed">
+        {t("Бэкап сохраняет хранилище в ZIP. При восстановлении текущая папка остаётся в notes.bak-<дата>.")}
       </p>
     </Card>
   );

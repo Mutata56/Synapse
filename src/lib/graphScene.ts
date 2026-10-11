@@ -358,7 +358,13 @@ export class GraphScene {
     return Boolean(this.target || breathe || (this.mode === "volume" && interacting));
   };
 
+  private minimapEnabled = true;
+  setMinimapEnabled(enabled: boolean) {
+    this.minimapEnabled = enabled;
+    if (enabled) this.publishMap(true);
+  }
   private publishMap(force: boolean) {
+    if (!this.minimapEnabled) return;
     const now = performance.now(); if (!force && now - this.lastMap < 120) return;
     this.lastMap = now;
     this.callbacks.minimap({ positions: this.positions, active: this.active, colors: this.mapColors, bounds: this.bounds(), camera: { ...this.camera }, width: this.width, height: this.height, geometryVersion: this.geometryVersion });

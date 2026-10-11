@@ -28,6 +28,7 @@ export function WorkspaceIconButton({ icon: Icon, label, active, className, ...p
 
 export async function createWorkspaceDocument(kind: "note" | "database" | "canvas" = "note") {
   const state = useNotesStore.getState();
+  if (!state.settings.modules.newNote || kind === "canvas" && !state.settings.modules.canvas || kind === "database" && !state.settings.modules.database) return;
   const folder = state.currentFolder;
   const titles = new Set(flattenNotes(state.tree).filter(note => note.folder === folder).map(note => note.title.toLocaleLowerCase()));
   const base = kind === "database" ? t("База данных") : t("Холст");
@@ -52,6 +53,8 @@ function useWorkspaceController() {
   useEffect(() => {
     const execute = (command: WorkspaceCommand) => {
       const state = useWorkspaceStore.getState();
+      const modules = useNotesStore.getState().settings.modules;
+      if (command === "new-tab" && !modules.home || command === "new-note" && !modules.newNote || command === "new-canvas" && (!modules.canvas || !modules.newNote) || command === "new-database" && (!modules.database || !modules.newNote) || command === "quick-switcher" && !modules.search || command === "help" && !modules.help || command === "toggle-context" && !modules.context) return;
       if (command === "new-tab") void state.newTab();
       else if (command === "close-tab") void state.closeTab();
       else if (command === "toggle-sidebar") state.toggleSidebar();
@@ -93,12 +96,14 @@ function useWorkspaceController() {
 export function WorkspaceChrome({ children }: { children: ReactNode }) {
   useWorkspaceController();
   const empty = useWorkspaceStore(state => activeWorkspaceTab(state).target.kind === "empty");
+  const settingsOpen = useWorkspaceStore(state => { const target = activeWorkspaceTab(state).target; return target.kind === "view" && target.view === "settings"; });
   const pending = useWorkspaceStore(state => state.pending);
   const rightVisible = useWorkspaceStore(state => state.rightVisible);
   const helpVisible = useWorkspaceStore(state => state.helpVisible);
+  const modules = useNotesStore(state => state.settings.modules);
   return <div className={cn("workspace-shell", isMac && "is-mac")}>
     <WorkspaceRibbon />
-    <Sidebar />
+    {!settingsOpen ? <Sidebar /> : null}
     <section className="workspace-center" aria-label={t("Рабочая область")}>
       <WorkspaceTabs />
       <main className={cn("workspace-stage", pending && "is-pending")}>
@@ -106,31 +111,37 @@ export function WorkspaceChrome({ children }: { children: ReactNode }) {
         {pending ? <div className="workspace-navigation-progress" role="status">{t("Загрузка…")}</div> : null}
       </main>
     </section>
-    {rightVisible ? <WorkspaceContext /> : null}
-    {helpVisible ? <WorkspaceHelp /> : null}
+    {!settingsOpen && rightVisible && modules.context ? <WorkspaceContext /> : null}
+    {helpVisible && modules.help ? <WorkspaceHelp /> : null}
   </div>;
 }
 
 function WorkspaceRibbon() {
+  const modules = useNotesStore(state => state.settings.modules);
   const current = useNotesStore(state => state.view);
   const empty = useWorkspaceStore(state => activeWorkspaceTab(state).target.kind === "empty");
   const open = useWorkspaceStore(state => state.openView);
+  const views = RIBBON_VIEWS.filter(view => view !== "settings" && modules[view]);
+  const hasActions = modules.home || modules.newNote;
+  const hasTools = modules.search || modules.newNote && (modules.canvas || modules.database);
   return <nav className="workspace-ribbon" aria-label={t("Разделы")}>
     <div className="workspace-ribbon-top">
-      <WorkspaceIconButton icon={Home} label={t("Новая вкладка")} active={empty} onClick={() => void useWorkspaceStore.getState().newTab()} />
-      <WorkspaceIconButton icon={FilePlus2} label={t("Новая заметка")} onClick={() => void createWorkspaceDocument()} />
-      <div className="workspace-ribbon-divider" />
-      {RIBBON_VIEWS.map(view => <WorkspaceIconButton key={view} icon={VIEW_ICONS[view]} label={t(WORKSPACE_VIEW_LABELS[view])} active={!empty && current === view} onClick={() => void open(view)} />)}
-      <div className="workspace-ribbon-divider" />
-      <WorkspaceIconButton icon={Shapes} label={t("Новый холст")} onClick={() => void createWorkspaceDocument("canvas")} />
-      <WorkspaceIconButton icon={Table2} label={t("Создать базу данных")} onClick={() => void createWorkspaceDocument("database")} />
-      <WorkspaceIconButton icon={Search} label={t("Перейти к файлу")} onClick={() => window.dispatchEvent(new CustomEvent(QUICK_SWITCHER_EVENT))} />
+      {modules.home ? <WorkspaceIconButton icon={Home} label={t("Новая вкладка")} active={empty} onClick={() => void useWorkspaceStore.getState().newTab()} /> : null}
+      {modules.newNote ? <WorkspaceIconButton icon={FilePlus2} label={t("Новая заметка")} onClick={() => void createWorkspaceDocument()} /> : null}
+      {hasActions && (views.length > 0 || hasTools) ? <div className="workspace-ribbon-divider" /> : null}
+      {views.map(view => <WorkspaceIconButton key={view} icon={VIEW_ICONS[view]} label={t(WORKSPACE_VIEW_LABELS[view])} active={!empty && current === view} onClick={() => void open(view)} />)}
+      {views.length > 0 && hasTools ? <div className="workspace-ribbon-divider" /> : null}
+      {modules.canvas && modules.newNote ? <WorkspaceIconButton icon={Shapes} label={t("Новый холст")} onClick={() => void createWorkspaceDocument("canvas")} /> : null}
+      {modules.database && modules.newNote ? <WorkspaceIconButton icon={Table2} label={t("Создать базу данных")} onClick={() => void createWorkspaceDocument("database")} /> : null}
+      {modules.search ? <WorkspaceIconButton icon={Search} label={t("Перейти к файлу")} onClick={() => window.dispatchEvent(new CustomEvent(QUICK_SWITCHER_EVENT))} /> : null}
     </div>
-    <div className="workspace-ribbon-bottom"><WorkspaceIconButton icon={HelpCircle} label={t("Помощь и сочетания клавиш")} onClick={() => useWorkspaceStore.getState().showHelp(true)} /></div>
+    <div className="workspace-ribbon-bottom"><WorkspaceIconButton icon={Settings2} label={t("Настройки")} onClick={() => void open("settings")} />{modules.help ? <WorkspaceIconButton icon={HelpCircle} label={t("Помощь и сочетания клавиш")} onClick={() => useWorkspaceStore.getState().showHelp(true)} /> : null}</div>
   </nav>;
 }
 
 function WorkspaceTabs() {
+  const settingsOpen = useWorkspaceStore(state => { const target = activeWorkspaceTab(state).target; return target.kind === "view" && target.view === "settings"; });
+  const modules = useNotesStore(state => state.settings.modules);
   const tabs = useWorkspaceStore(state => state.tabs), activeId = useWorkspaceStore(state => state.activeTabId);
   const sidebarVisible = useWorkspaceStore(state => state.sidebarVisible), rightVisible = useWorkspaceStore(state => state.rightVisible);
   const tree = useNotesStore(state => state.tree);
@@ -149,7 +160,7 @@ function WorkspaceTabs() {
     return () => { window.removeEventListener("pointerdown", close); window.removeEventListener("keydown", key); };
   }, [menu]);
   return <header className="workspace-tabs-header" data-tauri-drag-region>
-    {!sidebarVisible ? <WorkspaceIconButton icon={PanelLeft} label={t("Развернуть левую панель")} onClick={() => useWorkspaceStore.getState().toggleSidebar()} /> : null}
+    {!sidebarVisible && !settingsOpen && (modules.files || modules.search || modules.bookmarks) ? <WorkspaceIconButton icon={PanelLeft} label={t("Развернуть левую панель")} onClick={() => useWorkspaceStore.getState().toggleSidebar()} /> : null}
     <div className="workspace-tabs-scroll" role="tablist" aria-label={t("Открытые вкладки")}>
       {tabs.map(tab => {
         const Icon = tab.target.kind === "view" ? VIEW_ICONS[tab.target.view] : tab.target.kind === "note" ? FileText : null;
@@ -163,24 +174,26 @@ function WorkspaceTabs() {
       })}
     </div>
     <div className="workspace-tab-actions" ref={menuRoot}>
-      <WorkspaceIconButton icon={Plus} label={t("Новая вкладка")} onClick={() => void useWorkspaceStore.getState().newTab()} />
+      {modules.home ? <WorkspaceIconButton icon={Plus} label={t("Новая вкладка")} onClick={() => void useWorkspaceStore.getState().newTab()} /> : null}
       <WorkspaceIconButton icon={ChevronDown} label={t("Список вкладок")} aria-expanded={menu} onClick={() => setMenu(value => !value)} />
       {menu ? <div className="workspace-tab-menu" role="menu" aria-label={t("Список вкладок")}>
         {tabs.map(tab => <button key={tab.id} type="button" role="menuitem" className={tab.id === activeId ? "is-active" : ""} onClick={() => { setMenu(false); void useWorkspaceStore.getState().activateTab(tab.id); }}>{label(tab.target)}</button>)}
         <hr /><button type="button" role="menuitem" onClick={() => { setMenu(false); useWorkspaceStore.getState().closeOtherTabs(); }}>{t("Закрыть остальные вкладки")}</button>
       </div> : null}
-      <WorkspaceIconButton icon={PanelRight} label={t(rightVisible ? "Свернуть правую панель" : "Развернуть правую панель")} active={rightVisible} onClick={() => useWorkspaceStore.getState().toggleRight()} />
+      {modules.context && !settingsOpen ? <WorkspaceIconButton icon={PanelRight} label={t(rightVisible ? "Свернуть правую панель" : "Развернуть правую панель")} active={rightVisible} onClick={() => useWorkspaceStore.getState().toggleRight()} /> : null}
     </div>
   </header>;
 }
 
 function EmptyWorkspace() {
+  const modules = useNotesStore(state => state.settings.modules);
   return <div className="workspace-empty" id="workspace-active-content" role="tabpanel" aria-label={t("Новая вкладка")}>
     <div className="workspace-empty-actions">
-      <button type="button" onClick={() => void createWorkspaceDocument()}><FilePlus2 size={19} aria-hidden="true" /><span>{t("Новая заметка")}</span><kbd>{keyModifier} N</kbd></button>
-      <button type="button" onClick={() => void createWorkspaceDocument("database")}><List size={19} aria-hidden="true" /><span>{t("Создать базу данных")}</span></button>
-      <button type="button" onClick={() => void createWorkspaceDocument("canvas")}><LayoutGrid size={19} aria-hidden="true" /><span>{t("Новый холст")}</span></button>
-      <button type="button" onClick={() => window.dispatchEvent(new CustomEvent(QUICK_SWITCHER_EVENT))}><Search size={19} aria-hidden="true" /><span>{t("Перейти к файлу")}</span><kbd>{keyModifier} O</kbd></button>
+      {!modules.newNote && !modules.search ? <><p>{t("Выбери раздел в меню или включи нужные модули в настройках.")}</p><button type="button" onClick={() => void useWorkspaceStore.getState().openView("settings")}><Settings2 size={19} aria-hidden="true" /><span>{t("Настройки")}</span></button></> : null}
+      {modules.newNote ? <button type="button" onClick={() => void createWorkspaceDocument()}><FilePlus2 size={19} aria-hidden="true" /><span>{t("Новая заметка")}</span><kbd>{keyModifier} N</kbd></button> : null}
+      {modules.database && modules.newNote ? <button type="button" onClick={() => void createWorkspaceDocument("database")}><List size={19} aria-hidden="true" /><span>{t("Создать базу данных")}</span></button> : null}
+      {modules.canvas && modules.newNote ? <button type="button" onClick={() => void createWorkspaceDocument("canvas")}><LayoutGrid size={19} aria-hidden="true" /><span>{t("Новый холст")}</span></button> : null}
+      {modules.search ? <button type="button" onClick={() => window.dispatchEvent(new CustomEvent(QUICK_SWITCHER_EVENT))}><Search size={19} aria-hidden="true" /><span>{t("Перейти к файлу")}</span><kbd>{keyModifier} O</kbd></button> : null}
     </div>
   </div>;
 }

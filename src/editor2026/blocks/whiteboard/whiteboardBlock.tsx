@@ -25,6 +25,8 @@ import {
 import { createPortal } from "react-dom";
 import { boardBounds, parseBoard, serializeBoard } from "./model";
 import { t } from "../../../lib/i18n";
+import { registerFlusher } from "../../../store/notes";
+import { ModuleBlockGate } from "../../../components/ModuleBlockGate";
 import type { Board, Shape } from "./model";
 
 const WhiteboardCanvas = lazy(() => import("./WhiteboardCanvas"));
@@ -110,10 +112,16 @@ function WhiteboardView({ block, editor }: { block: any; editor: any }) {
   }, [name, editor, block]);
 
   useEffect(() => {
-    return () => {
-      if (timerRef.current !== null) window.clearTimeout(timerRef.current);
+    const commitPending = async () => {
+      if (timerRef.current !== null) flush(latestRef.current);
     };
-  }, []);
+    const unregister = registerFlusher(commitPending, "blocks");
+    return () => {
+      unregister();
+      // A disabled module unmounts this view; its rich state must survive.
+      void commitPending();
+    };
+  }, [flush]);
 
   return (
     // contentEditable=false + bubble stopPropagation: карточка и модалка
@@ -435,7 +443,7 @@ export const whiteboardBlock = createReactBlockSpec(
     // NodeSelection на карточку (фикс бага caret-after-block).
     meta: { isolating: false, selectable: false },
     render: (props) => (
-      <WhiteboardView block={props.block} editor={props.editor} />
+      <ModuleBlockGate module="canvas"><WhiteboardView block={props.block} editor={props.editor} /></ModuleBlockGate>
     ),
     toExternalHTML: () => <p data-whiteboard="1">[Доска]</p>,
     parse: (el) =>
