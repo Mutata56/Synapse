@@ -23,9 +23,9 @@ import { Toaster } from "./components/Toaster";
 import { TrashView } from "./components/TrashView";
 import { VersionHistory } from "./components/VersionHistory";
 import { WikiLinkPicker } from "./components/WikiLinkPicker";
-import { WritingDashboard } from "./components/WritingDashboard";
+const WritingDashboard = lazy(() => import("./components/WritingDashboard").then(module => ({ default: module.WritingDashboard })));
 import { warmAssetResolver } from "./editor2026/lib/assets";
-import { warmIndex, wordCountsFor } from "./lib/fullTextSearch";
+import { warmIndex } from "./lib/fullTextSearch";
 import { seedTemplatesIfEmpty } from "./lib/templates";
 import { flattenNotes } from "./lib/treeUtils";
 import { flushAllPending, useNotesStore, type View } from "./store/notes";
@@ -102,12 +102,8 @@ export default function App() {
       void useTemplatesStore.getState().refresh();
       const flatNotes = flattenNotes(useNotesStore.getState().tree);
       void warmIndex(flatNotes);
-      // Fire-and-forget прогрев подсчёта слов, чтобы первый "Обзор" открылся
-      // без чтения диска: `warmIndex` заполняет кэш тел, а этот проход
-      // заполняет параллельный кэш подсчёта слов по тем же телам.
-      void wordCountsFor(flatNotes).catch(() => {
-        /* best-effort прогрев; ошибки логируются самим wordCountsFor. */
-      });
+      // Статистика слов загружается только по выбору «Объём текстов» в Обзоре.
+      // Параллельный прогрев здесь дублировал чтения холодного search-кэша.
       if (useNotesStore.getState().settings.openDailyOnStartup) {
         void useNotesStore.getState().openDailyNote(new Date());
       }
@@ -144,12 +140,10 @@ export default function App() {
         } catch (e) {
           console.error("close: flushAllPending failed:", e);
         } finally {
-          // Tauri 2: window.destroy() реально закрывает (в отличие от
-          // `close()`, который снова запускает цикл запросов). Оборачиваем,
-          // чтобы поглотить ошибку tear-down, и окно гарантированно
-          // закроется, даже если flusher крикнул.
-          await win.destroy().catch((e) => {
-            console.error("close: window.destroy failed:", e);
+          // Rust оставляет приложение в трее. Сохраняем тот же webview,
+          // чтобы повторный запуск мог показать его после flush сохранений.
+          await win.hide().catch((e) => {
+            console.error("close: window.hide failed:", e);
           });
         }
       })
@@ -271,7 +265,7 @@ function renderView(view: View, activeId: string | null): ReactNode {
     case "calendar":
       return <CalendarView />;
     case "overview":
-      return <WritingDashboard />;
+      return <Suspense fallback={<div role="status" className="p-6 text-sm text-neutral-400">{t("Загрузка обзора…")}</div>}><WritingDashboard /></Suspense>;
     case "inbox":
       return <InboxView />;
     case "settings":

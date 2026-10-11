@@ -29,6 +29,7 @@ import {
   splitMarkdownSource,
   wikiTarget,
 } from "./obsidianImport";
+import { createImageFilesIndex, extractImageReferences, imageFormat, resolveImageReferences, type ImageLibrary, type ImageReferences, type LibraryImage } from "./imageLibrary";
 
 const ROOT = "notes";
 const TRASH = "notes/.trash";
@@ -2172,12 +2173,7 @@ async function listAssetsImpl(): Promise<AssetInfo[]> {
   await ensureWorkspace();
   if (!(await pathExists(ASSETS))) return [];
 
-  // Распараллеливаем независимые единицы IO.
-  const [entries, refs, dir] = await Promise.all([
-    readDir(ASSETS, APP_DATA),
-    collectAllNoteRefs(),
-    getAppDataDir(),
-  ]);
+  const entries = await readDir(ASSETS, APP_DATA);
 
   // Набор реальных имён ассетов на диске: каждая "найденная" ссылка должна
   // совпасть с именем отсюда, иначе отфильтровывается (отсекаем случайные
@@ -2185,6 +2181,10 @@ async function listAssetsImpl(): Promise<AssetInfo[]> {
   const candidates = entries.filter(
     (e) => e.isFile && e.name && !e.name.startsWith(TMP_PREFIX),
   );
+  // With no assets there is nothing to protect; avoid traversing every note
+  // and version snapshot just to return an empty cover-picker collection.
+  if (!candidates.length) return [];
+  const [refs, dir] = await Promise.all([collectAllNoteRefs(), getAppDataDir()]);
   const knownNames = new Set(candidates.map((e) => e.name!));
 
   const usageByAsset = new Map<string, NoteRef[]>();
@@ -2385,6 +2385,143 @@ async function listAssetsImpl(): Promise<AssetInfo[]> {
 
 export async function deleteAsset(name: string): Promise<void> {
   await safeRemove(`${ASSETS}/${name}`);
+}
+
+// Image library is separate from listAssets: editor/cover pickers still see
+// only managed assets, while the library also sees lossless vault attachments.
+type ImageRefCacheEntry = { mtime: number; size: number; references: ImageReferences };
+const IMAGE_REFS_CACHE = `${CACHE_DIR}/image-references-v1.json`;
+let imageRefsCache: Map<string, ImageRefCacheEntry> | null = null;
+let imageScanInFlight: Promise<ImageLibrary> | null = null;
+let imageRefsFlush: Promise<void> = Promise.resolve();
+const imageDirectorySlots = createSemaphore(4);
+
+export function listImageLibrary(): Promise<ImageLibrary> {
+  if (imageScanInFlight) return imageScanInFlight;
+  imageScanInFlight = scanImageLibrary().finally(() => { imageScanInFlight = null; });
+  return imageScanInFlight;
+}
+
+async function scanImageLibrary(): Promise<ImageLibrary> {
+  await ensureWorkspace();
+  let complete = true;
+  const imagePaths: string[] = []; const markdownPaths: string[] = [];
+  const walk = async (path: string, protectedArea = false): Promise<void> => {
+    let entries;
+    try { entries = await imageDirectorySlots.run(() => readDir(path, APP_DATA)); }
+    catch (error) { complete = false; console.error("image library directory:", path, error); return; }
+    await Promise.all(entries.map(async (entry) => {
+      if (!entry.name || entry.isSymlink || entry.name.startsWith(TMP_PREFIX)) return;
+      const child = `${path}/${entry.name}`;
+      if (entry.isDirectory) {
+        if (entry.name.startsWith(".") && ![".assets", ".trash", ".versions"].includes(entry.name)) return;
+        await walk(child, protectedArea || entry.name === ".trash" || entry.name === ".versions");
+      } else if (entry.isFile) {
+        if (entry.name.endsWith(NOTE_EXT)) markdownPaths.push(child);
+        else if (!protectedArea && imageFormat(entry.name)) imagePaths.push(child.slice(ROOT.length + 1));
+      }
+    }));
+  };
+  const [tree, dir] = await Promise.all([listTree(), getAppDataDir(), walk(ROOT)]);
+  if (!imagePaths.length) return { images: [], complete };
+  const notes = new Map(flattenNotes(tree).map((note) => [note.id, note]));
+  const files = createImageFilesIndex(imagePaths);
+  const usage = new Map<string, Map<string, { id: string; title: string; folder: string }>>();
+  const addUsage = (path: string, ref: { id: string; title: string; folder: string }) => {
+    const existing = usage.get(path) ?? new Map(); existing.set(ref.id, ref); usage.set(path, existing);
+  };
+  if (!imageRefsCache) {
+    imageRefsCache = new Map();
+    try {
+      if (await pathExists(IMAGE_REFS_CACHE)) {
+        const data = JSON.parse(await readTextFile(IMAGE_REFS_CACHE, APP_DATA));
+        if (data.v === 1 && data.entries) for (const [path, entry] of Object.entries(data.entries)) {
+          const value = entry as ImageRefCacheEntry;
+          if (Number.isFinite(value?.mtime) && Number.isFinite(value.size) && Array.isArray(value.references?.managed) && value.references.managed.every((ref) => typeof ref === "string") && Array.isArray(value.references.links) && value.references.links.every((ref) => typeof ref.value === "string" && typeof ref.relative === "boolean")) imageRefsCache.set(path, value);
+        }
+      }
+    } catch (error) { console.error("image library reference cache:", error); }
+  }
+  let dirty = false;
+  for (const note of notes.values()) {
+    if (note.cover?.startsWith(COVER_PREFIX.file)) {
+      const path = `.assets/${note.cover.slice(COVER_PREFIX.file.length)}`;
+      const target = files.paths.get(path.normalize("NFC").toLowerCase());
+      if (target) addUsage(target, note);
+    }
+  }
+  await Promise.all(markdownPaths.map((path) => fileReadSemaphore.run(async () => {
+    const cached = imageRefsCache!.get(path);
+    let references: ImageReferences;
+    try {
+      if (path.startsWith(`${VERSIONS}/`) && cached) references = cached.references;
+      else {
+        const info = await stat(path, APP_DATA);
+        const mtime = info.mtime ? new Date(info.mtime).getTime() : 0;
+        const size = Number(info.size ?? 0);
+        if (mtime && cached?.mtime === mtime && cached.size === size) references = cached.references;
+        else {
+          references = extractImageReferences(await readTextFile(path, APP_DATA));
+          if (mtime) { imageRefsCache!.set(path, { mtime, size, references }); dirty = true; }
+        }
+      }
+    } catch (error) {
+      if (!isMissingPathError(error)) { complete = false; console.error("image library note references:", path, error); }
+      return;
+    }
+    const origin = classifyNotePath(path, notes);
+    const relative = path.slice(ROOT.length + 1, -NOTE_EXT.length);
+    const noteId = origin === "version" ? path.slice(VERSIONS.length + 1, path.lastIndexOf("/")) : relative;
+    const ref = origin === "trash" ? { id: "__trash__", title: "В корзине", folder: "" }
+      : origin === "version" ? { id: "__versions__", title: "История версий", folder: "" }
+      : origin ?? { id: `__unindexed__:${relative}`, title: relative.slice(relative.lastIndexOf("/") + 1), folder: relative.slice(0, Math.max(0, relative.lastIndexOf("/"))) };
+    for (const target of resolveImageReferences(references, noteId, files)) addUsage(target, ref);
+  })));
+  if (complete) {
+    const active = new Set(markdownPaths);
+    for (const path of imageRefsCache.keys()) if (!active.has(path)) { imageRefsCache.delete(path); dirty = true; }
+  }
+  if (dirty) {
+    const entries = Object.fromEntries(imageRefsCache);
+    imageRefsFlush = imageRefsFlush.catch(() => undefined).then(async () => {
+      await ensureDir(CACHE_DIR);
+      await atomicWriteTextFile(IMAGE_REFS_CACHE, JSON.stringify({ v: 1, entries }));
+    }).catch((error) => console.error("image library cache write:", error));
+  }
+  const results = await Promise.all(imagePaths.map((id) => fileReadSemaphore.run(async (): Promise<LibraryImage | null> => {
+    try {
+      const info = await stat(`${ROOT}/${id}`, APP_DATA);
+      const mtime = info.mtime ? new Date(info.mtime).getTime() : 0;
+      const modifiedAt = Number.isFinite(mtime) ? mtime : 0;
+      const sizeBytes = Number(info.size ?? 0);
+      const usedBy = [...(usage.get(id)?.values() ?? [])].sort((a, b) => a.id.localeCompare(b.id));
+      return { id, name: id.slice(id.lastIndexOf("/") + 1), folder: id.slice(0, Math.max(0, id.lastIndexOf("/"))), url: convertFileSrc(joinAbsolute(dir, ROOT, id)) + `?v=${modifiedAt}-${sizeBytes}`, sizeBytes, modifiedAt, managed: id.startsWith(".assets/"), usedBy };
+    } catch (error) {
+      if (!isMissingPathError(error)) { complete = false; console.error("image library file metadata:", id, error); }
+      return null;
+    }
+  })));
+  return { images: results.filter((item): item is LibraryImage => item !== null).sort((a, b) => a.id.localeCompare(b.id)), complete };
+}
+
+export async function imageFilePath(id: string): Promise<string> {
+  if (boundedVaultPath(id) !== id || !imageFormat(id)) throw new Error("Invalid image path");
+  return joinAbsolute(await getAppDataDir(), ROOT, id);
+}
+
+/** Original vault attachments remain read-only. Revalidate managed references
+ * immediately before deleting, including references in trash and versions. */
+export async function deleteUnusedLibraryImages(ids: readonly string[]): Promise<void> {
+  const [library, managed] = await Promise.all([listImageLibrary(), listAssets()]);
+  if (!library.complete) throw new Error("Не удалось проверить все ссылки на изображения");
+  const images = new Map(library.images.map((image) => [image.id, image]));
+  const legacy = new Map(managed.map((asset) => [asset.name, asset]));
+  for (const id of new Set(ids)) {
+    const image = images.get(id);
+    if (!image) continue;
+    if (!image.managed || image.usedBy.length || legacy.get(image.name)?.usedBy.length || id !== `.assets/${image.name}`) throw new Error("Изображение используется или относится к исходному хранилищу");
+    await remove(`${ROOT}/${id}`, APP_DATA);
+  }
 }
 
 /**
