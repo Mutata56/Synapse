@@ -1,6 +1,7 @@
 import { AnimatePresence, motion } from "framer-motion";
 import {
   ChevronRight,
+  Copy,
   Download,
   FilePlus,
   FileText,
@@ -40,6 +41,7 @@ import { NoteIcon } from "./NoteIcon";
 import { useIconizeStore } from "../store/iconize";
 import { resolveIcon } from "../lib/iconize";
 import { noteClickAction } from "../lib/noteClick";
+import { copyWorkspacePaths, type WorkspacePathFormat } from "../lib/workspaceClipboard";
 import { stableKey } from "../lib/treeKeys";
 import { confirmDialog } from "../store/confirm";
 import { reportError, useNotesStore } from "../store/notes";
@@ -778,6 +780,8 @@ function NoteRow({
         },
       },
       { kind: "item", label: t("Открыть в новой вкладке"), icon: FilePlus, onClick: () => useWorkspaceStore.getState().openNote(note.id, true) },
+      { kind: "item", label: t("Скопировать абсолютный путь"), icon: Copy, onClick: () => copyPath("absolute") },
+      { kind: "item", label: t("Скопировать относительный путь"), icon: Copy, onClick: () => copyPath("relative") },
       { kind: "separator" },
       {
         kind: "item",
@@ -830,6 +834,15 @@ function NoteRow({
         },
       },
     ]);
+  };
+
+  const copyPath = async (format: WorkspacePathFormat) => {
+    try {
+      await copyWorkspacePaths([{ kind: "note", path: note.id }], format);
+      useToastStore.getState().push(t("Путь скопирован"), "success");
+    } catch (error) {
+      reportError(t("Не удалось скопировать путь"), "FolderTree clipboard:", error);
+    }
   };
 
   const onClick = (e: React.MouseEvent) => {

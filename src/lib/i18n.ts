@@ -419,6 +419,8 @@ const en: Record<string, string> = {
   "Удалённые заметки и папки появятся здесь": "Deleted notes and folders will appear here",
   "Действия с элементами": "Item actions",
   "Копировать путь": "Copy path",
+  "Скопировать абсолютный путь": "Copy absolute path",
+  "Скопировать относительный путь": "Copy relative path",
   "Путь скопирован": "Path copied",
   "Не удалось скопировать путь": "Could not copy the path",
   "Не удалось обновить список": "Could not refresh the list",

@@ -20,6 +20,7 @@ import "./fileBrowser.css";
 import { NoteIcon } from "./NoteIcon";
 import { useIconizeStore } from "../store/iconize";
 import { resolveIcon } from "../lib/iconize";
+import { copyWorkspacePaths, type WorkspacePathFormat } from "../lib/workspaceClipboard";
 
 const ROW_HEIGHT = 49;
 type Props = { mode: "files" | "trash"; readBody?: (id: string) => Promise<string>; initialSelected?: string[] };
@@ -110,6 +111,13 @@ export function FileBrowser({ mode, readBody, initialSelected = [] }: Props) {
     menuRef.current?.querySelector<HTMLButtonElement>("button")?.focus();
     return () => { document.removeEventListener("pointerdown", dismiss); window.removeEventListener("keydown", escape); };
   }, [menu, windowed.ref]);
+  useLayoutEffect(() => {
+    if (!menu || !menuRef.current) return;
+    const bounds = menuRef.current.getBoundingClientRect();
+    const x = Math.max(8, Math.min(menu.x, window.innerWidth - bounds.width - 8));
+    const y = Math.max(8, Math.min(menu.y, window.innerHeight - bounds.height - 8));
+    if (x !== menu.x || y !== menu.y) setMenu({ x, y });
+  }, [menu]);
   const selectAt = (position: number, toggle: boolean, range: boolean) => {
     if (blocked || !keys[position]) return;
     const anchorIndex = rowIndexes.get(anchor.current) ?? position;
@@ -157,12 +165,10 @@ export function FileBrowser({ mode, readBody, initialSelected = [] }: Props) {
     if (!(await confirmDialog(t("Очистить корзину полностью? Это действие нельзя отменить."), { confirmLabel: t("Очистить корзину") }))) return;
     await execute(() => useNotesStore.getState().emptyTrash());
   };
-  const copyPaths = async () => {
-    const value = selectedItems.map(entry => `${mode === "trash" ? ".trash/" : ""}${entry.path}${entry.kind === "note" ? ".md" : ""}`).join("\n");
-    if (!value) return;
+  const copyPaths = async (format: WorkspacePathFormat = "relative") => {
+    if (!selectedItems.length) return;
     try {
-      if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(value);
-      else { const element = document.createElement("textarea"); element.value = value; element.style.position = "fixed"; element.style.opacity = "0"; document.body.appendChild(element); element.select(); try { if (!document.execCommand("copy")) throw new Error("Clipboard unavailable"); } finally { element.remove(); } }
+      await copyWorkspacePaths(selectedItems, format, mode === "trash");
       useToastStore.getState().push(t("Путь скопирован")); setMenu(null);
     } catch (error) { reportError(t("Не удалось скопировать путь"), "FileBrowser clipboard:", error); }
   };
@@ -191,7 +197,7 @@ export function FileBrowser({ mode, readBody, initialSelected = [] }: Props) {
   const showMenu = (event: MouseEvent, entry: FileEntry) => {
     event.preventDefault(); event.stopPropagation(); if (blocked) return;
     if (!selected.has(entry.key)) setSelected(new Set([entry.key]));
-    setActive(entry.key); setMenu({ x: Math.min(event.clientX, window.innerWidth - 222), y: Math.min(event.clientY, window.innerHeight - 256) });
+    setActive(entry.key); setMenu({ x: event.clientX, y: event.clientY });
   };
   return <section ref={host} className="fs-browser" aria-label={mode === "files" ? t("Файлы") : t("Корзина")} data-mode={mode}>
     <header className="fs-header"><h1>{mode === "files" ? t("Файлы") : t("Корзина")}</h1>
@@ -254,7 +260,8 @@ export function FileBrowser({ mode, readBody, initialSelected = [] }: Props) {
       {selectedItems.length === 1 && mode === "files" && <><button type="button" role="menuitem" onClick={() => { setMenu(null); open(selectedItems[0]); }}><FileText size={15} />{t("Открыть")}</button><button type="button" role="menuitem" onClick={() => { setMenu(null); setDialog({ mode: "rename", entry: selectedItems[0] }); }}>{t("Переименовать")}<kbd>F2</kbd></button></>}
       {mode === "files" && <button type="button" role="menuitem" onClick={() => { setMenu(null); const first = selectedItems[0]; useIconizeStore.getState().openPicker({ targets: selectedItems.map(item => ({ kind: item.kind === "folder" ? "folder" : "file", path: item.path + (item.kind === "note" ? ".md" : "") })), current: first ? resolveIcon(useIconizeStore.getState().data, first.kind === "folder" ? "folder" : "file", first.path + (first.kind === "note" ? ".md" : ""), first.note) ?? undefined : undefined }); }}>{t("Изменить иконку")}</button>}
       {mode === "files" ? <><button type="button" role="menuitem" onClick={() => { setMenu(null); setDialog({ mode: "move" }); }}><Folder size={15} />{t("Переместить…")}</button><button type="button" role="menuitem" className="fs-danger" onClick={() => { setMenu(null); void trash(); }}><Trash2 size={15} />{t("В корзину")}</button></> : <><button type="button" role="menuitem" onClick={() => { setMenu(null); void restore(); }}><RotateCcw size={15} />{t("Восстановить")}</button><button type="button" role="menuitem" className="fs-danger" onClick={() => { setMenu(null); void permanentlyDelete(); }}><Trash2 size={15} />{t("Удалить навсегда")}</button></>}
-      <button type="button" role="menuitem" onClick={() => void copyPaths()}><Copy size={15} />{t("Копировать путь")}</button>
+      <button type="button" role="menuitem" onClick={() => void copyPaths("absolute")}><Copy size={15} />{t("Скопировать абсолютный путь")}</button>
+      <button type="button" role="menuitem" onClick={() => void copyPaths("relative")}><Copy size={15} />{t("Скопировать относительный путь")}</button>
     </div>, document.body)}
   </section>;
 }
