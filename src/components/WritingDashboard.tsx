@@ -106,7 +106,7 @@ export function WritingDashboard({ loadWords }: { loadWords?: OverviewWordLoader
   return <section className="overview" aria-label={t("Обзор")}>
     <header className="overview-header">
       <div className="overview-title"><h1>{t("Обзор")}</h1><span>{dateLabel}</span></div>
-      <div className="overview-actions"><button className="overview-search" type="button" onClick={openCommandPalette}><Search size={17} /><span>{t("Поиск заметок")}</span><kbd>⌘ / Ctrl K</kbd></button><button className="overview-primary" type="button" disabled={!!busy} onClick={() => void create("note")}><Plus size={16} />{busy === "note" ? t("Создаём…") : t("Новая заметка")}</button></div>
+      <div className="overview-actions"><button className="overview-search" type="button" aria-label={t("Поиск заметок")} onClick={openCommandPalette}><Search size={17} /><span>{t("Поиск заметок")}</span><kbd>⌘ / Ctrl K</kbd></button><button className="overview-primary" type="button" disabled={!!busy} onClick={() => void create("note")}><Plus size={16} />{busy === "note" ? t("Создаём…") : t("Новая заметка")}</button></div>
       <div className="overview-tabs" ref={tabs} role="tablist" aria-label={t("Режим обзора")} onKeyDown={event => {
         if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
         event.preventDefault(); const next = event.key === "Home" ? "desk" : event.key === "End" ? "analytics" : panel === "desk" ? "analytics" : "desk";

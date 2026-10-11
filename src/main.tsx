@@ -7,6 +7,9 @@ import { t } from "./lib/i18n";
 
 const App = React.lazy(() => import("./App"));
 const CaptureWindow = React.lazy(() => import("./components/CaptureWindow").then(module => ({ default: module.CaptureWindow })));
+function StartupLoading() {
+  return <div role="status" className="h-screen grid place-items-center text-sm text-[var(--text-secondary)]">{t("Загрузка…")}</div>;
+}
 
 
 /*
@@ -94,7 +97,7 @@ ReactDOM.createRoot(container).render(
   <React.StrictMode>
     <ErrorBoundary>
       <LanguageProvider>
-        <React.Suspense fallback={<div role="status" className="h-screen grid place-items-center text-sm text-[var(--text-secondary)]">{t("Загрузка…")}</div>}>
+        <React.Suspense fallback={<StartupLoading />}>
           {isCaptureWindow ? <CaptureWindow /> : <App />}
         </React.Suspense>
       </LanguageProvider>

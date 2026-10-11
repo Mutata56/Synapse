@@ -1,9 +1,9 @@
 import { listen } from "@tauri-apps/api/event";
+import { isTauri } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { AnimatePresence, motion } from "framer-motion";
 import { lazy, Suspense, useEffect, type ReactNode } from "react";
 import { t } from "./lib/i18n";
-import { CalendarView } from "./components/CalendarView";
+const CalendarView = lazy(() => import("./components/CalendarView").then(module => ({ default: module.CalendarView })));
 import { CommandPalette } from "./components/CommandPalette";
 import { ConfirmDialog } from "./components/ConfirmDialog";
 import { PromptDialog } from "./components/PromptDialog";
@@ -12,12 +12,13 @@ const Editor2026 = lazy(() => import("./editor2026/Editor2026").then(module => (
 import { FilesView } from "./components/FilesView";
 const GraphView = lazy(() => import("./components/GraphView").then((module) => ({ default: module.GraphView })));
 import { ImageLightbox } from "./components/ImageLightbox";
-import { ImagesView } from "./components/ImagesView";
+const ImagesView = lazy(() => import("./components/ImagesView").then(module => ({ default: module.ImagesView })));
 import { InboxView } from "./components/InboxView";
 import { NotesGallery } from "./components/NotesGallery";
 const MarkdownSourceEditor = lazy(() => import("./components/MarkdownSourceEditor").then(module => ({ default: module.MarkdownSourceEditor })));
-import { SettingsView } from "./components/SettingsView";
-import { Sidebar } from "./components/Sidebar";
+const SettingsView = lazy(() => import("./components/SettingsView").then(module => ({ default: module.SettingsView })));
+import { WorkspaceChrome } from "./components/WorkspaceChrome";
+import { useWorkspaceStore } from "./store/workspace";
 import { TagsView } from "./components/TagsView";
 import { Toaster } from "./components/Toaster";
 import { TrashView } from "./components/TrashView";
@@ -25,16 +26,13 @@ import { VersionHistory } from "./components/VersionHistory";
 import { WikiLinkPicker } from "./components/WikiLinkPicker";
 const WritingDashboard = lazy(() => import("./components/WritingDashboard").then(module => ({ default: module.WritingDashboard })));
 import { warmAssetResolver } from "./editor2026/lib/assets";
+import { warmIndex } from "./lib/fullTextSearch";
 import { seedTemplatesIfEmpty } from "./lib/templates";
+import { flattenNotes } from "./lib/treeUtils";
 import { flushAllPending, useNotesStore, type View } from "./store/notes";
 import { useTemplatesStore } from "./store/templates";
 
 // ─── Константы ─────────────────────────────────────────────────────────────
-
-const VIEW_TRANSITION = {
-  duration: 0.18,
-  ease: [0.16, 1, 0.3, 1] as const,
-};
 
 const BN_EDITOR_SELECTOR = ".bn-editor";
 
@@ -53,7 +51,7 @@ const Z_KEY_CHARS = new Set(["z", "Z", "я", "Я"]);
 
 // ─── Component ─────────────────────────────────────────────────────────────
 
-export default function App() {
+export default function App({ bootstrap = true }: { bootstrap?: boolean } = {}) {
   const refreshTree = useNotesStore((s) => s.refreshTree);
   const loadFolderColors = useNotesStore((s) => s.loadFolderColors);
   const loadSettings = useNotesStore((s) => s.loadSettings);
@@ -62,9 +60,13 @@ export default function App() {
   const undo = useNotesStore((s) => s.undo);
   const redo = useNotesStore((s) => s.redo);
 
-  // Bootstrap загружает только метаданные. Тела заметок и поисковый кэш
-  // читаются при первом поиске, открытии графа или статистики текстов.
+  // Разовый bootstrap воркспейса. `refreshTree` сам ловит ошибки и логирует,
+  // так что на сайте вызова обрабатывать не нужно, но помечаем fire-and-forget
+  // через `void`. Когда дерево загружено, прогреваем кэш полнотекстового
+  // поиска в фоне, чтобы первый глобальный поиск не платил за чтение всех
+  // заметок с диска при нажатии.
   useEffect(() => {
+    if (!bootstrap) return;
     // Разовая очистка устаревшего флага беты Editor2026 (старый ключ,
     // можно удалить позже). Старый <Editor/> ушёл на пенсию, Editor2026
     // теперь единственный редактор; ключ безвреден после переключения,
@@ -86,6 +88,7 @@ export default function App() {
       // (до чтения дерева, которое заполняет UI).
       await loadSettings();
       await refreshTree();
+      await useWorkspaceStore.getState().restore();
       // Создаём встроенные шаблоны, если их нет (идемпотентно, см.
       // seedTemplatesIfEmpty). Запускаем ПОСЛЕ refreshTree, так что
       // ensureWorkspace уже создал папку `notes/`; dotdir шаблонов
@@ -95,6 +98,8 @@ export default function App() {
         console.error("seedTemplatesIfEmpty failed (ignored):", e);
       });
       void useTemplatesStore.getState().refresh();
+      const flatNotes = flattenNotes(useNotesStore.getState().tree);
+      void warmIndex(flatNotes);
       // Статистика слов загружается только по выбору «Объём текстов» в Обзоре.
       // Параллельный прогрев здесь дублировал чтения холодного search-кэша.
       if (useNotesStore.getState().settings.openDailyOnStartup) {
@@ -102,11 +107,12 @@ export default function App() {
       }
     })();
     void loadFolderColors();
-  }, [refreshTree, loadFolderColors, loadSettings]);
+  }, [bootstrap, refreshTree, loadFolderColors, loadSettings]);
 
   // Окно быстрого захвата пишет заметку в своём webview, затем шлёт это
   // событие, чтобы главное окно перечитало дерево и захват появился.
   useEffect(() => {
+    if (!isTauri()) return;
     let unlisten: (() => void) | undefined;
     void listen("note-captured", () => void refreshTree()).then((u) => {
       unlisten = u;
@@ -122,6 +128,7 @@ export default function App() {
   // flush. Пропускаем в окне быстрого захвата, у него свой простой
   // textarea и нет flusher-ов.
   useEffect(() => {
+    if (!isTauri()) return;
     const win = getCurrentWindow();
     if (win.label === "capture") return;
     let unlistenClose: (() => void) | undefined;
@@ -133,8 +140,8 @@ export default function App() {
         } catch (e) {
           console.error("close: flushAllPending failed:", e);
         } finally {
-          // Rust оставляет приложение в трее. Сохраняем тот же webview,
-          // чтобы повторный запуск мог показать его после flush сохранений.
+          // Скрываем окно после flush: процесс и main webview остаются
+          // живыми в трее, поэтому повторный запуск восстанавливает окно.
           await win.hide().catch((e) => {
             console.error("close: window.hide failed:", e);
           });
@@ -177,7 +184,7 @@ export default function App() {
   }, [undo, redo]);
 
   return (
-    <div className="app-shell flex h-screen w-screen overflow-hidden">
+    <div className="app-shell h-screen w-screen overflow-hidden">
       <CommandPalette />
       <Toaster />
       <WikiLinkPicker />
@@ -186,39 +193,14 @@ export default function App() {
       <PromptDialog />
       <TemplatePicker />
       <ImageLightbox />
-      <Sidebar />
-      <main className="flex-1 flex flex-col min-w-0 min-h-0 relative overflow-hidden">
-        <AnimatePresence mode="wait">
-          {/* IMPORTANT: the screen key intentionally does NOT include
-              activeId. Switching between two notes inside the "notes"
-              view would otherwise unmount + remount the Editor (and
-              therefore BlockNote) on every selection , defeating
-              Editor's own optimisation of swapping content via
-              `replaceBlocks` while the editor instance stays alive.
-              NoteHero handles the per-note visual swap via its own
-              `key={activeId}`. */}
-          {/* initial={false}: skip the enter animation. Previously this was
-              { opacity: 0, y: 4 } , on a rapid double key-flip (e.g. clicking
-              a usage chip in ImagesView fires setView("notes") and selectNote
-              in the same tick, producing "images" , "gallery" , "editor"),
-              AnimatePresence mode="wait" + interrupted enter could leave the
-              NEW wrapper stuck at its initial opacity:0. The mid-mount DOM
-              still hit-tested (cursor changed on hover) but everything was
-              invisible , the reported "захожу опять и пусто" bug. With no
-              enter animation, an interrupted enter cannot leave the wrapper
-              hidden. Exit cross-fade still works. */}
-          <motion.div
-            key={screenKeyFor(view, activeId)}
-            initial={false}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -4 }}
-            transition={VIEW_TRANSITION}
-            className="flex-1 flex flex-col min-w-0 min-h-0 overflow-hidden"
-          >
-            {renderView(view, activeId)}
-          </motion.div>
-        </AnimatePresence>
-      </main>
+      <WorkspaceChrome>
+        {/* The editor key stays stable across note selections. View changes
+            render immediately rather than waiting for a background RAF/exit. */}
+        <div key={screenKeyFor(view, activeId)} id="workspace-active-content" role="tabpanel"
+          className="workspace-view flex-1 flex flex-col min-w-0 min-h-0 overflow-hidden">
+          <Suspense fallback={<div role="status" className="p-6 text-sm text-[var(--text-secondary)]">{t("Загрузка…")}</div>}>{renderView(view, activeId)}</Suspense>
+        </div>
+      </WorkspaceChrome>
     </div>
   );
 }
@@ -273,11 +255,9 @@ function NoteEditor() {
   const note = useNotesStore((s) => s.activeNote);
   const reloadNonce = useNotesStore((s) => s.editorReloadNonce);
   if (!note) return <div className="flex-1 grid place-items-center text-zinc-500">Заметка не загружена</div>;
-  return <Suspense fallback={<div role="status" className="flex-1 grid place-items-center text-sm text-[var(--text-secondary)]">{t("Загрузка…")}</div>}>
-    {note.markdownSource
-      ? <MarkdownSourceEditor key={`${note.id}:${reloadNonce}`} />
-      : <Editor2026 />}
-  </Suspense>;
+  return note.markdownSource
+    ? <MarkdownSourceEditor key={`${note.id}:${reloadNonce}`} />
+    : <Editor2026 />;
 }
 
 /**

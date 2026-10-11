@@ -16,7 +16,15 @@
         "title": "Synapse",
         "width": 1200,
         "height": 800,
-        "dragDropEnabled": false
+        "dragDropEnabled": false,
+        "titleBarStyle": "Overlay",
+        "hiddenTitle": true,
+        "trafficLightPosition": {
+          "x": 14,
+          "y": 20
+        },
+        "minWidth": 700,
+        "minHeight": 500
       },
       {
         "label": "capture",
@@ -35,7 +43,11 @@
       "csp": null,
       "assetProtocol": {
         "enable": true,
-        "scope": ["$APPDATA/**", "$APPDATA/**/.*", "$APPDATA/**/.*/**"]
+        "scope": [
+          "$APPDATA/**",
+          "$APPDATA/**/.*",
+          "$APPDATA/**/.*/**"
+        ]
       }
     }
   },

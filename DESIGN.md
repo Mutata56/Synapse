@@ -141,6 +141,26 @@ typography:
     lineHeight: 1.6
   files-reader-heading:
     fontSize: "16px"
+  workspace-tab-label:
+    fontSize: "16px"
+    fontWeight: 400
+    lineHeight: 1.55
+  workspace-tree-label:
+    fontSize: "15px"
+    fontWeight: 400
+    lineHeight: 1.55
+  workspace-action-label:
+    fontSize: "14px"
+    fontWeight: 400
+    lineHeight: 1.55
+  workspace-result-title:
+    fontSize: "13px"
+    fontWeight: 500
+  workspace-keycap:
+    fontSize: "12px"
+  workspace-result-context:
+    fontSize: "11px"
+    lineHeight: 1.5
 rounded:
   control: "6px"
   card: "12px"
@@ -155,6 +175,13 @@ rounded:
   files-detail: "4px"
   files-icon: "5px"
   files-menu: "8px"
+  workspace-stage: "30px"
+  workspace-stage-narrow: "18px"
+  workspace-action: "24px"
+  workspace-keycap: "9px"
+  workspace-control: "5px"
+  workspace-detail: "4px"
+  workspace-menu: "7px"
 spacing:
   tight: "6px"
   control: "12px"
@@ -166,6 +193,8 @@ spacing:
   files-inset: "24px"
   files-inset-compact: "18px"
   files-inset-narrow: "14px"
+  workspace-action-gap: "9px"
+  workspace-chrome-gap: "7px"
 components:
   button-primary:
     backgroundColor: "{colors.primary}"
@@ -283,6 +312,54 @@ components:
     typography: "{typography.files-tag-label}"
     rounded: "{rounded.files-detail}"
     padding: "2px 7px"
+  workspace-ribbon:
+    backgroundColor: "var(--color-bg-overlay)"
+    width: "56px"
+  workspace-topbar:
+    backgroundColor: "{colors.surface-low}"
+    height: "56px"
+  workspace-icon-button:
+    backgroundColor: "transparent"
+    textColor: "{colors.foreground-muted}"
+    rounded: "{rounded.workspace-control}"
+    width: "30px"
+    height: "30px"
+  workspace-ribbon-button:
+    backgroundColor: "transparent"
+    textColor: "{colors.foreground-muted}"
+    rounded: "{rounded.workspace-control}"
+    width: "36px"
+    height: "33px"
+  workspace-tab-active:
+    backgroundColor: "var(--color-bg-overlay)"
+    textColor: "{colors.link}"
+    typography: "{typography.workspace-tab-label}"
+    rounded: "{rounded.control}"
+    height: "38px"
+    width: "248px"
+  workspace-stage:
+    backgroundColor: "{colors.neutral-bg}"
+    rounded: "{rounded.workspace-stage}"
+  workspace-stage-narrow:
+    backgroundColor: "{colors.neutral-bg}"
+    rounded: "{rounded.workspace-stage-narrow}"
+  workspace-empty-action:
+    backgroundColor: "transparent"
+    textColor: "{colors.foreground-secondary}"
+    typography: "{typography.workspace-action-label}"
+    rounded: "{rounded.workspace-action}"
+    padding: "8px 14px"
+  workspace-keycap:
+    backgroundColor: "{colors.surface-low}"
+    textColor: "{colors.foreground-secondary}"
+    typography: "{typography.workspace-keycap}"
+    rounded: "{rounded.workspace-keycap}"
+    padding: "3px 7px"
+  workspace-search:
+    backgroundColor: "transparent"
+    textColor: "{colors.foreground-strong}"
+    rounded: "{rounded.workspace-control}"
+    padding: "7px 9px"
 ---
 
 # Design System: Synapse
@@ -299,11 +376,14 @@ The implemented All Notes library supplies a second scoped extension, evidenced 
 
 The implemented Files and Trash workspace supplies a scoped extension, evidenced by `src/components/fileBrowser.css`, the shared `FileBrowser` and the finished dark desktop, narrow and Trash captures. Its `files-` entries record a dense work table, a current-folder route, selection actions and a collapsible properties region. It inherits the same Inter family, dark surfaces and violet interaction states. Surface direction and delegated-choice provenance stay in `.impeccable/surfaces/src-components-filesview-tsx.md`; operation details stay in `docs/FILES_BROWSER.md`.
 
+The implemented workspace shell supplies an approved shell extension, evidenced by `src/components/workspace.css`, `WorkspaceChrome`, `Sidebar`, and the finished desktop and narrow captures. It keeps the incumbent palette while adding docked utility chrome, document tabs and a bounded active work region. The `workspace-` entries describe the shell itself; the specific Obsidian reference, pinned composition and quality bar stay in `.impeccable/surfaces/src-app-tsx.md`. Existing local views retain their own scoped systems inside the work region.
+
 **Key Characteristics:**
 
 - Dark tonal surfaces
 - Violet selection
 - Compact readable controls
+- Docked utility chrome around one active work region
 
 ## Colors
 
@@ -326,6 +406,12 @@ The local `library-muted` role mixes the existing text and background in the sou
 The local `files-muted` role carries paths, dates, type labels, counts and quiet controls. `files-folder` is the default folder outline and `files-tag` is the bounded mint membership summary. `files-danger` is the implemented fallback for destructive controls when the shell has no danger alias. The dialog scrim darkens the existing work area without changing its palette. These roles remain local to Files, Trash and their dialogs; they do not replace the shell or Tags tokens.
 
 **The Files Accent Rule.** Within Files and Trash, violet marks selection, keyboard focus, destinations and primary actions; mint identifies note tags, lavender identifies uncustomized folders, and the local danger role identifies destructive actions. Preserve user-assigned folder colors.
+
+### Workspace shell
+
+The shell uses existing semantic colors. Active document-tab text, selected search/bookmark labels and active tab-list entries use `link`; contextual text and secondary controls use `foreground-secondary`. `foreground-muted` remains for quiet outline icons. The working region uses the neutral background; its empty page and active tabs use the existing overlay surface. No reference-screenshot palette is introduced.
+
+**The Workspace Active Label Rule.** In the shell, use the existing link role for small active text and the secondary foreground for context. Keep accent fill and focus distinct from text contrast.
 
 ## Typography
 
@@ -351,9 +437,25 @@ The `files-` title roles distinguish the view from the properties heading. The m
 
 The properties heading becomes (18px) on narrow layouts, while row names become (13px). Quick-look prose uses the local reader role and a bounded measure (72ch); its Markdown headings step through (20px), (18px) and the local reader-heading role. These are Files adaptations of the incumbent Inter family, not a new global type ramp.
 
+### Workspace hierarchy
+
+The shell inherits the incumbent Inter/system family. The recorded tab-label role also describes the vault name: the rendered browser values are regular (400), with a line height of (1.55). Tree labels and empty-page actions use their own adjacent steps, while result titles, result context and keycaps retain compact roles. Search input and context headings use the existing compact interface scale (13px).
+
+The shell's button font reset wins over the single-class font-size/weight declarations on document tabs and the vault name. The workspace roles record measured browser output at (1280 × 720), rather than treating those overridden declarations as implemented typography. The inherited text stack remains unchanged.
+
 ## Layout
 
 The persistent navigation rail sits to the left of the work area. View headers and independently scrolling content regions fill the available desktop height. Current views use roughly 24–40 px outer spacing and smaller spacing within a control group.
+
+### Workspace shell
+
+The icon ribbon and the aligned sidebar, document and context headers use the workspace width/height roles. The left pane is docked and resizable on desktop, with File / Search / Bookmarks controls above a centered five-action file toolbar (48px high), independently scrolling content and a vault/help/settings footer (54px high). Its initial width follows the supplied composition at about (44.5%) of the viewport including the ribbon, subject to the source bounds; user resizing persists. Tree rows have a minimum height of (38px).
+
+The center keeps tabs above one active work region. A sole tab can grow to (410px), multiple tabs share available width around the recorded base width with a (130px) minimum, and overflow scrolls horizontally. The working region has insets of (10px left, 12px right and bottom). The empty page centers a vertical group (268px wide) with the workspace action gap and a small top offset (16px); action height is at least (40px).
+
+The optional outline/backlinks region is docked on the right at (270px). At viewport widths of (1000px) and below it becomes an overlay, bounded by `min(300px, calc(100vw - 90px))`. At (759px) and below the left pane also becomes an overlay beside the ribbon, its resize handle disappears, and a new session starts with it collapsed. The stage uses its narrow radius and insets (5px left, 7px right and bottom); tabs may shrink to (90px), and the action group is bounded by `min(250px, calc(100% - 30px))`. These viewport changes belong to the shell; the existing local views continue to use their own container queries.
+
+**The Active Work Region Rule.** Tabs retain destinations and the shell renders only the active content. Preserve the work area's available width and reachable panel controls when either side pane collapses or overlays it.
 
 ### Tags finder
 
@@ -389,6 +491,10 @@ All Notes cards use tonal fill and a thin border at rest, with no card shadow. H
 
 Files and Trash rows are flat at rest, separated by fine rules. Hover changes tone; selected rows gain violet fill and an inset stroke, while the active keyboard row has an inset violet focus outline. Ordinary work regions have no decorative shadow. Structural depth is reserved for the narrow properties overlay (`-12px 0 30px rgba(0,0,0,.25)`), action menu (`0 10px 32px rgba(0,0,0,.42)`) and dialog (`0 18px 60px rgba(0,0,0,.45)`). Files buttons use a short background response (120ms); the reduced-motion preference removes it.
 
+Workspace work regions and rows are flat at rest, using tonal fills and thin borders. Structural depth appears only on the tab-list menu (`0 10px 30px rgba(0,0,0,.3)`), help dialog (`0 14px 45px rgba(0,0,0,.35)`) and overlapping side panes (`6px 4px 22px rgba(0,0,0,.24)` on the left, `-6px 4px 22px rgba(0,0,0,.24)` on the right). Workspace icon background/color responses last (120ms), with transitions removed by the reduced-motion preference. Outline jumps also respect that preference.
+
+The application shell and top-level workspace content remain visible from their first render. Route changes do not wait for an exit animation or background RAF; the editor key stays stable across note selections. Loading uses the existing readable secondary text token.
+
 ## Shapes
 
 Controls are gently rounded, note cards have the existing card radius, and the recorded pill primitive remains available to incumbent surfaces. Lucide outline icons carry a consistent stroke.
@@ -398,6 +504,8 @@ Tags uses a nested compact corner vocabulary: small checks, dismiss controls and
 All Notes reuses the established card radius. Its search, filters and primary action use `library-control`; checkbox/favorite controls use `library-detail`; footer tags and the eye action use `library-tag`. Rounded corners bound useful note content, with no empty decorative cover panel for a note that has no cover.
 
 Files reuses the control radius for search, named actions, route buttons and the selection strip, and the card radius for dialogs. The local `files-detail` step bounds checks, tag summaries and small scope controls; `files-icon` bounds icon actions, folder-picker rows and quick-look code blocks; `files-menu` bounds the floating action menu. Table rows keep square aligned edges. Lucide outline folder/note icons remain visible even when secondary columns are hidden.
+
+The workspace has a deliberate nested silhouette: the large working-region radius, its narrow adaptation and the action-pill radius belong to the shell extension. Keycaps use `workspace-keycap`; compact icon/search/result controls use `workspace-control`; tab-close, menu rows and outline rows use `workspace-detail`; the tab-list menu uses `workspace-menu`. Document tabs retain the incumbent control radius, and the help dialog retains the card radius. These shape roles do not enlarge the corners of Tags, Files/Trash or library controls.
 
 ## Components
 
@@ -445,6 +553,18 @@ Properties shows the selected item or aggregate, real location and metadata; wit
 
 Creation and rename dialogs use a labeled name field and inline validation. The move/navigation picker shows real folder hierarchy, a windowed destination list and an explicit destination summary; moving a folder into itself or a descendant is unavailable. Dialogs trap focus, restore their connected opener on close, and close with Escape or outside interaction when idle. Destructive confirmations explain folder contents and permanence. The full note opens through the existing editor rather than embedding an editor in the browser.
 
+### Workspace chrome and empty page
+
+The ribbon exposes existing sections and working creation/switcher actions with Lucide outline icons (18px, stroke 1.7). Icon-only controls retain translated accessible labels, hover tone and visible inset focus (2px). Left-pane File / Search / Bookmarks controls and right-pane Outline / Backlinks controls show the active state. Document tabs provide selection, close, reorder and overflow-list actions; an empty last-tab replacement retains a reachable path to content.
+
+The empty page contains four real actions: new note, a note with the existing data-table block, a note with the existing whiteboard block, and file switcher. Their pills use the local shape role, thin borders and secondary text; hover raises surface and border contrast. Shortcut keycaps are ancillary labels, not substitutes for action text.
+
+### Workspace context and navigation
+
+The outline reflects actual Markdown headings, including formatting and repeated labels. Selecting an occurrence reaches that occurrence in reading mode; source mode selects its exact Markdown line. Backlinks reuse the existing note relationship component. Empty/no-heading context is explained with visible text.
+
+Tab navigation flushes pending saves before changing active content or closing the active tab. Session persistence contains tab IDs and destinations plus separate shell preferences, never document bodies. Preserve translated labels, independent pane scrolling and the existing note/editor routes.
+
 ## Do's and Don'ts
 
 - Do use the semantic CSS variables and the existing icon family.
@@ -461,6 +581,9 @@ Creation and rename dialogs use a labeled name field and inline validation. The 
 - Do keep the current folder route and selection actions reachable in narrow Files layouts.
 - Do preserve fixed row bounds, folders-first ordering and mounted keyboard targets in Files and Trash.
 - Do load Files quick look only on request and describe Trash dates as modification dates.
+- Do keep workspace geometry and shape roles scoped to the shell while retaining each local view's container behavior.
+- Do use the existing link and secondary foreground roles for workspace text states.
+- Do keep shell controls reachable when panels collapse and preserve save-before-navigation behavior.
 - Don't let a local feature silently change the global palette or typography.
 - Don't impose decorative image covers or motion on dense note indexes.
 - Don't turn preview tag actions into note edits or load image covers while filtering Tags.
