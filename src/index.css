@@ -750,26 +750,26 @@ input:focus-visible {
 /* Блок встроенной базы данных (dataTable) - построен на div-сетке (без тега <table>: см. DataTableView). */
 /* Ограничиваем таблицу шириной заметки (по аналогии с фиксом для коллаутов): сам блок
    является флекс-элементом внутри `.bn-block-content` с `min-width: auto`. Без этого ограничения
-   широкая сетка растянет весь редактор целиком вместо того, чтобы скроллиться внутри `.e26-db__scroll`. */
+   сетка должна оставаться в ширине заметки, а длинный текст увеличивать высоту строк. */
 .bn-block-content[data-content-type="dataTable"],
 .bn-block-content[data-content-type="dataTable"] > * {
   min-width: 0;
 }
 .e26-db {
   margin: 8px 0;
+  width: 100%;
   min-width: 0;
   max-width: 100%;
   font-size: 13px;
 }
 .e26-db__scroll {
-  overflow-x: auto;
-  padding-bottom: 2px;
+  min-width: 0;
 }
 .e26-db__grid {
   display: grid;
   gap: 1px;
-  width: max-content;
-  min-width: 100%;
+  width: 100%;
+  min-width: 0;
   background: var(--color-border, rgba(255, 255, 255, 0.1));
   border: 1px solid var(--color-border, rgba(255, 255, 255, 0.1));
   border-radius: 10px;
@@ -780,17 +780,22 @@ input:focus-visible {
   flex: 1;
   min-width: 0;
 }
-.e26-db__text > input,
+.e26-db__text > textarea,
 .e26-db__measure {
   grid-area: 1 / 1;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
-.e26-db__text > input {
+.e26-db__text > textarea {
   min-width: 0;
   width: 100%;
+  height: 100%;
+  resize: none;
+  overflow: hidden;
 }
 .e26-db__text > .e26-db__measure {
-  width: max-content;
-  white-space: pre;
+  width: auto;
   visibility: hidden;
   pointer-events: none;
   user-select: none;
@@ -798,15 +803,23 @@ input:focus-visible {
 .e26-db__h {
   position: relative;
   display: flex;
-  align-items: center;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  align-content: flex-start;
   gap: 4px;
-  height: 36px;
-  padding: 0 4px 0 8px;
+  min-width: 0;
+  min-height: 36px;
+  padding: 6px 4px 6px 8px;
   background: rgba(255, 255, 255, 0.045);
+}
+.e26-db__h .e26-db__text {
+  flex-basis: 60px;
+  max-width: 100%;
 }
 .e26-db__htype {
   display: inline-flex;
   flex-shrink: 0;
+  margin-top: 3px;
   color: var(--color-text-secondary);
   opacity: 0.8;
 }
@@ -901,6 +914,7 @@ input:focus-visible {
 }
 .e26-db__cellinput,
 .e26-db__date {
+  min-width: 0;
   width: 100%;
   padding: 6px 8px;
   background: transparent;

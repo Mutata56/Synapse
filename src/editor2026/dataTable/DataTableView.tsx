@@ -43,7 +43,10 @@ export function DataTableView({ block, editor }: { block: any; editor: any }) {
   const [menu, setMenu] = useState<{ colId: string; x: number; y: number } | null>(
     null,
   );
-  const [drag, setDrag] = useState<{ colId: string; startX: number; startW: number; w: number } | null>(null);
+  const [drag, setDrag] = useState<{
+    colId: string; nextId: string; startX: number; startW: number;
+    startNextW: number; scale: number; w: number; nextW: number;
+  } | null>(null);
 
   const commit = (next: DataTableModel) =>
     editor.updateBlock(block, {
@@ -118,28 +121,44 @@ export function DataTableView({ block, editor }: { block: any; editor: any }) {
 
   // ресайз: превью локально, коммит один раз на pointer-up
   const onResizeDown = (e: React.PointerEvent, col: DataColumn) => {
+    const next = model.columns[model.columns.findIndex(c => c.id === col.id) + 1];
+    if (!next) return;
     e.preventDefault();
     e.stopPropagation();
     (e.target as HTMLElement).setPointerCapture(e.pointerId);
-    const startW = e.currentTarget.parentElement?.getBoundingClientRect().width ?? col.width;
-    setDrag({ colId: col.id, startX: e.clientX, startW, w: startW });
+    const grid = e.currentTarget.closest(".e26-db__grid") as HTMLElement;
+    const available = Math.max(1, grid.clientWidth - 40 - model.columns.length);
+    const total = model.columns.reduce((sum, c) => sum + c.width, 0);
+    setDrag({ colId: col.id, nextId: next.id, startX: e.clientX,
+      startW: col.width, startNextW: next.width, scale: total / available,
+      w: col.width, nextW: next.width });
   };
-  const onResizeMove = (e: React.PointerEvent) =>
-    setDrag((d) =>
-      d ? { ...d, w: Math.min(720, Math.max(80, d.startW + (e.clientX - d.startX))) } : d,
-    );
+  const onResizeMove = (e: React.PointerEvent) => {
+    const clientX = e.clientX;
+    setDrag(d => {
+      if (!d) return d;
+      // Move the shared boundary: the adjacent column yields the same space,
+      // so neither dragging nor saved widths can push columns off screen.
+      const minDelta = Math.max(64 - d.startW, d.startNextW - 720);
+      const maxDelta = Math.min(720 - d.startW, d.startNextW - 64);
+      const delta = Math.min(maxDelta, Math.max(minDelta,
+        Math.round((clientX - d.startX) * d.scale)));
+      return { ...d, w: d.startW + delta, nextW: d.startNextW - delta };
+    });
+  };
   const onResizeUp = () => {
     if (drag)
       commit({
         ...model,
         columns: model.columns.map((c) =>
-          c.id === drag.colId ? { ...c, width: drag.w } : c,
+          c.id === drag.colId ? { ...c, width: drag.w }
+            : c.id === drag.nextId ? { ...c, width: drag.nextW } : c,
         ),
       });
     setDrag(null);
   };
-  const widthOf = (col: DataColumn) =>
-    drag && drag.colId === col.id ? drag.w : col.width;
+  const widthOf = (col: DataColumn) => drag?.colId === col.id ? drag.w
+    : drag?.nextId === col.id ? drag.nextW : col.width;
 
   // закрытие меню колонки по клику снаружи / Esc
   useEffect(() => {
@@ -163,7 +182,7 @@ export function DataTableView({ block, editor }: { block: any; editor: any }) {
   };
 
   const gridTemplateColumns =
-    model.columns.map((c) => `minmax(${widthOf(c)}px, max-content)`).join(" ") + " 40px";
+    model.columns.map((c) => `minmax(0, ${widthOf(c)}fr)`).join(" ") + " 40px";
   const menuCol = menu ? model.columns.find((c) => c.id === menu.colId) : undefined;
 
   return (
@@ -171,7 +190,7 @@ export function DataTableView({ block, editor }: { block: any; editor: any }) {
       <div className="e26-db__scroll">
         <div className="e26-db__grid" style={{ gridTemplateColumns }}>
           {/* заголовки */}
-          {model.columns.map((col) => (
+          {model.columns.map((col, index) => (
             <div className="e26-db__h" key={`h:${col.id}`}>
               <span className="e26-db__htype" title={TYPE_META[col.type].label}>
                 {TYPE_META[col.type].icon}
@@ -206,12 +225,13 @@ export function DataTableView({ block, editor }: { block: any; editor: any }) {
               >
                 <MoreHorizontal size={14} />
               </button>
-              <span
+              {index < model.columns.length - 1 && <span
                 className="e26-db__resize"
                 onPointerDown={(e) => onResizeDown(e, col)}
                 onPointerMove={onResizeMove}
                 onPointerUp={onResizeUp}
-              />
+                onPointerCancel={() => setDrag(null)}
+              />}
             </div>
           ))}
           <div className="e26-db__hadd" key="h:add">
@@ -306,14 +326,14 @@ function CellText({
   }, [value]);
   return (
     <div className="e26-db__text">
-      {/* Native inputs have no intrinsic width for their value. The hidden
-          mirror lets CSS size the whole column, including uncommitted edits. */}
+      {/* The hidden mirror wraps at the column width and sizes the row height
+          while typing, without measuring or saving on each keystroke. */}
       <span className={`${className} e26-db__measure`} aria-hidden="true">
-        {draft || placeholder || "\u00a0"}
+        {(draft || placeholder || "") + "\u00a0"}
       </span>
-      <input
+      <textarea
         className={className}
-        size={1}
+        rows={1}
         placeholder={placeholder}
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
@@ -321,7 +341,10 @@ function CellText({
           if (draft !== value) onCommit(draft);
         }}
         onKeyDown={(e) => {
-          if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+          if (e.key === "Enter" && !e.nativeEvent.isComposing) {
+            e.preventDefault();
+            e.currentTarget.blur();
+          }
         }}
       />
     </div>
