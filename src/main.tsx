@@ -1,15 +1,14 @@
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import React, { lazy, Suspense } from "react";
+import React from "react";
 import ReactDOM from "react-dom/client";
-import { CaptureWindow } from "./components/CaptureWindow";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { LanguageProvider } from "./components/LanguageProvider";
 import { t } from "./lib/i18n";
 
-// The hidden capture webview does not need the application/editor module graph.
-const App = lazy(() => import("./App"));
+const App = React.lazy(() => import("./App"));
+const CaptureWindow = React.lazy(() => import("./components/CaptureWindow").then(module => ({ default: module.CaptureWindow })));
 function StartupLoading() {
-  return <div role="status" className="flex h-screen items-center justify-center text-sm text-neutral-400">{t("Загрузка…")}</div>;
+  return <div role="status" className="h-screen grid place-items-center text-sm text-[var(--text-secondary)]">{t("Загрузка…")}</div>;
 }
 
 
@@ -98,7 +97,9 @@ ReactDOM.createRoot(container).render(
   <React.StrictMode>
     <ErrorBoundary>
       <LanguageProvider>
-        {isCaptureWindow ? <CaptureWindow /> : <Suspense fallback={<StartupLoading />}><App /></Suspense>}
+        <React.Suspense fallback={<StartupLoading />}>
+          {isCaptureWindow ? <CaptureWindow /> : <App />}
+        </React.Suspense>
       </LanguageProvider>
     </ErrorBoundary>
   </React.StrictMode>,

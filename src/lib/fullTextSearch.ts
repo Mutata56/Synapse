@@ -81,18 +81,16 @@ function bodyFor(note: NoteMeta): Promise<CachedBody> {
   if (cached?.updatedAt === note.updatedAt) return Promise.resolve(cached);
   const current = pendingBodies.get(note.id);
   if (current?.updatedAt === note.updatedAt) return current.request;
-  const pending: PendingBody = {
-    updatedAt: note.updatedAt,
-    request: Promise.resolve().then(async () => {
+  const pending: PendingBody = { updatedAt: note.updatedAt, request: null! };
+  pending.request = (async () => {
       const full = await readNote(note.id);
       const body = full?.content ?? "";
       const value = { updatedAt: note.updatedAt, body, bodyLower: body.toLowerCase() };
-      if (pendingBodies.get(note.id) === pending) bodyCache.set(note.id, value);
+      if (full && pendingBodies.get(note.id) === pending) bodyCache.set(note.id, value);
       return value;
-    }).finally(() => {
+    })().finally(() => {
       if (pendingBodies.get(note.id) === pending) pendingBodies.delete(note.id);
-    }),
-  };
+    });
   pendingBodies.set(note.id, pending);
   return pending.request;
 }
@@ -195,7 +193,7 @@ export async function wordCountsFor(notes: NoteMeta[]): Promise<WordEntry[]> {
     const value = await bodyFor(note);
     const cached = wordCountCache.get(note.id);
     const words = cached?.updatedAt === note.updatedAt ? cached.words : countWords(value.body);
-    if (bodyCache.get(note.id)?.updatedAt === note.updatedAt) wordCountCache.set(note.id, { updatedAt: note.updatedAt, words });
+    if (bodyCache.get(note.id) === value) wordCountCache.set(note.id, { updatedAt: note.updatedAt, words });
     out.push({ createdAt: note.createdAt, words });
   });
 
