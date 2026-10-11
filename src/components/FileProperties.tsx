@@ -1,20 +1,15 @@
-import { Copy, ExternalLink, FileText, Folder, Hash, PanelRightClose, RotateCcw, Trash2, Eye } from "lucide-react";
-import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { Copy, ExternalLink, FileText, Folder, Hash, PanelRightClose, RotateCcw, Trash2 } from "lucide-react";
+import { useMemo } from "react";
 import { pluralRu } from "../lib/format";
 import type { FileEntry, FileIndex } from "../lib/fileBrowser";
 import { useI18n } from "./LanguageProvider";
 
-const QuickPreview = lazy(() => import("./FileQuickPreview"));
-type Props = { mode: "files" | "trash"; items: FileEntry[]; index: FileIndex; folder: string; busy: boolean; onClose: () => void; onOpen: (entry: FileEntry) => void; onMove: () => void; onTrash: () => void; onRestore: () => void; onDelete: () => void; onCopy: () => void; read: (id: string) => Promise<string>; previewKey: string };
+type Props = { mode: "files" | "trash"; items: FileEntry[]; index: FileIndex; folder: string; busy: boolean; onClose: () => void; onOpen: (entry: FileEntry) => void; onMove: () => void; onTrash: () => void; onRestore: () => void; onDelete: () => void; onCopy: () => void };
 
-export function FileProperties({ mode, items, index, folder, busy, onClose, onOpen, onMove, onTrash, onRestore, onDelete, onCopy, read, previewKey }: Props) {
+export function FileProperties({ mode, items, index, folder, busy, onClose, onOpen, onMove, onTrash, onRestore, onDelete, onCopy }: Props) {
   const { t, lang } = useI18n();
-  const [peek, setPeek] = useState(false);
   const rootName = mode === "files" ? t("Хранилище") : t("Корзина");
   const single = items.length === 1 ? items[0] : undefined;
-  useEffect(() => setPeek(false), [single?.key]);
-  useEffect(() => { setPeek(!!single && previewKey === single.key); }, [previewKey, single?.key]);
-  const readPreview = useCallback((id: string) => read(id.slice(id.indexOf(":") + 1)), [read]);
   const data = useMemo(() => {
     const parents = new Set(items.map(item => item.parent));
     const notes = items.filter(item => item.kind === "note").length;
@@ -39,6 +34,5 @@ export function FileProperties({ mode, items, index, folder, busy, onClose, onOp
       {single && mode === "files" && <button type="button" className="fs-text-button" disabled={busy} onClick={() => onOpen(single)}><ExternalLink size={13} />{single.kind === "folder" ? t("Открыть папку") : t("Открыть заметку")}</button>}
     </section>
     {data.tags.length > 0 && <section><h3>{t("Теги")} ({data.tags.length})</h3><div className="fs-properties-tags">{data.tags.slice(0, 8).map(tag => <span className="fs-tag" key={tag}><Hash size={12} />{tag.replace(/^#/, "")}</span>)}{data.tags.length > 8 && <span>+{data.tags.length - 8}</span>}</div></section>}
-    {single?.kind === "note" && <section><button type="button" className="fs-text-button" aria-expanded={peek} onClick={() => setPeek(value => !value)}><Eye size={14} />{peek ? t("Скрыть просмотр") : t("Быстрый просмотр")}</button>{peek && <Suspense fallback={<p role="status">{t("Загрузка…")}</p>}><QuickPreview id={`${mode}:${single.path}`} revision={single.modified} read={readPreview} /></Suspense>}</section>}
   </aside>;
 }
