@@ -350,6 +350,426 @@
           "oklch(0.8357 0.00344 286.31)",
           "oklch(0.9500 0.00344 286.31)"
         ]
+      },
+      "anu-rosewater": {
+        "role": "secondary",
+        "displayName": "AnuPpuccin Rosewater",
+        "tonalRamp": [
+          "oklch(0.1500 0.08073 68.24)",
+          "oklch(0.2643 0.08073 68.24)",
+          "oklch(0.3786 0.08073 68.24)",
+          "oklch(0.4929 0.08073 68.24)",
+          "oklch(0.6071 0.08073 68.24)",
+          "oklch(0.7214 0.08073 68.24)",
+          "oklch(0.8357 0.08073 68.24)",
+          "oklch(0.9500 0.08073 68.24)"
+        ]
+      },
+      "anu-flamingo": {
+        "role": "primary",
+        "displayName": "AnuPpuccin Flamingo",
+        "tonalRamp": [
+          "oklch(0.1500 0.07222 43.38)",
+          "oklch(0.2643 0.07222 43.38)",
+          "oklch(0.3786 0.07222 43.38)",
+          "oklch(0.4929 0.07222 43.38)",
+          "oklch(0.6071 0.07222 43.38)",
+          "oklch(0.7214 0.07222 43.38)",
+          "oklch(0.8357 0.07222 43.38)",
+          "oklch(0.9500 0.07222 43.38)"
+        ]
+      },
+      "anu-pink": {
+        "role": "secondary",
+        "displayName": "AnuPpuccin Pink",
+        "tonalRamp": [
+          "oklch(0.1500 0.14531 318.65)",
+          "oklch(0.2643 0.14531 318.65)",
+          "oklch(0.3786 0.14531 318.65)",
+          "oklch(0.4929 0.14531 318.65)",
+          "oklch(0.6071 0.14531 318.65)",
+          "oklch(0.7214 0.14531 318.65)",
+          "oklch(0.8357 0.14531 318.65)",
+          "oklch(0.9500 0.14531 318.65)"
+        ]
+      },
+      "anu-mauve": {
+        "role": "secondary",
+        "displayName": "AnuPpuccin Mauve",
+        "tonalRamp": [
+          "oklch(0.1500 0.14855 301.88)",
+          "oklch(0.2643 0.14855 301.88)",
+          "oklch(0.3786 0.14855 301.88)",
+          "oklch(0.4929 0.14855 301.88)",
+          "oklch(0.6071 0.14855 301.88)",
+          "oklch(0.7214 0.14855 301.88)",
+          "oklch(0.8357 0.14855 301.88)",
+          "oklch(0.9500 0.14855 301.88)"
+        ]
+      },
+      "anu-red": {
+        "role": "secondary",
+        "displayName": "AnuPpuccin Red",
+        "tonalRamp": [
+          "oklch(0.1500 0.20633 24.43)",
+          "oklch(0.2643 0.20633 24.43)",
+          "oklch(0.3786 0.20633 24.43)",
+          "oklch(0.4929 0.20633 24.43)",
+          "oklch(0.6071 0.20633 24.43)",
+          "oklch(0.7214 0.20633 24.43)",
+          "oklch(0.8357 0.20633 24.43)",
+          "oklch(0.9500 0.20633 24.43)"
+        ]
+      },
+      "anu-maroon": {
+        "role": "secondary",
+        "displayName": "AnuPpuccin Maroon",
+        "tonalRamp": [
+          "oklch(0.1500 0.15983 22.38)",
+          "oklch(0.2643 0.15983 22.38)",
+          "oklch(0.3786 0.15983 22.38)",
+          "oklch(0.4929 0.15983 22.38)",
+          "oklch(0.6071 0.15983 22.38)",
+          "oklch(0.7214 0.15983 22.38)",
+          "oklch(0.8357 0.15983 22.38)",
+          "oklch(0.9500 0.15983 22.38)"
+        ]
+      },
+      "anu-peach": {
+        "role": "secondary",
+        "displayName": "AnuPpuccin Peach",
+        "tonalRamp": [
+          "oklch(0.1500 0.12413 66.56)",
+          "oklch(0.2643 0.12413 66.56)",
+          "oklch(0.3786 0.12413 66.56)",
+          "oklch(0.4929 0.12413 66.56)",
+          "oklch(0.6071 0.12413 66.56)",
+          "oklch(0.7214 0.12413 66.56)",
+          "oklch(0.8357 0.12413 66.56)",
+          "oklch(0.9500 0.12413 66.56)"
+        ]
+      },
+      "anu-yellow": {
+        "role": "secondary",
+        "displayName": "AnuPpuccin Yellow",
+        "tonalRamp": [
+          "oklch(0.1500 0.13425 112.76)",
+          "oklch(0.2643 0.13425 112.76)",
+          "oklch(0.3786 0.13425 112.76)",
+          "oklch(0.4929 0.13425 112.76)",
+          "oklch(0.6071 0.13425 112.76)",
+          "oklch(0.7214 0.13425 112.76)",
+          "oklch(0.8357 0.13425 112.76)",
+          "oklch(0.9500 0.13425 112.76)"
+        ]
+      },
+      "anu-green": {
+        "role": "secondary",
+        "displayName": "AnuPpuccin Green",
+        "tonalRamp": [
+          "oklch(0.1500 0.21952 148.02)",
+          "oklch(0.2643 0.21952 148.02)",
+          "oklch(0.3786 0.21952 148.02)",
+          "oklch(0.4929 0.21952 148.02)",
+          "oklch(0.6071 0.21952 148.02)",
+          "oklch(0.7214 0.21952 148.02)",
+          "oklch(0.8357 0.21952 148.02)",
+          "oklch(0.9500 0.21952 148.02)"
+        ]
+      },
+      "anu-teal": {
+        "role": "secondary",
+        "displayName": "AnuPpuccin Teal",
+        "tonalRamp": [
+          "oklch(0.1500 0.10532 189.21)",
+          "oklch(0.2643 0.10532 189.21)",
+          "oklch(0.3786 0.10532 189.21)",
+          "oklch(0.4929 0.10532 189.21)",
+          "oklch(0.6071 0.10532 189.21)",
+          "oklch(0.7214 0.10532 189.21)",
+          "oklch(0.8357 0.10532 189.21)",
+          "oklch(0.9500 0.10532 189.21)"
+        ]
+      },
+      "anu-sky": {
+        "role": "secondary",
+        "displayName": "AnuPpuccin Sky",
+        "tonalRamp": [
+          "oklch(0.1500 0.09338 212.85)",
+          "oklch(0.2643 0.09338 212.85)",
+          "oklch(0.3786 0.09338 212.85)",
+          "oklch(0.4929 0.09338 212.85)",
+          "oklch(0.6071 0.09338 212.85)",
+          "oklch(0.7214 0.09338 212.85)",
+          "oklch(0.8357 0.09338 212.85)",
+          "oklch(0.9500 0.09338 212.85)"
+        ]
+      },
+      "anu-sapphire": {
+        "role": "secondary",
+        "displayName": "AnuPpuccin Sapphire",
+        "tonalRamp": [
+          "oklch(0.1500 0.10754 230.23)",
+          "oklch(0.2643 0.10754 230.23)",
+          "oklch(0.3786 0.10754 230.23)",
+          "oklch(0.4929 0.10754 230.23)",
+          "oklch(0.6071 0.10754 230.23)",
+          "oklch(0.7214 0.10754 230.23)",
+          "oklch(0.8357 0.10754 230.23)",
+          "oklch(0.9500 0.10754 230.23)"
+        ]
+      },
+      "anu-blue": {
+        "role": "secondary",
+        "displayName": "AnuPpuccin Blue",
+        "tonalRamp": [
+          "oklch(0.1500 0.14943 268.32)",
+          "oklch(0.2643 0.14943 268.32)",
+          "oklch(0.3786 0.14943 268.32)",
+          "oklch(0.4929 0.14943 268.32)",
+          "oklch(0.6071 0.14943 268.32)",
+          "oklch(0.7214 0.14943 268.32)",
+          "oklch(0.8357 0.14943 268.32)",
+          "oklch(0.9500 0.14943 268.32)"
+        ]
+      },
+      "anu-lavender": {
+        "role": "secondary",
+        "displayName": "AnuPpuccin Lavender",
+        "tonalRamp": [
+          "oklch(0.1500 0.11982 314.19)",
+          "oklch(0.2643 0.11982 314.19)",
+          "oklch(0.3786 0.11982 314.19)",
+          "oklch(0.4929 0.11982 314.19)",
+          "oklch(0.6071 0.11982 314.19)",
+          "oklch(0.7214 0.11982 314.19)",
+          "oklch(0.8357 0.11982 314.19)",
+          "oklch(0.9500 0.11982 314.19)"
+        ]
+      },
+      "anu-text": {
+        "role": "neutral",
+        "displayName": "AnuPpuccin Text",
+        "tonalRamp": [
+          "oklch(0.1500 0.00791 106.55)",
+          "oklch(0.2643 0.00791 106.55)",
+          "oklch(0.3786 0.00791 106.55)",
+          "oklch(0.4929 0.00791 106.55)",
+          "oklch(0.6071 0.00791 106.55)",
+          "oklch(0.7214 0.00791 106.55)",
+          "oklch(0.8357 0.00791 106.55)",
+          "oklch(0.9500 0.00791 106.55)"
+        ]
+      },
+      "anu-subtext1": {
+        "role": "neutral",
+        "displayName": "AnuPpuccin Subtext 1",
+        "tonalRamp": [
+          "oklch(0.1500 0.01896 106.79)",
+          "oklch(0.2643 0.01896 106.79)",
+          "oklch(0.3786 0.01896 106.79)",
+          "oklch(0.4929 0.01896 106.79)",
+          "oklch(0.6071 0.01896 106.79)",
+          "oklch(0.7214 0.01896 106.79)",
+          "oklch(0.8357 0.01896 106.79)",
+          "oklch(0.9500 0.01896 106.79)"
+        ]
+      },
+      "anu-subtext0": {
+        "role": "neutral",
+        "displayName": "AnuPpuccin Subtext 0",
+        "tonalRamp": [
+          "oklch(0.1500 0.01382 106.71)",
+          "oklch(0.2643 0.01382 106.71)",
+          "oklch(0.3786 0.01382 106.71)",
+          "oklch(0.4929 0.01382 106.71)",
+          "oklch(0.6071 0.01382 106.71)",
+          "oklch(0.7214 0.01382 106.71)",
+          "oklch(0.8357 0.01382 106.71)",
+          "oklch(0.9500 0.01382 106.71)"
+        ]
+      },
+      "anu-overlay2": {
+        "role": "neutral",
+        "displayName": "AnuPpuccin Overlay 2",
+        "tonalRamp": [
+          "oklch(0.1500 0.03590 277.89)",
+          "oklch(0.2643 0.03590 277.89)",
+          "oklch(0.3786 0.03590 277.89)",
+          "oklch(0.4929 0.03590 277.89)",
+          "oklch(0.6071 0.03590 277.89)",
+          "oklch(0.7214 0.03590 277.89)",
+          "oklch(0.8357 0.03590 277.89)",
+          "oklch(0.9500 0.03590 277.89)"
+        ]
+      },
+      "anu-overlay1": {
+        "role": "neutral",
+        "displayName": "AnuPpuccin Overlay 1",
+        "tonalRamp": [
+          "oklch(0.1500 0.04818 278.98)",
+          "oklch(0.2643 0.04818 278.98)",
+          "oklch(0.3786 0.04818 278.98)",
+          "oklch(0.4929 0.04818 278.98)",
+          "oklch(0.6071 0.04818 278.98)",
+          "oklch(0.7214 0.04818 278.98)",
+          "oklch(0.8357 0.04818 278.98)",
+          "oklch(0.9500 0.04818 278.98)"
+        ]
+      },
+      "anu-overlay0": {
+        "role": "neutral",
+        "displayName": "AnuPpuccin Overlay 0",
+        "tonalRamp": [
+          "oklch(0.1500 0.03892 277.43)",
+          "oklch(0.2643 0.03892 277.43)",
+          "oklch(0.3786 0.03892 277.43)",
+          "oklch(0.4929 0.03892 277.43)",
+          "oklch(0.6071 0.03892 277.43)",
+          "oklch(0.7214 0.03892 277.43)",
+          "oklch(0.8357 0.03892 277.43)",
+          "oklch(0.9500 0.03892 277.43)"
+        ]
+      },
+      "anu-surface2": {
+        "role": "neutral",
+        "displayName": "AnuPpuccin Surface 2",
+        "tonalRamp": [
+          "oklch(0.1500 0.03216 277.83)",
+          "oklch(0.2643 0.03216 277.83)",
+          "oklch(0.3786 0.03216 277.83)",
+          "oklch(0.4929 0.03216 277.83)",
+          "oklch(0.6071 0.03216 277.83)",
+          "oklch(0.7214 0.03216 277.83)",
+          "oklch(0.8357 0.03216 277.83)",
+          "oklch(0.9500 0.03216 277.83)"
+        ]
+      },
+      "anu-surface1": {
+        "role": "neutral",
+        "displayName": "AnuPpuccin Surface 1",
+        "tonalRamp": [
+          "oklch(0.1500 0.02975 276.96)",
+          "oklch(0.2643 0.02975 276.96)",
+          "oklch(0.3786 0.02975 276.96)",
+          "oklch(0.4929 0.02975 276.96)",
+          "oklch(0.6071 0.02975 276.96)",
+          "oklch(0.7214 0.02975 276.96)",
+          "oklch(0.8357 0.02975 276.96)",
+          "oklch(0.9500 0.02975 276.96)"
+        ]
+      },
+      "anu-surface0": {
+        "role": "neutral",
+        "displayName": "AnuPpuccin Surface 0",
+        "tonalRamp": [
+          "oklch(0.1500 0.02679 278.84)",
+          "oklch(0.2643 0.02679 278.84)",
+          "oklch(0.3786 0.02679 278.84)",
+          "oklch(0.4929 0.02679 278.84)",
+          "oklch(0.6071 0.02679 278.84)",
+          "oklch(0.7214 0.02679 278.84)",
+          "oklch(0.8357 0.02679 278.84)",
+          "oklch(0.9500 0.02679 278.84)"
+        ]
+      },
+      "anu-base": {
+        "role": "neutral",
+        "displayName": "AnuPpuccin Base",
+        "tonalRamp": [
+          "oklch(0.1500 0.02210 277.51)",
+          "oklch(0.2643 0.02210 277.51)",
+          "oklch(0.3786 0.02210 277.51)",
+          "oklch(0.4929 0.02210 277.51)",
+          "oklch(0.6071 0.02210 277.51)",
+          "oklch(0.7214 0.02210 277.51)",
+          "oklch(0.8357 0.02210 277.51)",
+          "oklch(0.9500 0.02210 277.51)"
+        ]
+      },
+      "anu-mantle": {
+        "role": "neutral",
+        "displayName": "AnuPpuccin Mantle",
+        "tonalRamp": [
+          "oklch(0.1500 0.01884 280.49)",
+          "oklch(0.2643 0.01884 280.49)",
+          "oklch(0.3786 0.01884 280.49)",
+          "oklch(0.4929 0.01884 280.49)",
+          "oklch(0.6071 0.01884 280.49)",
+          "oklch(0.7214 0.01884 280.49)",
+          "oklch(0.8357 0.01884 280.49)",
+          "oklch(0.9500 0.01884 280.49)"
+        ]
+      },
+      "anu-crust": {
+        "role": "neutral",
+        "displayName": "AnuPpuccin Crust",
+        "tonalRamp": [
+          "oklch(0.1500 0.01559 279.46)",
+          "oklch(0.2643 0.01559 279.46)",
+          "oklch(0.3786 0.01559 279.46)",
+          "oklch(0.4929 0.01559 279.46)",
+          "oklch(0.6071 0.01559 279.46)",
+          "oklch(0.7214 0.01559 279.46)",
+          "oklch(0.8357 0.01559 279.46)",
+          "oklch(0.9500 0.01559 279.46)"
+        ]
+      },
+      "anu-surface-overlay": {
+        "role": "neutral",
+        "displayName": "AnuPpuccin Surface Overlay",
+        "tonalRamp": [
+          "oklch(0.1500 0.00791 106.55 / 0.075)",
+          "oklch(0.2643 0.00791 106.55 / 0.075)",
+          "oklch(0.3786 0.00791 106.55 / 0.075)",
+          "oklch(0.4929 0.00791 106.55 / 0.075)",
+          "oklch(0.6071 0.00791 106.55 / 0.075)",
+          "oklch(0.7214 0.00791 106.55 / 0.075)",
+          "oklch(0.8357 0.00791 106.55 / 0.075)",
+          "oklch(0.9500 0.00791 106.55 / 0.075)"
+        ]
+      },
+      "anu-quote-surface": {
+        "role": "neutral",
+        "displayName": "AnuPpuccin Quote Surface",
+        "tonalRamp": [
+          "oklch(0.1500 0.01559 279.46 / 0.5)",
+          "oklch(0.2643 0.01559 279.46 / 0.5)",
+          "oklch(0.3786 0.01559 279.46 / 0.5)",
+          "oklch(0.4929 0.01559 279.46 / 0.5)",
+          "oklch(0.6071 0.01559 279.46 / 0.5)",
+          "oklch(0.7214 0.01559 279.46 / 0.5)",
+          "oklch(0.8357 0.01559 279.46 / 0.5)",
+          "oklch(0.9500 0.01559 279.46 / 0.5)"
+        ]
+      },
+      "anu-search-hit": {
+        "role": "secondary",
+        "displayName": "AnuPpuccin Search Hit",
+        "tonalRamp": [
+          "oklch(0.1500 0.07222 43.38 / 0.4)",
+          "oklch(0.2643 0.07222 43.38 / 0.4)",
+          "oklch(0.3786 0.07222 43.38 / 0.4)",
+          "oklch(0.4929 0.07222 43.38 / 0.4)",
+          "oklch(0.6071 0.07222 43.38 / 0.4)",
+          "oklch(0.7214 0.07222 43.38 / 0.4)",
+          "oklch(0.8357 0.07222 43.38 / 0.4)",
+          "oklch(0.9500 0.07222 43.38 / 0.4)"
+        ]
+      },
+      "anu-search-hit-current": {
+        "role": "secondary",
+        "displayName": "AnuPpuccin Search Hit Current",
+        "tonalRamp": [
+          "oklch(0.1500 0.07222 43.38 / 0.6)",
+          "oklch(0.2643 0.07222 43.38 / 0.6)",
+          "oklch(0.3786 0.07222 43.38 / 0.6)",
+          "oklch(0.4929 0.07222 43.38 / 0.6)",
+          "oklch(0.6071 0.07222 43.38 / 0.6)",
+          "oklch(0.7214 0.07222 43.38 / 0.6)",
+          "oklch(0.8357 0.07222 43.38 / 0.6)",
+          "oklch(0.9500 0.07222 43.38 / 0.6)"
+        ]
       }
     },
     "typographyMeta": {
@@ -591,6 +1011,96 @@
       "tabPx": 12,
       "interfacePx": 15,
       "scaleVersion": "obsidian-live-26-v1"
+    },
+    "appearancePresets": {
+      "default": "synapse",
+      "synapse": {
+        "label": "Synapse",
+        "source": "src/index.css",
+        "description": "The incumbent palette remains the default for new and older workspaces."
+      },
+      "anuppuccin": {
+        "label": "AnuPpuccin · Dracula",
+        "source": "src/themes/anuppuccin.css",
+        "scope": ":root[data-color-theme=\"anuppuccin\"]",
+        "paletteTokens": [
+          "anu-rosewater",
+          "anu-flamingo",
+          "anu-pink",
+          "anu-mauve",
+          "anu-red",
+          "anu-maroon",
+          "anu-peach",
+          "anu-yellow",
+          "anu-green",
+          "anu-teal",
+          "anu-sky",
+          "anu-sapphire",
+          "anu-blue",
+          "anu-lavender",
+          "anu-text",
+          "anu-subtext1",
+          "anu-subtext0",
+          "anu-overlay2",
+          "anu-overlay1",
+          "anu-overlay0",
+          "anu-surface2",
+          "anu-surface1",
+          "anu-surface0",
+          "anu-base",
+          "anu-mantle",
+          "anu-crust"
+        ],
+        "surfaceBindings": {
+          "shell": "{colors.anu-crust}",
+          "headers": "{colors.anu-mantle}",
+          "work-region": "{colors.anu-base}",
+          "editor": "{colors.anu-base}",
+          "code": "{colors.anu-crust}",
+          "quote": "{colors.anu-quote-surface}",
+          "table-heading": "{colors.anu-mantle}",
+          "text": "{colors.anu-text}",
+          "secondary-text": "{colors.anu-subtext1}",
+          "quote-and-files-context": "{colors.anu-subtext0}",
+          "border": "{colors.anu-surface0}",
+          "strong-border": "{colors.anu-surface2}"
+        },
+        "initialAccent": "{colors.anu-flamingo}",
+        "accentBehavior": "Choosing a preset sets its default accent; workspace accentColor remains customizable. Runtime active-control ink selects Crust when it meets 4.5:1, then white when it meets 4.5:1, with a black/white fallback for middle luminance. The initial Flamingo uses Crust ink.",
+        "headingBindings": {
+          "h1": "{colors.anu-red}",
+          "h2": "{colors.anu-peach}",
+          "h3": "{colors.anu-green}",
+          "h4": "{colors.anu-teal}",
+          "h5": "{colors.anu-lavender}",
+          "h6": "{colors.anu-mauve}"
+        },
+        "headingDividers": "H1/H2 use a 1px currentColor rule and .2em bottom inset in full Markdown, Files Markdown and BlockNote headings. Compact Tags/library readers retain their local geometry.",
+        "folderSequence": [
+          "{colors.anu-red}",
+          "{colors.anu-maroon}",
+          "{colors.anu-peach}",
+          "{colors.anu-yellow}",
+          "{colors.anu-green}",
+          "{colors.anu-teal}",
+          "{colors.anu-sky}",
+          "{colors.anu-sapphire}",
+          "{colors.anu-blue}",
+          "{colors.anu-lavender}",
+          "{colors.anu-mauve}",
+          "{colors.anu-pink}"
+        ],
+        "folderBehavior": "Each parent restarts the twelve-tone order among its sibling folders, including descendants. WeakMap caching follows tree identity. Explicit folder colors and resolved Iconize colors precede automatic colors.",
+        "preservedSystems": [
+          "typography",
+          "layout",
+          "shapes",
+          "editor instances",
+          "source Markdown",
+          "workspace navigation",
+          "module configuration"
+        ]
+      }
     }
   },
   "components": [
@@ -817,12 +1327,13 @@
   ],
   "narrative": {
     "northStar": "Existing Synapse desktop interface",
-    "overview": "This records the incumbent visual system, rather than a new identity. The authority is `src/index.css`, the existing Sidebar, TagsView, NoteCard, and the running desktop interface. New local surfaces inherit this shell; their own layout decisions stay in surface briefs.\n\nThe implemented Tags finder supplies a scoped extension, evidenced by `src/components/TagsView.css` and the approved actual viewport. Its dense rows, mint tag markers and quiet reading area use the incumbent shell and semantic tokens. The `tags-` entries below describe this surface; they do not replace the global type or shape vocabulary.\n\nThe implemented All Notes library supplies a second scoped extension, evidenced by `src/components/NotesGallery.css` and the finished desktop, narrow and reading captures. Its `library-` entries retain the incumbent palette and font family while recording the library's content cards, context contrast and compact controls. Surface composition and acceptance evidence stay in `.impeccable/surfaces/src-components-notesgallery-tsx.md`.\n\nThe implemented Files and Trash workspace supplies a scoped extension, evidenced by `src/components/fileBrowser.css`, the shared `FileBrowser` and the finished dark desktop, narrow and Trash captures. Its `files-` entries record a dense work table, a current-folder route, selection actions and a collapsible properties region. It inherits the same Inter family, dark surfaces and violet interaction states. Surface direction and delegated-choice provenance stay in `.impeccable/surfaces/src-components-filesview-tsx.md`; operation details stay in `docs/FILES_BROWSER.md`.\n\nThe implemented workspace shell supplies an approved shell extension, evidenced by `src/components/workspace.css`, `WorkspaceChrome`, `Sidebar`, and the finished desktop and narrow captures. It keeps the incumbent palette while adding docked utility chrome, document tabs and a bounded active work region. The `workspace-` entries describe the shell itself; the specific Obsidian reference, pinned composition and quality bar stay in `.impeccable/surfaces/src-app-tsx.md`. Existing local views retain their own scoped systems inside the work region.\n\nThe implemented Calendar workspace supplies a scoped extension, evidenced by src/components/calendar.css, CalendarView, CalendarTaskRow, CalendarWeek and the finished synthetic review captures. Its calendar- entries retain the incumbent Inter family, dark semantic surfaces and violet interaction states while recording local source colors, compact date context and bounded planning controls. Direction, composition, benchmark limits and review acceptance stay in .impeccable/surfaces/src-components-calendarview-tsx.md. Local light overrides were tested with synthetic semantic tokens; the application still ships the established dark palette.",
+    "overview": "This records the incumbent visual system, rather than a new identity. The authority is `src/index.css`, the existing Sidebar, TagsView, NoteCard, and the running desktop interface. New local surfaces inherit this shell; their own layout decisions stay in surface briefs.\n\nThe implemented Tags finder supplies a scoped extension, evidenced by `src/components/TagsView.css` and the approved actual viewport. Its dense rows, mint tag markers and quiet reading area use the incumbent shell and semantic tokens. The `tags-` entries below describe this surface; they do not replace the global type or shape vocabulary.\n\nThe implemented All Notes library supplies a second scoped extension, evidenced by `src/components/NotesGallery.css` and the finished desktop, narrow and reading captures. Its `library-` entries retain the incumbent palette and font family while recording the library's content cards, context contrast and compact controls. Surface composition and acceptance evidence stay in `.impeccable/surfaces/src-components-notesgallery-tsx.md`.\n\nThe implemented Files and Trash workspace supplies a scoped extension, evidenced by `src/components/fileBrowser.css`, the shared `FileBrowser` and the finished dark desktop, narrow and Trash captures. Its `files-` entries record a dense work table, a current-folder route, selection actions and a collapsible properties region. It inherits the same Inter family, dark surfaces and violet interaction states. Surface direction and delegated-choice provenance stay in `.impeccable/surfaces/src-components-filesview-tsx.md`; operation details stay in `docs/FILES_BROWSER.md`.\n\nThe implemented workspace shell supplies an approved shell extension, evidenced by `src/components/workspace.css`, `WorkspaceChrome`, `Sidebar`, and the finished desktop and narrow captures. It keeps the incumbent palette while adding docked utility chrome, document tabs and a bounded active work region. The `workspace-` entries describe the shell itself; the specific Obsidian reference, pinned composition and quality bar stay in `.impeccable/surfaces/src-app-tsx.md`. Existing local views retain their own scoped systems inside the work region.\n\nThe implemented Calendar workspace supplies a scoped extension, evidenced by src/components/calendar.css, CalendarView, CalendarTaskRow, CalendarWeek and the finished synthetic review captures. Its calendar- entries retain the incumbent Inter family, dark semantic surfaces and violet interaction states while recording local source colors, compact date context and bounded planning controls. Direction, composition, benchmark limits and review acceptance stay in .impeccable/surfaces/src-components-calendarview-tsx.md. Local light overrides were tested with synthetic semantic tokens; the application still ships the established dark palette.\n\nThe optional AnuPpuccin · Dracula preset supplies a user-selected color system, evidenced by `src/themes/anuppuccin.css`, the current settings application and the reviewed desktop/narrow captures. The incumbent color tokens and violet descriptions below continue to describe the Synapse preset, which remains the default for new and older workspaces. AnuPpuccin rebinds those semantic roles only when selected: it preserves the established fonts, type ramp, shapes, layout and local surface behavior. The `anu-` tokens record the imported palette and supported reading/folder colors; the direction and verification scope stay in `.impeccable/surfaces/src-themes-anuppuccin-css.md`.",
     "keyCharacteristics": [
       "Dark tonal surfaces",
       "Violet selection",
       "Compact readable controls",
-      "Docked utility chrome around one active work region"
+      "Docked utility chrome around one active work region",
+      "Optional user-selected AnuPpuccin palette with the existing type and geometry"
     ],
     "rules": [
       {
@@ -884,9 +1395,27 @@
         "name": "The Calendar Date Context Rule",
         "body": "Within Calendar, period arrows follow the displayed anchor while preserving a useful selected day. Changing month/week/list retains the chosen date; opening a compact day plan transfers focus after commit, and closing it restores a visible date target or pane toggle.",
         "section": "components"
+      },
+      {
+        "name": "The Explicit Preset Rule",
+        "body": "Synapse remains the default. Apply the AnuPpuccin palette only after an explicit workspace choice; switching back restores the Synapse palette and its default accent. Selecting either preset sets its default accent, after which the accent remains customizable.",
+        "section": "colors"
+      },
+      {
+        "name": "The Folder Override Rule",
+        "body": "In AnuPpuccin, derive automatic folder tones from each folder's order among sibling folders, including descendants, and repeat the twelve-tone sequence independently within each parent. Cache that mapping per tree identity; explicit folder colors and resolved Iconize colors retain precedence over automatic tones.",
+        "section": "colors"
+      },
+      {
+        "name": "The Reading Color Rule",
+        "body": "Apply the six heading colors and supported code, quote and table roles as rendering styles. Preserve Markdown bytes, editor instances, the established type scale and each reader's local geometry when appearance changes.",
+        "section": "components"
       }
     ],
     "dos": [
+      "Do keep the AnuPpuccin preset separate from the incumbent Synapse palette and preserve explicit workspace selection.",
+      "Do preserve the imported AnuPpuccin color functions, readable accent ink and explicit folder/icon color precedence.",
+      "Do keep reading colors separate from font sizes, editor lifecycle and source Markdown.",
       "Do use the semantic CSS variables and the existing icon family.",
       "Do preserve the application shell while improving a local view.",
       "Do theme focus, selection, scrolling and selected filters with established tokens.",
@@ -909,6 +1438,8 @@
       "Do pair Calendar source color with labels or icons and keep task editing, journal opening and external sending explicit."
     ],
     "donts": [
+      "Don't turn a selectable AnuPpuccin preset into an implicit default migration.",
+      "Don't infer complete Obsidian plugin compatibility from the supported palette and reading/folder adaptation.",
       "Don't let a local feature silently change the global palette or typography.",
       "Don't impose decorative image covers or motion on dense note indexes.",
       "Don't turn preview tag actions into note edits or load image covers while filtering Tags.",
@@ -916,5 +1447,5 @@
       "Don't treat Calendar's synthetic light-token capture as a shipped global application light theme."
     ]
   },
-  "generatedAt": "2026-10-11T13:20:21.910573+00:00"
+  "generatedAt": "2026-10-11T18:55:25.239365+00:00"
 }

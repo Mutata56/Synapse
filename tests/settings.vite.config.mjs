@@ -10,9 +10,10 @@ export default defineConfig(async () => mergeConfig(await base({}), {
         return (window.settingsPreviewDocuments ?? []).filter(doc => ids.has(doc.note.id));
       };
     `;
-    if (id.endsWith('/src/lib/storage.ts')) return code.replace('export async function getWorkspaceDir(', 'async function originalGetWorkspaceDir(') + `
+    if (id.endsWith('/src/lib/storage.ts')) return code.replace('export async function getWorkspaceDir(', 'async function originalGetWorkspaceDir(').replace('export async function listVaultFiles(', 'async function originalListVaultFiles(') + `
       export const getWorkspaceDir = async () => '/demo/Synapse Vault';
+      export const listVaultFiles = async () => [];
     `;
   }}],
-  server: { port: 1447, strictPort: true, host: '127.0.0.1' },
+  server: { port: 1478, strictPort: true, host: '127.0.0.1' },
 }));

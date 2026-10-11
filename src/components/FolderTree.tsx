@@ -32,6 +32,7 @@ import {
   type DragItem,
 } from "../lib/dnd";
 import { exportNoteMarkdown } from "../lib/export";
+import { themeFolderColors } from "../lib/folderTheme";
 import { FOLDER_COLORS } from "../lib/folderColors";
 import { DEFAULT_NOTE_TITLE } from "../lib/format";
 import type { TreeNode, NoteMeta } from "../lib/storage";
@@ -460,6 +461,8 @@ function FolderRow({
   const renameFolder = useNotesStore((s) => s.renameFolder);
   const setFolderColor = useNotesStore((s) => s.setFolderColor);
   const folderColor = useNotesStore((s) => s.folderColors[node.path] ?? null);
+  const rainbowColor = useNotesStore(s => s.settings.colorTheme === "anuppuccin" ? themeFolderColors(s.tree).get(node.path) : undefined);
+  const displayColor = folderColor ?? rainbowColor;
   const expandFolder = useNotesStore((s) => s.expandFolder);
   const startCreateNote = useNotesStore((s) => s.startCreateNote);
   const creatingFolderHere = useNotesStore(
@@ -621,13 +624,14 @@ function FolderRow({
             : "hover:bg-white/[0.04] text-zinc-400",
         )}
         style={{
+          color: displayColor,
           paddingLeft: FOLDER_ROW_PAD_LEFT_PX + depth * DEPTH_INDENT_PX,
         }}
       >
         <motion.div
           animate={{ rotate: expanded ? 90 : 0 }}
           transition={{ duration: 0.18, ease: EASE_OUT }}
-          className="workspace-folder-chevron text-zinc-600 flex items-center"
+          className="workspace-folder-chevron text-zinc-600 flex items-center" style={displayColor ? { color: displayColor } : undefined}
         >
           <ChevronRight size={11} strokeWidth={2.4} />
         </motion.div>
@@ -636,14 +640,14 @@ function FolderRow({
             size={13}
             strokeWidth={1.8}
             className="text-[var(--color-accent)]/80"
-            style={folderColor ? { color: folderColor } : undefined}
+            style={displayColor ? { color: displayColor } : undefined}
           />
         ) : (
           <Folder
             size={13}
             strokeWidth={1.8}
             className="text-zinc-500"
-            style={folderColor ? { color: folderColor } : undefined}
+            style={displayColor ? { color: displayColor } : undefined}
           />
         )} />
         {renaming ? (

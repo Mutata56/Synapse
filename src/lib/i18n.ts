@@ -16,6 +16,9 @@
 // строках UI на местах. Главное - ключи тут должны совпадать со строками в
 // вызовах t(), иначе перевод молча не подхватится.
 const en: Record<string, string> = {
+  "Цветовая тема": "Color theme",
+  "Тема оформления": "Appearance theme",
+  "AnuPpuccin: палитра Dracula, цветные папки и заголовки как в Obsidian.": "AnuPpuccin: the Dracula palette, rainbow folders and headings from Obsidian.",
   "Выноска": "Callout",
   "Выноски": "Callouts",
   "Кратко": "Summary",

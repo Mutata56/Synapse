@@ -40,6 +40,36 @@ colors:
   calendar-event: "#86b6f6"
   calendar-note: "#aba8ee"
   calendar-danger: "#f08e98"
+  anu-rosewater: "#f6c999"
+  anu-flamingo: "#f5bda6"
+  anu-pink: "#e49df8"
+  anu-mauve: "#bd93f9"
+  anu-red: "#ff5555"
+  anu-maroon: "#e66666"
+  anu-peach: "#ffb86c"
+  anu-yellow: "#f1fa8c"
+  anu-green: "#50fa7b"
+  anu-teal: "#68dbd3"
+  anu-sky: "#8be9fd"
+  anu-sapphire: "#68c5f0"
+  anu-blue: "#5f7ede"
+  anu-lavender: "#c592de"
+  anu-text: "#f8f8f2"
+  anu-subtext1: "#d3d3c5"
+  anu-subtext0: "#bfbfb5"
+  anu-overlay2: "#8b8fa7"
+  anu-overlay1: "#6e7291"
+  anu-overlay0: "#585c74"
+  anu-surface2: "#44475a"
+  anu-surface1: "#383b4c"
+  anu-surface0: "#303241"
+  anu-base: "#282a36"
+  anu-mantle: "#21222c"
+  anu-crust: "#1a1b23"
+  anu-surface-overlay: "rgba(248,248,242,.075)"
+  anu-quote-surface: "rgba(26,27,35,.5)"
+  anu-search-hit: "rgba(245,189,166,.4)"
+  anu-search-hit-current: "rgba(245,189,166,.6)"
 typography:
   headline:
     fontFamily: "Inter, system-ui, sans-serif"
@@ -520,12 +550,15 @@ The implemented workspace shell supplies an approved shell extension, evidenced 
 
 The implemented Calendar workspace supplies a scoped extension, evidenced by src/components/calendar.css, CalendarView, CalendarTaskRow, CalendarWeek and the finished synthetic review captures. Its calendar- entries retain the incumbent Inter family, dark semantic surfaces and violet interaction states while recording local source colors, compact date context and bounded planning controls. Direction, composition, benchmark limits and review acceptance stay in .impeccable/surfaces/src-components-calendarview-tsx.md. Local light overrides were tested with synthetic semantic tokens; the application still ships the established dark palette.
 
+The optional AnuPpuccin · Dracula preset supplies a user-selected color system, evidenced by `src/themes/anuppuccin.css`, the current settings application and the reviewed desktop/narrow captures. The incumbent color tokens and violet descriptions below continue to describe the Synapse preset, which remains the default for new and older workspaces. AnuPpuccin rebinds those semantic roles only when selected: it preserves the established fonts, type ramp, shapes, layout and local surface behavior. The `anu-` tokens record the imported palette and supported reading/folder colors; the direction and verification scope stay in `.impeccable/surfaces/src-themes-anuppuccin-css.md`.
+
 **Key Characteristics:**
 
 - Dark tonal surfaces
 - Violet selection
 - Compact readable controls
 - Docked utility chrome around one active work region
+- Optional user-selected AnuPpuccin palette with the existing type and geometry
 
 ## Colors
 
@@ -562,6 +595,19 @@ The local calendar-muted role derives readable secondary context from the existi
 **The Calendar Source Rule.** Within Calendar, violet marks the selected date, today, completion, focus and primary actions; amber identifies local task previews, blue identifies external events and lavender identifies notes and journal marks. Preserve user task colors as task metadata, and pair source color with text or outline icons.
 
 The source has local light overrides for these accents and native input color-scheme. Their compatibility capture uses synthetic semantic tokens; it is evidence of local compatibility, not an added global light theme.
+
+### AnuPpuccin · Dracula preset
+
+This selectable preset uses the active AnuPpuccin 1.5.0 / extended Dracula profile. The `anu-` frontmatter entries retain all 26 imported palette values plus the implemented translucent overlays. They form a second palette; they do not replace the incumbent Synapse values.
+
+- **Primary:** Flamingo is the preset's initial accent for selection, links, focus and filled controls. The workspace accent can be customized after selecting the preset. Filled accent controls use runtime contrast-selected ink; the initial Flamingo uses Crust ink.
+- **Secondary:** Red, Peach, Green, Teal, Lavender and Mauve identify content heading levels one through six. The twelve folder tones run Red, Maroon, Peach, Yellow, Green, Teal, Sky, Sapphire, Blue, Lavender, Mauve and Pink, then repeat. Green also identifies tags and ordinary task-checkbox accents.
+- **Neutral:** Crust grounds the shell and code; Mantle grounds ribbon and headers; Base grounds the work region, editor and Quick Look reader. Text is the cream foreground, Subtext 1 is secondary copy, Subtext 0 is quote/Files context, and Overlay 2 supplies quiet outline/context roles. Surface 0 and Surface 2 distinguish normal and stronger rules; menu surfaces use the same palette.
+- **Translucent surfaces:** The surface overlay remains the source `rgba()` value. The quote surface is a half-opacity Crust field behind muted quote text with an accent rule. Search-hit overlays use the two source Flamingo alpha values. These color functions are intentional color roles; they are not approximated as opaque swatches.
+
+**The Explicit Preset Rule.** Synapse remains the default. Apply the AnuPpuccin palette only after an explicit workspace choice; switching back restores the Synapse palette and its default accent. Selecting either preset sets its default accent, after which the accent remains customizable.
+
+**The Folder Override Rule.** In AnuPpuccin, derive automatic folder tones from each folder's order among sibling folders, including descendants, and repeat the twelve-tone sequence independently within each parent. Cache that mapping per tree identity; explicit folder colors and resolved Iconize colors retain precedence over automatic tones.
 
 ## Typography
 
@@ -706,6 +752,14 @@ Calendar reuses the incumbent control radius for named actions, date markers and
 
 Buttons, inputs, navigation rows, chips and note content retain familiar web semantics inside Tauri. Active navigation uses violet tone and a clear label. Focus must remain visible. Inline image covers are optional content, not mandatory chrome for every note representation.
 
+### AnuPpuccin reading and controls
+
+The existing Appearance selector applies the palette through the root color-theme attribute and semantic CSS variables after the workspace setting is saved. The capture window applies the persisted appearance on mounting and each focus gain. Filled active controls use readable runtime accent ink; switching appearance does not change their dimensions or interaction model.
+
+Content-heading colors cover rendered Markdown, BlockNote headings and compact readers. H1/H2 dividers apply to the full Markdown and Files readers and BlockNote headings; compact library/Tags readers receive the heading tones while preserving their own density. Code surfaces use Crust, quotes retain the translucent Crust surface and accent rule, and table headings use Mantle with Surface 2 borders. The existing font and heading-size hierarchy remains authoritative.
+
+**The Reading Color Rule.** Apply the six heading colors and supported code, quote and table roles as rendering styles. Preserve Markdown bytes, editor instances, the established type scale and each reader's local geometry when appearance changes.
+
 ### Tags filters and hierarchy
 
 Active filter chips are mint, lightly filled, stroked and individually removable. Each visible chip is bounded in height and width (28px high, maximum 180px wide). The +N control exposes all selected tags in a popover whose width is bounded by the work area (maximum 320px); its list scrolls within the smaller of (280px) or (45dvh). Escape, outside interaction and a known focus exit close it. Sequential removals keep the list open down to its last tag, even after the selection fits in the header. Removing a focused tag restores focus to the next row, or the previous row at the end; removing the last selected tag closes the list, moves focus to Any and preserves the current reading pane.
@@ -780,6 +834,9 @@ The connection menu exposes deliberate iCal refresh, configured CalDAV sending, 
 
 ## Do's and Don'ts
 
+- Do keep the AnuPpuccin preset separate from the incumbent Synapse palette and preserve explicit workspace selection.
+- Do preserve the imported AnuPpuccin color functions, readable accent ink and explicit folder/icon color precedence.
+- Do keep reading colors separate from font sizes, editor lifecycle and source Markdown.
 - Do use the semantic CSS variables and the existing icon family.
 - Do preserve the application shell while improving a local view.
 - Do theme focus, selection, scrolling and selected filters with established tokens.
@@ -800,6 +857,8 @@ The connection menu exposes deliberate iCal refresh, configured CalDAV sending, 
 - Do keep Calendar source, context, type and corner roles scoped to the calendar workspace.
 - Do preserve the displayed date anchor, bounded previews, complete paged day lists and focus restoration when changing visible Calendar regions.
 - Do pair Calendar source color with labels or icons and keep task editing, journal opening and external sending explicit.
+- Don't turn a selectable AnuPpuccin preset into an implicit default migration.
+- Don't infer complete Obsidian plugin compatibility from the supported palette and reading/folder adaptation.
 - Don't let a local feature silently change the global palette or typography.
 - Don't impose decorative image covers or motion on dense note indexes.
 - Don't turn preview tag actions into note edits or load image covers while filtering Tags.

@@ -140,3 +140,8 @@ https://github.com/user-attachments/assets/9db144f0-f82d-4251-ba05-e5130e225cc1
 ## Лицензия
 
 GPL-3.0, см. [LICENSE](LICENSE).
+
+
+### AnuPpuccin appearance
+
+The AnuPpuccin · Dracula preset adapts the palette and color roles of [AnuPpuccin](https://github.com/AnubisNekhet/AnuPpuccin) by Anubis / AnubisNekhet (GPL-3.0). See [the profile and provenance](docs/ANUPPUCCIN.md) and the [upstream license](https://github.com/AnubisNekhet/AnuPpuccin/blob/main/LICENSE) and the theme author’s [Buy Me a Coffee page](https://www.buymeacoffee.com/anubisnekhet).

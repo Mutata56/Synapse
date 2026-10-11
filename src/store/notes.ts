@@ -8,7 +8,7 @@ import {
   toISODate,
 } from "../lib/daily";
 import {
-  applyAccent,
+  applyAppearance,
   coerceSettings,
   type AppSettings,
 } from "../lib/settings";
@@ -2056,7 +2056,7 @@ export const useNotesStore = create<Store>((set, get) => {
       try {
         const settings = await readSettings();
         set({ settings });
-        applyAccent(settings.accentColor);
+        applyAppearance(settings);
         if (isTauri()) {
           await invoke("set_capture_shortcut", { accelerator: settings.captureShortcut, enabled: settings.modules.newNote }).catch(e => console.error("set_capture_shortcut (load) failed:", e));
         }
@@ -2077,7 +2077,7 @@ export const useNotesStore = create<Store>((set, get) => {
           if (rebind && isTauri()) await invoke("set_capture_shortcut", { accelerator: next.captureShortcut, enabled: next.modules.newNote });
           await writeSettings(next);
           set({ settings: next, settingsSaveState: "saved" });
-          if (next.accentColor !== prev.accentColor) applyAccent(next.accentColor);
+          if (next.accentColor !== prev.accentColor || next.colorTheme !== prev.colorTheme) applyAppearance(next);
         } catch (error) {
           if (rebind && isTauri()) await invoke("set_capture_shortcut", { accelerator: prev.captureShortcut, enabled: prev.modules.newNote }).catch(() => {});
           set({ settingsSaveState: "error" });

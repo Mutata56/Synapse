@@ -12,7 +12,11 @@
 
 import { coerceGraphFeatures, coerceModules, DEFAULT_GRAPH_FEATURES, MINIMAL_MODULES, type GraphFeatures, type ModuleSettings } from "./modules";
 
+export type ColorTheme = "synapse" | "anuppuccin";
+export const ANUPPUCCIN_ACCENT = "#f5bda6";
+
 export type AppSettings = {
+  colorTheme: ColorTheme;
   modules: ModuleSettings;
   graph: GraphFeatures;
   animations: boolean;
@@ -42,6 +46,7 @@ export type AppSettings = {
  *  повторяет нативную регистрацию в `lib.rs` (CONTROL|SHIFT + KeyN), на
  *  Windows/Linux `CommandOrControl` это Ctrl. */
 export const DEFAULT_SETTINGS: AppSettings = {
+  colorTheme: "synapse",
   modules: { ...MINIMAL_MODULES },
   graph: { ...DEFAULT_GRAPH_FEATURES },
   animations: false,
@@ -88,6 +93,7 @@ export function coerceSettings(raw: unknown): AppSettings {
   }
   const r = raw as Record<string, unknown>;
   return {
+    colorTheme: r.colorTheme === "anuppuccin" ? "anuppuccin" : "synapse",
     modules: coerceModules(r.modules),
     graph: coerceGraphFeatures(r.graph),
     animations: typeof r.animations === "boolean" ? r.animations : DEFAULT_SETTINGS.animations,
@@ -154,16 +160,39 @@ function lighten(hex: string, t: number): string {
  * варианты по альфе и светлоте повторяют исходные дизайн-токены.
  */
 export function applyAccent(hex: string): void {
+  if (typeof document === "undefined") return;
   const rgb = hexToRgb(hex);
   if (!rgb) return;
   const { r, g, b } = rgb;
   const root = document.documentElement;
+  root.style.setProperty("--accent", hex);
   root.style.setProperty("--color-accent", hex);
   root.style.setProperty("--color-accent-bg", `rgba(${r}, ${g}, ${b}, 0.12)`);
   root.style.setProperty("--color-accent-bg-hover", `rgba(${r}, ${g}, ${b}, 0.18)`);
   root.style.setProperty("--color-accent-border", `rgba(${r}, ${g}, ${b}, 0.35)`);
-  root.style.setProperty("--color-link", lighten(hex, 0.15));
-  root.style.setProperty("--color-link-hover", lighten(hex, 0.3));
+  const anu = root.dataset.colorTheme === "anuppuccin";
+  root.style.setProperty("--color-link", anu ? hex : lighten(hex, 0.15));
+  root.style.setProperty("--color-link-hover", anu ? hex : lighten(hex, 0.3));
+  root.style.setProperty("--accent-foreground", accentForeground(hex));
+}
+
+/** Select readable ink for a custom accent, including the bright AnuPpuccin preset. */
+export function accentForeground(hex: string): string {
+  const rgb = hexToRgb(hex);
+  if (!rgb) return "#ffffff";
+  const channel = (value: number) => { const n = value / 255; return n <= .04045 ? n / 12.92 : ((n + .055) / 1.055) ** 2.4; };
+  const light = .2126 * channel(rgb.r) + .7152 * channel(rgb.g) + .0722 * channel(rgb.b);
+  const darkLight = .2126 * channel(26) + .7152 * channel(27) + .0722 * channel(35);
+  if ((light + .05) / (darkLight + .05) >= 4.5) return "#1a1b23";
+  if (1.05 / (light + .05) >= 4.5) return "#ffffff";
+  return light > .179 ? "#000000" : "#ffffff";
+}
+
+export function applyAppearance(settings: Pick<AppSettings, "colorTheme" | "accentColor">): void {
+  if (typeof document === "undefined") return;
+  document.documentElement.dataset.colorTheme = settings.colorTheme;
+  applyAccent(settings.accentColor);
+  if (typeof window !== "undefined" && typeof window.dispatchEvent === "function") window.dispatchEvent(new Event("synapse-appearance-change"));
 }
 
 // ─── Хелперы хоткея заметки ────────────────────────────────────────────────

@@ -1,0 +1,61 @@
+/* AnuPpuccin by Anubis (AnubisNekhet), GPL-3.0.
+ * Adapted Dracula palette from AnuPpuccin 1.5.0 + extended-colorschemes and its
+ * color-role/rainbow/header mappings; selectors below are authored for Synapse.
+ * https://github.com/AnubisNekhet/AnuPpuccin — see LICENSE and docs/ANUPPUCCIN.md.
+ */
+:root[data-color-theme="anuppuccin"] {
+  --anu-rosewater:#f6c999; --anu-flamingo:#f5bda6; --anu-pink:#e49df8;
+  --anu-mauve:#bd93f9; --anu-red:#ff5555; --anu-maroon:#e66666;
+  --anu-peach:#ffb86c; --anu-yellow:#f1fa8c; --anu-green:#50fa7b;
+  --anu-teal:#68dbd3; --anu-sky:#8be9fd; --anu-sapphire:#68c5f0;
+  --anu-blue:#5f7ede; --anu-lavender:#c592de;
+  --anu-text:#f8f8f2; --anu-subtext1:#d3d3c5; --anu-subtext0:#bfbfb5;
+  --anu-overlay2:#8b8fa7; --anu-overlay1:#6e7291; --anu-overlay0:#585c74;
+  --anu-surface2:#44475a; --anu-surface1:#383b4c; --anu-surface0:#303241;
+  --anu-base:#282a36; --anu-mantle:#21222c; --anu-crust:#1a1b23;
+  --bg:var(--anu-crust); --surface-1:var(--anu-base);
+  --surface-2:rgba(248,248,242,.075); --surface-2-solid:var(--anu-surface0);
+  --text:var(--anu-text); --text-strong:var(--anu-text); --text-secondary:var(--anu-subtext1);
+  --text-muted:var(--anu-overlay2); --text-dim:var(--anu-overlay2); --text-quote:var(--anu-subtext0);
+  --border:var(--anu-surface0); --border-strong:var(--anu-surface2);
+  --accent:var(--anu-flamingo); --accent-foreground:var(--anu-base);
+  --link:var(--anu-flamingo); --link-hover:var(--anu-flamingo); --tag-accent:var(--anu-green);
+  --code-bg:var(--anu-crust); --code-text:var(--anu-yellow); --pre-bg:var(--anu-crust);
+  --table-head-bg:var(--anu-mantle); --search-hit:rgba(245,189,166,.4); --search-hit-current:rgba(245,189,166,.6);
+  --scrollbar-thumb:var(--anu-surface2); --scrollbar-thumb-hover:var(--anu-overlay0);
+  --color-danger:var(--anu-red); --color-success:var(--anu-green); --color-warning:var(--anu-yellow);
+  --color-zinc-50:var(--anu-text); --color-zinc-100:var(--anu-text); --color-zinc-200:var(--anu-text);
+  --color-zinc-300:var(--anu-subtext1); --color-zinc-400:var(--anu-overlay2); --color-zinc-500:var(--anu-overlay2);
+  --color-zinc-600:var(--anu-overlay2); --color-zinc-700:var(--anu-surface2); --color-zinc-800:var(--anu-surface1);
+  --color-zinc-900:var(--anu-mantle); --color-zinc-950:var(--anu-crust);
+  --folder-tone-0:var(--anu-red); --folder-tone-1:var(--anu-maroon); --folder-tone-2:var(--anu-peach);
+  --folder-tone-3:var(--anu-yellow); --folder-tone-4:var(--anu-green); --folder-tone-5:var(--anu-teal);
+  --folder-tone-6:var(--anu-sky); --folder-tone-7:var(--anu-sapphire); --folder-tone-8:var(--anu-blue);
+  --folder-tone-9:var(--anu-lavender); --folder-tone-10:var(--anu-mauve); --folder-tone-11:var(--anu-pink);
+  --cluster-0:var(--anu-red); --cluster-1:var(--anu-maroon); --cluster-2:var(--anu-peach); --cluster-3:var(--anu-yellow);
+  --cluster-4:var(--anu-green); --cluster-5:var(--anu-teal); --cluster-6:var(--anu-sky); --cluster-7:var(--anu-sapphire);
+  --cluster-8:var(--anu-blue); --cluster-9:var(--anu-lavender); --cluster-10:var(--anu-mauve); --cluster-11:var(--anu-pink);
+}
+[data-color-theme="anuppuccin"] .app-shell { background:var(--anu-crust); }
+[data-color-theme="anuppuccin"] .workspace-shell,[data-color-theme="anuppuccin"] .workspace-sidebar { background:var(--anu-crust); }
+[data-color-theme="anuppuccin"] .workspace-ribbon,[data-color-theme="anuppuccin"] .workspace-sidebar-header,[data-color-theme="anuppuccin"] .workspace-tabs-header { background:var(--anu-mantle); }
+[data-color-theme="anuppuccin"] .workspace-stage { --bg:var(--anu-base); --color-bg:var(--anu-base); background:var(--anu-base); }
+[data-color-theme="anuppuccin"] .workspace-tab.is-active { background:var(--anu-base); color:var(--color-accent); }
+[data-color-theme="anuppuccin"] :is(.bg-accent,.fs-primary,.settings-accent-sample,.settings-switch input:checked + span) { color:var(--accent-foreground); }
+[data-color-theme="anuppuccin"] :is(.fs-browser,.fs-dialog,.fs-menu) { --fs-muted:var(--anu-subtext0); --fs-folder:var(--anu-lavender); --fs-tag:var(--anu-green); --fs-danger:var(--anu-red); }
+[data-color-theme="anuppuccin"] .fs-quicklook-reader { background:var(--anu-base); }
+[data-color-theme="anuppuccin"] .bn-container { --bn-colors-editor-background:var(--anu-base) !important; --bn-colors-editor-text:var(--anu-text) !important; --bn-colors-menu-background:var(--anu-surface0) !important; --bn-colors-menu-text:var(--anu-text) !important; --bn-colors-tooltip-background:var(--anu-mantle) !important; --bn-colors-tooltip-text:var(--anu-text) !important; --bn-colors-border:var(--anu-surface2) !important; --bn-colors-side-menu:var(--anu-overlay2) !important; }
+[data-color-theme="anuppuccin"] :is(.md-content,.fs-markdown,.library-reader-body,.tags-reader-body) { color:var(--anu-text); }
+[data-color-theme="anuppuccin"] :is(.md-content,.fs-markdown,.library-reader-body,.tags-reader-body) h1,[data-color-theme="anuppuccin"] .bn-block-content[data-content-type="heading"]:is([data-level="1"],:not([data-level])) { color:var(--anu-red); }
+[data-color-theme="anuppuccin"] :is(.md-content,.fs-markdown,.library-reader-body,.tags-reader-body) h2,[data-color-theme="anuppuccin"] .bn-block-content[data-content-type="heading"][data-level="2"] { color:var(--anu-peach); }
+[data-color-theme="anuppuccin"] :is(.md-content,.fs-markdown,.library-reader-body,.tags-reader-body) h3,[data-color-theme="anuppuccin"] .bn-block-content[data-content-type="heading"][data-level="3"] { color:var(--anu-green); }
+[data-color-theme="anuppuccin"] :is(.md-content,.fs-markdown,.library-reader-body,.tags-reader-body) h4,[data-color-theme="anuppuccin"] .bn-block-content[data-content-type="heading"][data-level="4"] { color:var(--anu-teal); }
+[data-color-theme="anuppuccin"] :is(.md-content,.fs-markdown,.library-reader-body,.tags-reader-body) h5,[data-color-theme="anuppuccin"] .bn-block-content[data-content-type="heading"][data-level="5"] { color:var(--anu-lavender); }
+[data-color-theme="anuppuccin"] :is(.md-content,.fs-markdown,.library-reader-body,.tags-reader-body) h6,[data-color-theme="anuppuccin"] .bn-block-content[data-content-type="heading"][data-level="6"] { color:var(--anu-mauve); }
+[data-color-theme="anuppuccin"] :is(.md-content,.fs-markdown) :is(h1,h2),[data-color-theme="anuppuccin"] .bn-block-content[data-content-type="heading"]:is([data-level="1"],[data-level="2"],:not([data-level])) { border-bottom:1px solid currentColor; padding-bottom:.2em; }
+[data-color-theme="anuppuccin"] :is(.md-content,.fs-markdown) :is(code,pre),[data-color-theme="anuppuccin"] .bn-block-content[data-content-type="codeBlock"] pre { background:var(--anu-crust); }
+[data-color-theme="anuppuccin"] .bn-block-content[data-content-type="codeBlock"] pre { background:var(--anu-crust) !important; }
+[data-color-theme="anuppuccin"] :is(.md-content,.fs-markdown) blockquote { border-color:var(--color-accent); color:var(--anu-subtext0); background:rgba(26,27,35,.5); }
+[data-color-theme="anuppuccin"] :is(.md-content,.fs-markdown) :is(th,td) { border-color:var(--anu-surface2); }
+[data-color-theme="anuppuccin"] :is(.md-content,.fs-markdown) th { background:var(--anu-mantle); }
+[data-color-theme="anuppuccin"] :is(.md-content,.fs-markdown,.bn-editor) input[type="checkbox"] { accent-color:var(--anu-green); }

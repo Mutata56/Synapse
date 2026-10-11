@@ -4,12 +4,14 @@ import { useEffect, useRef, useState } from "react";
 import { t } from "../lib/i18n";
 import { INBOX_FOLDER } from "../lib/inbox";
 import {
+  readSettings,
   importAssetBytes,
   newNoteId,
   nextNumberedTitle,
   writeNote,
   type Note,
 } from "../lib/storage";
+import { applyAppearance } from "../lib/settings";
 import { toPortableAssetRef } from "../editor2026/lib/assets";
 
 /**
@@ -28,10 +30,11 @@ export function CaptureWindow() {
   // монтировании).
   useEffect(() => {
     ref.current?.focus();
+    void readSettings().then(applyAppearance).catch(() => {});
     let unlisten: (() => void) | undefined;
     void getCurrentWindow()
       .onFocusChanged(({ payload: focused }) => {
-        if (focused) ref.current?.focus();
+        if (focused) { ref.current?.focus(); void readSettings().then(applyAppearance).catch(() => {}); }
       })
       .then((u) => {
         unlisten = u;

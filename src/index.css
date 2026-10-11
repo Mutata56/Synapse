@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "./typography.css";
+@import "./themes/anuppuccin.css";
 
 /* Copied vault Markdown: preview is separate from the original source. */
 .markdown-source-editor { display: flex; flex: 1; flex-direction: column; min-width: 0; min-height: 0; }

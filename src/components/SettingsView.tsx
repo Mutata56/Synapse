@@ -8,7 +8,7 @@ import { confirmDialog } from "../store/confirm";
 import { cn } from "../lib/cn";
 import { t } from "../lib/i18n";
 import { useI18n } from "./LanguageProvider";
-import { ACCENT_PRESETS, accelFromKeyboardEvent, DEFAULT_SETTINGS, isValidHex, isValidIcsUrl, normalizeHex, prettyAccelerator } from "../lib/settings";
+import { ANUPPUCCIN_ACCENT, ACCENT_PRESETS, accelFromKeyboardEvent, DEFAULT_SETTINGS, isValidHex, isValidIcsUrl, normalizeHex, prettyAccelerator } from "../lib/settings";
 import { ALL_MODULES, APP_MODULES, MINIMAL_MODULES, type GraphFeatures, type ModuleId } from "../lib/modules";
 import { getWorkspaceDir } from "../lib/storage";
 import { useCalendarStore } from "../store/calendar";
@@ -81,6 +81,7 @@ export function SettingsView() {
               <p className="settings-footnote">{t("Редактирование заметок и настройки доступны всегда.")}</p>
             </> : item.id === "graph" ? <GraphSettings busy={status === "saving"} save={save} /> : item.id === "appearance" ? <>
               <LangCard />
+              <SettingGroup title={t("Цветовая тема")}><SettingRow title={t("Тема оформления")} description={t("AnuPpuccin: палитра Dracula, цветные папки и заголовки как в Obsidian.")}><select className="settings-input" aria-label={t("Тема оформления")} value={settings.colorTheme} disabled={status === "saving"} onChange={event => { const colorTheme = event.target.value === "anuppuccin" ? "anuppuccin" : "synapse"; void save({ colorTheme, accentColor: colorTheme === "anuppuccin" ? ANUPPUCCIN_ACCENT : DEFAULT_SETTINGS.accentColor }); }}><option value="synapse">Synapse</option><option value="anuppuccin">AnuPpuccin · Dracula</option></select></SettingRow></SettingGroup>
               <AccentCard value={settings.accentColor} onChange={accentColor => void save({ accentColor })} />
               <SettingGroup title={t("Движение")}><SettingRow title={t("Анимации интерфейса")} description={t("Переходы и эффекты. Системное ограничение движения учитывается всегда.")}><SettingsSwitch label={t("Анимации интерфейса")} checked={settings.animations} disabled={status === "saving"} onChange={animations => void save({ animations })} /></SettingRow></SettingGroup>
             </> : item.id === "icons" ? <IconizeSettings /> : item.id === "behavior" ? <>
@@ -144,7 +145,7 @@ function AccentCard({ value, onChange }: { value: string; onChange: (hex: string
   return <Card icon={Palette} title={t("Акцентный цвет")} description={t("Цвет выделения, ссылок и активных элементов")}>
     <div className="settings-accent-presets">{ACCENT_PRESETS.map(preset => <button type="button" key={preset.hex} style={{ background: preset.hex }} aria-label={t(preset.label)} title={t(preset.label)} aria-pressed={value === preset.hex} onClick={() => onChange(preset.hex)}>{value === preset.hex ? <Check size={16} aria-hidden="true" /> : null}</button>)}<input type="color" aria-label={t("Выбрать свой цвет")} value={value} onChange={event => onChange(event.target.value)} /><input className="settings-input settings-hex" aria-label={t("Цвет в формате HEX")} aria-invalid={invalid} aria-describedby={invalid ? errorId : undefined} value={custom} spellCheck={false} onChange={event => setCustom(event.target.value)} onBlur={commit} onKeyDown={event => { if (event.key === "Enter") commit(); }} /></div>
     {invalid ? <p className="settings-field-error" id={errorId}>{t("Введите цвет в формате #RRGGBB.")}</p> : null}
-    <div className="settings-accent-preview"><span>{t("Превью")}</span><span className="settings-accent-sample" style={{ background: value }}>{t("Кнопка")}</span><span style={{ color: "var(--color-link)" }}>{t("Ссылка")}</span></div>
+    <div className="settings-accent-preview"><span>{t("Превью")}</span><span className="settings-accent-sample" style={{ background: value, color: "var(--accent-foreground)" }}>{t("Кнопка")}</span><span style={{ color: "var(--color-link)" }}>{t("Ссылка")}</span></div>
   </Card>;
 }
 function ShortcutCard({ value, onChange }: { value: string; onChange: (accel: string) => void }) {

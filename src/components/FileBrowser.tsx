@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { decodeDrag, setDragData, type DragItem } from "../lib/dnd";
 import { pluralRu } from "../lib/format";
 import { closestFileFolder, entryTarget, fileRangeSelection, fileRows, getFileIndex, normalizeFileTargets, type FileEntry, type FileSort } from "../lib/fileBrowser";
+import { themeFolderColors } from "../lib/folderTheme";
 import { buildBreadcrumbs } from "../lib/treeUtils";
 import { readNote, readTrashedNoteBody } from "../lib/storage";
 import { confirmDialog } from "../store/confirm";
@@ -30,6 +31,8 @@ export function FileBrowser({ mode, readBody, initialSelected = [] }: Props) {
   const tree = useNotesStore(state => mode === "files" ? state.tree : state.trashTree);
   const folder = useNotesStore(state => mode === "files" ? state.currentFolder : state.currentTrashFolder);
   const colors = useNotesStore(state => state.folderColors);
+  const colorTheme = useNotesStore(state => state.settings.colorTheme);
+  const rainbow = useMemo(() => colorTheme === "anuppuccin" ? themeFolderColors(tree) : undefined, [tree, colorTheme]);
   const undoBusy = useNotesStore(state => state._undoRedoBusy);
   const index = useMemo(() => getFileIndex(tree), [tree]);
   const [query, setQuery] = useState(""), deferredQuery = useDeferredValue(query);
@@ -236,7 +239,7 @@ export function FileBrowser({ mode, readBody, initialSelected = [] }: Props) {
               const items = checked ? selectedItems.map(entryTarget) : [entryTarget(entry)]; setDragData(event.dataTransfer, items, { label: entry.name, meta: entry.parent || t("Хранилище") });
             }} onDragOver={mode === "files" && entry.kind === "folder" ? event => { event.preventDefault(); event.stopPropagation(); event.dataTransfer.dropEffect = "move"; event.currentTarget.classList.add("is-drop-target"); } : undefined} onDragLeave={event => event.currentTarget.classList.remove("is-drop-target")} onDrop={event => { if (entry.kind !== "folder") return; event.preventDefault(); event.stopPropagation(); event.currentTarget.classList.remove("is-drop-target"); void drop(decodeDrag(event.dataTransfer), entry.path); }}>
               <div role="gridcell" className="fs-check-cell"><button type="button" tabIndex={-1} role="checkbox" aria-checked={checked} aria-label={t("Выбрать {name}", { name: entry.name })} className={checked ? "fs-checked" : "fs-checkbox"} disabled={blocked} onDoubleClick={event => event.stopPropagation()} onClick={event => { event.stopPropagation(); selectAt(position, true, event.shiftKey); }}>{checked && <Check size={13} />}</button></div>
-              <div role="gridcell" className="fs-name-cell"><NoteIcon note={entry.note} kind={entry.kind === "folder" ? "folder" : "file"} path={(mode === "trash" ? ".trash/" : "") + entry.path + (entry.kind === "note" ? ".md" : "")} size={20} fallback={entry.kind === "folder" ? <Folder size={20} style={{ color: colors[entry.path] || undefined }} className="fs-folder-icon" /> : <FileText size={20} />} /><span className="fs-entry-name" title={entry.name}>{entry.name}{deep && entry.parent !== folder && <small>{entry.parent || t("Хранилище")}</small>}</span><div className="fs-row-tags">{entry.note?.tags.slice(0, 3).map(tag => <span key={tag} className="fs-tag">#{tag.replace(/^#/, "")}</span>)}</div></div>
+              <div role="gridcell" className="fs-name-cell"><NoteIcon note={entry.note} kind={entry.kind === "folder" ? "folder" : "file"} path={(mode === "trash" ? ".trash/" : "") + entry.path + (entry.kind === "note" ? ".md" : "")} size={20} fallback={entry.kind === "folder" ? <Folder size={20} style={{ color: colors[entry.path] || rainbow?.get(entry.path) }} className="fs-folder-icon" /> : <FileText size={20} />} /><span className="fs-entry-name" title={entry.name}>{entry.name}{deep && entry.parent !== folder && <small>{entry.parent || t("Хранилище")}</small>}</span><div className="fs-row-tags">{entry.note?.tags.slice(0, 3).map(tag => <span key={tag} className="fs-tag">#{tag.replace(/^#/, "")}</span>)}</div></div>
               <div role="gridcell" className="fs-type-cell">{entry.kind === "folder" ? t("Папка") : t("Заметка")}</div><div role="gridcell" className="fs-date-cell">{entry.modified > 0 ? dateFormat.format(entry.modified) : "—"}</div><div role="gridcell" className="fs-menu-cell"><button type="button" tabIndex={-1} className="fs-icon-button" aria-label={t("Действия: {name}", { name: entry.name })} disabled={blocked} onClick={event => showMenu(event, entry)}><MoreHorizontal size={17} /></button></div>
             </div>;
           })}</div> : <div className="fs-empty"><Folder size={36} /><h2>{query || kind !== "all" ? t("Ничего не найдено") : mode === "trash" ? t("Корзина пуста") : t("В папке пока нет элементов")}</h2><p>{query || kind !== "all" ? t("Измени поиск или сбрось фильтр типа") : mode === "trash" ? t("Удалённые заметки и папки появятся здесь") : t("Создай заметку или папку")}</p>{(query || kind !== "all") && <button type="button" className="fs-button" onClick={() => { setQuery(""); setKind("all"); }}>{t("Сбросить фильтры")}</button>}</div>}
