@@ -28,6 +28,13 @@ test('day filters use last modification date, combine with favorites/tags, and n
  const source=[note('a',{favorite:true,updatedAt:time(8),createdAt:time(1)}),note('b',{updatedAt:time(9),tags:['sql']})],model=buildOverviewModel(source);
  assert.deepEqual(overviewSelection(model,'favorites','2026-10-08').notes.map(x=>x.id),['a']);assert.equal(overviewSelection(model,'recent','2026-10-01').count,0);assert.deepEqual(overviewSelection(model,'untagged',null).notes.map(x=>x.id),['a']);assert.equal(overviewSelection(model,'recent','2026-10-08').count,1);
 });
+test('cached metadata reflects changed tags, folder and modification date, including same-object inputs',()=>{
+ const source=note('mutable',{tags:['#SQL'],updatedAt:time(8)});
+ const first=buildOverviewModel([source]);assert.equal(first.topics[0].tag,'sql');
+ source.tags[0]='#WMS';source.folder='Работа/WMS';source.updatedAt=time(9);
+ const next=buildOverviewModel([source]);assert.equal(next.topics[0].tag,'wms');assert.equal(next.collections[0].path,'Работа');assert.equal(next.days.get('2026-10-09'),1);assert.equal(next.days.has('2026-10-08'),false);
+ assert.equal(first.topics[0].tag,'sql');assert.equal(first.days.get('2026-10-08'),1);
+});
 test('activity stays bounded across month, leap-day and DST boundaries',()=>{
  const activity=overviewActivity(buildOverviewModel([]),'2024-03-01');assert.equal(activity.length,30);assert.equal(activity.at(-2).key,'2024-02-29');assert.equal(activity.at(-1).key,'2024-03-01');assert.equal(new Set(activity.map(x=>x.key)).size,30);
  const dst=overviewActivity(buildOverviewModel([]),'2026-03-09');assert.equal(dst.length,30);assert.equal(new Set(dst.map(x=>x.key)).size,30);

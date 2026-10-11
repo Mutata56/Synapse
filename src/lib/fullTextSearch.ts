@@ -70,31 +70,33 @@ type CachedBody = { updatedAt: number; body: string; bodyLower: string };
 
 /** id это последнее прочитанное тело. Живёт между открытиями палитры всю жизнь приложения. */
 const bodyCache = new Map<string, CachedBody>();
-const bodyFlights = new Map<string, { updatedAt: number; promise: Promise<CachedBody> }>();
+type PendingBody = { updatedAt: number; request: Promise<CachedBody> };
+const bodyFlights = new Map<string, PendingBody>();
+let bodyListGeneration = 0;
+let wordListGeneration = 0;
 
-/** Share a disk read across overlapping searches, graph indexing and statistics. */
+/** Share a cold read across searches, graph indexing and statistics. */
 function cachedBodyFor(note: NoteMeta): Promise<CachedBody> {
   const cached = bodyCache.get(note.id);
   if (cached?.updatedAt === note.updatedAt) return Promise.resolve(cached);
-  const pending = bodyFlights.get(note.id);
-  if (pending?.updatedAt === note.updatedAt) return pending.promise;
-
-  const flight = { updatedAt: note.updatedAt, promise: null! as Promise<CachedBody> };
-  flight.promise = (async () => {
-    try {
+  const current = bodyFlights.get(note.id);
+  if (current?.updatedAt === note.updatedAt) return current.request;
+  const pending: PendingBody = {
+    updatedAt: note.updatedAt,
+    request: Promise.resolve().then(async () => {
       const full = await readNote(note.id);
       const body = full?.content ?? "";
-      const result = { updatedAt: note.updatedAt, body, bodyLower: body.toLowerCase() };
-      // A slow old revision must not replace the newest cache. Missing reads
-      // remain retryable instead of caching an empty body for the whole session.
-      if (full && bodyFlights.get(note.id) === flight) bodyCache.set(note.id, result);
-      return result;
-    } finally {
-      if (bodyFlights.get(note.id) === flight) bodyFlights.delete(note.id);
-    }
-  })();
-  bodyFlights.set(note.id, flight);
-  return flight.promise;
+      const value = { updatedAt: note.updatedAt, body, bodyLower: body.toLowerCase() };
+      // A slow previous revision cannot replace the latest cache. Missing reads
+      // remain retryable rather than caching an empty body for the whole session.
+      if (full && bodyFlights.get(note.id) === pending) bodyCache.set(note.id, value);
+      return value;
+    }).finally(() => {
+      if (bodyFlights.get(note.id) === pending) bodyFlights.delete(note.id);
+    }),
+  };
+  bodyFlights.set(note.id, pending);
+  return pending.request;
 }
 
 /** id это последний посчитанный word count, по тому же `updatedAt`, что и
@@ -114,6 +116,7 @@ const wordCountCache = new Map<string, { updatedAt: number; words: number }>();
  * правильно, даже если само тело не менялось.
  */
 export async function buildSearchDocs(notes: NoteMeta[]): Promise<SearchDoc[]> {
+  const generation = ++bodyListGeneration;
   const docs: SearchDoc[] = [];
   const misses: NoteMeta[] = [];
   const present = new Set<string>();
@@ -134,8 +137,8 @@ export async function buildSearchDocs(notes: NoteMeta[]): Promise<SearchDoc[]> {
   });
 
   // Выкидываем из кэша удалённые и отправленные в корзину заметки.
-  for (const id of bodyCache.keys()) {
-    if (!present.has(id)) bodyCache.delete(id);
+  if (generation === bodyListGeneration) {
+    for (const id of bodyCache.keys()) if (!present.has(id)) bodyCache.delete(id);
   }
 
   return docs;
@@ -168,6 +171,7 @@ export async function warmIndex(notes: NoteMeta[]): Promise<void> {
  * Возврат на дашборд не делает ничего, пока ни одна заметка не менялась.
  */
 export async function wordCountsFor(notes: NoteMeta[]): Promise<WordEntry[]> {
+  const generation = ++wordListGeneration;
   const out: WordEntry[] = [];
   const misses: NoteMeta[] = [];
   const present = new Set<string>();
@@ -191,15 +195,16 @@ export async function wordCountsFor(notes: NoteMeta[]): Promise<WordEntry[]> {
 
   await pooledForEach(misses, READ_CONCURRENCY, async (note) => {
     const cached = await cachedBodyFor(note);
-    const words = countWords(cached.body);
+    const previous = wordCountCache.get(note.id);
+    const words = previous?.updatedAt === note.updatedAt ? previous.words : countWords(cached.body);
     if (bodyCache.get(note.id) === cached) wordCountCache.set(note.id, { updatedAt: note.updatedAt, words });
     out.push({ createdAt: note.createdAt, words });
   });
 
   // Выкидываем удалённые и отправленные в корзину заметки, так же как чистим
   // body-cache в `buildSearchDocs`, чтобы оба кэша шли нога в ногу.
-  for (const id of wordCountCache.keys()) {
-    if (!present.has(id)) wordCountCache.delete(id);
+  if (generation === wordListGeneration) {
+    for (const id of wordCountCache.keys()) if (!present.has(id)) wordCountCache.delete(id);
   }
 
   return out;

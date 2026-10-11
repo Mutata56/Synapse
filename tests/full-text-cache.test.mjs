@@ -38,6 +38,7 @@ test("a slow previous revision cannot replace a newer cached body", async () => 
   const { buildSearchDocs } = await fresh(() => new Promise(resolve => pending.push(resolve)));
   const older = buildSearchDocs([note("same")]);
   const newer = buildSearchDocs([note("same", { updatedAt: 2 })]);
+  await new Promise(resolve => setImmediate(resolve));
   assert.equal(pending.length, 2);
   pending[1]({ content: "newest body" }); assert.equal((await newer)[0].body, "newest body");
   pending[0]({ content: "older body" }); assert.equal((await older)[0].body, "older body");
