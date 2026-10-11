@@ -38,6 +38,7 @@ import { confirmDialog } from "../store/confirm";
 import { reportError, useNotesStore } from "../store/notes";
 import { useToastStore } from "../store/toasts";
 import { ContextMenu, type ContextMenuItem } from "./ContextMenu";
+import { useWorkspaceStore } from "../store/workspace";
 import { t } from "../lib/i18n";
 
 const EASE_OUT = [0.16, 1, 0.3, 1] as const;
@@ -78,7 +79,7 @@ function useTreeCtx(): TreeCtx {
 
 // ─── Компонент ─────────────────────────────────────────────────────────────
 
-export function FolderTree() {
+export function FolderTree({ compact = false, orderedTree }: { compact?: boolean; orderedTree?: TreeNode[] } = {}) {
   const tree = useNotesStore((s) => s.tree);
   const startCreateNote = useNotesStore((s) => s.startCreateNote);
   const startCreateFolder = useNotesStore((s) => s.startCreateFolder);
@@ -264,8 +265,8 @@ export function FolderTree() {
 
   return (
     <TreeContext.Provider value={ctx}>
-      <div className="flex flex-col flex-1 min-h-0">
-        <div className="px-3 pt-3 pb-1.5 flex items-center justify-between">
+      <div className={cn("flex flex-col flex-1 min-h-0", compact && "workspace-file-tree")}>
+        {!compact && <div className="px-3 pt-3 pb-1.5 flex items-center justify-between">
           <span className="text-[10px] uppercase tracking-[0.08em] font-semibold text-zinc-600">
             {t("Файлы")}
           </span>
@@ -277,7 +278,7 @@ export function FolderTree() {
               <FilePlus size={13} strokeWidth={2} />
             </IconBtn>
           </div>
-        </div>
+        </div>}
 
         <div
           onDragOver={(e) => {
@@ -322,7 +323,7 @@ export function FolderTree() {
               <span className="text-zinc-700">{t("Нажми + чтобы начать")}</span>
             </div>
           ) : (
-            tree.map((node) => (
+            (orderedTree ?? tree).map((node) => (
               <TreeNodeView key={nodeKey(node)} node={node} depth={0} />
             ))
           )}
@@ -516,7 +517,7 @@ function FolderRow({
         onDragLeave={() => setDragOver(false)}
         onDrop={onDrop}
         className={cn(
-          "group flex items-center gap-1 px-1.5 py-1 cursor-pointer rounded-md text-[13px] transition-colors",
+          "workspace-tree-row is-folder group flex items-center gap-1 px-1.5 py-1 cursor-pointer rounded-md text-[13px] transition-colors",
           selected || dragOver
             ? "bg-[var(--color-accent-bg)] text-white ring-1 ring-inset ring-[var(--color-accent-border)]"
             : "hover:bg-white/[0.04] text-zinc-400",
@@ -528,7 +529,7 @@ function FolderRow({
         <motion.div
           animate={{ rotate: expanded ? 90 : 0 }}
           transition={{ duration: 0.18, ease: EASE_OUT }}
-          className="text-zinc-600 flex items-center"
+          className="workspace-folder-chevron text-zinc-600 flex items-center"
         >
           <ChevronRight size={11} strokeWidth={2.4} />
         </motion.div>
@@ -636,8 +637,6 @@ function NoteRow({
   const active = useNotesStore(
     (s) => s.view === "notes" && s.activeId === note.id,
   );
-  const selectNote = useNotesStore((s) => s.selectNote);
-  const setView = useNotesStore((s) => s.setView);
   const trashNote = useNotesStore((s) => s.trashNote);
   const toggleFavorite = useNotesStore((s) => s.toggleFavorite);
   const renameNote = useNotesStore((s) => s.renameNote);
@@ -673,10 +672,10 @@ function NoteRow({
         label: t("Открыть"),
         icon: FileText,
         onClick: () => {
-          setView("notes");
-          void selectNote(note.id);
+          void useWorkspaceStore.getState().openNote(note.id);
         },
       },
+      { kind: "item", label: t("Открыть в новой вкладке"), icon: FilePlus, onClick: () => useWorkspaceStore.getState().openNote(note.id, true) },
       { kind: "separator" },
       {
         kind: "item",
@@ -737,8 +736,7 @@ function NoteRow({
       ctx.toggleNote(note.id);
       return;
     }
-    setView("notes");
-    void selectNote(note.id);
+    void useWorkspaceStore.getState().openNote(note.id);
   };
 
   return (
@@ -753,11 +751,17 @@ function NoteRow({
         }}
         onDragEnd={() => setDragging(false)}
         onClick={onClick}
+        onAuxClick={(e) => { if (e.button === 1) { e.preventDefault(); void useWorkspaceStore.getState().openNote(note.id, true); } }}
+        role="treeitem"
+        tabIndex={0}
+        aria-selected={active || selected}
+        data-note-id={note.id}
+        onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void useWorkspaceStore.getState().openNote(note.id, e.ctrlKey || e.metaKey); } }}
         onContextMenu={onContextMenu}
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
         className={cn(
-          "group relative flex items-center gap-1.5 px-1.5 py-1 cursor-pointer text-[13px] rounded-md transition-colors select-none",
+          "workspace-tree-row group relative flex items-center gap-1.5 px-1.5 py-1 cursor-pointer text-[13px] rounded-md transition-colors select-none",
           selected || active
             ? "bg-[var(--color-accent-bg)] text-white ring-1 ring-inset ring-[var(--color-accent-border)]"
             : "text-zinc-500 hover:bg-white/[0.04] hover:text-zinc-200",

@@ -1,150 +1,115 @@
-import { motion } from "framer-motion";
-import { Sparkles } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
-import { cn } from "../lib/cn";
+import { Bookmark, Check, ChevronsDownUp, ChevronsUpDown, FilePlus2, FileText, Folder, FolderPlus, HelpCircle, PanelLeft, PanelTop, Search, Settings2, SortAsc, type LucideIcon } from "lucide-react";
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+import { buildSearchDocs, searchFullText, type SearchDoc } from "../lib/fullTextSearch";
 import { t } from "../lib/i18n";
-import { reducedFx } from "../lib/platform";
-import { FavoritesSection } from "./FavoritesSection";
+import type { NoteMeta, TreeNode } from "../lib/storage";
+import { flattenNotes } from "../lib/treeUtils";
+import { useNotesStore } from "../store/notes";
+import { promptDialog } from "../store/confirm";
+import { clampSidebarWidth, defaultSidebarWidth, useWorkspaceStore } from "../store/workspace";
+import { ContextMenu, type ContextMenuItem } from "./ContextMenu";
 import { FolderTree } from "./FolderTree";
-import { NavSection } from "./NavSection";
+import { WorkspaceIconButton } from "./WorkspaceChrome";
 
-const APP_NAME = "Synapse";
-
-// Ширина тянется мышью и помнится между сессиями. Зажата в рамки, чтобы панель
-// нельзя было утянуть в бесполезно узкую или раздуть на всё окно.
-const MIN_WIDTH = 200;
-const MAX_WIDTH = 480;
-const DEFAULT_WIDTH = 256; // как был старый фиксированный `w-64`
-const WIDTH_KEY = "sidebar-width";
-
-function clampWidth(w: number): number {
-  return Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, w));
-}
-
-function loadWidth(): number {
-  const raw = Number(localStorage.getItem(WIDTH_KEY));
-  return Number.isFinite(raw) && raw > 0 ? clampWidth(raw) : DEFAULT_WIDTH;
+function sortTree(tree: TreeNode[], order: "name" | "modified" | "created"): TreeNode[] {
+  return tree.map(node => node.kind === "folder" ? { ...node, children: sortTree(node.children, order) } : node).sort((a, b) => {
+    if (a.kind !== b.kind) return a.kind === "folder" ? -1 : 1;
+    if (a.kind === "note" && b.kind === "note" && order !== "name") return (order === "modified" ? b.note.updatedAt - a.note.updatedAt : b.note.createdAt - a.note.createdAt) || a.note.title.localeCompare(b.note.title);
+    return (a.kind === "folder" ? a.name : a.note.title).localeCompare(b.kind === "folder" ? b.name : b.note.title, undefined, { numeric: true, sensitivity: "base" });
+  });
 }
 
 export function Sidebar() {
-  const [width, setWidth] = useState(loadWidth);
-  const dragging = useRef(false);
-
-  // Тянем за край. Левая граница сайдбара стоит в x=0 вьюпорта, поэтому текущая
-  // ширина это просто clientX курсора (с зажимом). Слушатели висят на `window`,
-  // чтобы быстрый драг, соскользнувший с 6px-хваталки, не обрывал ресайз.
-  useEffect(() => {
-    const onMove = (e: MouseEvent) => {
-      if (dragging.current) setWidth(clampWidth(e.clientX));
-    };
-    const stop = () => {
-      if (!dragging.current) return;
-      dragging.current = false;
-      document.body.style.cursor = "";
-      document.body.style.userSelect = "";
-      // Сбрасываем итоговую ширину, когда драг устаканился. Эффект ниже не
-      // пишет во время драга, так что это единственная запись на жест.
-      try {
-        localStorage.setItem(WIDTH_KEY, String(widthRef.current));
-      } catch {
-        /* квота или приватный режим, забиваем */
-      }
-    };
-    window.addEventListener("mousemove", onMove);
-    window.addEventListener("mouseup", stop);
-    return () => {
-      window.removeEventListener("mousemove", onMove);
-      window.removeEventListener("mouseup", stop);
-    };
-  }, []);
-
-  // Дублируем `width` в ref, чтобы эффект на размонтировании читал свежее
-  // значение без переподписки.
-  const widthRef = useRef(width);
-  widthRef.current = width;
-
-  // Сохраняем выбранную ширину. Во время активного драга пропускаем: `stop`
-  // один раз запишет итог, вместо записи на каждый mousemove (было 60-120
-  // синхронных записей в localStorage в секунду на каждый драг).
-  useEffect(() => {
-    if (dragging.current) return;
-    try {
-      localStorage.setItem(WIDTH_KEY, String(width));
-    } catch {
-      /* квота или приватный режим, забиваем */
+  const visible = useWorkspaceStore(state => state.sidebarVisible);
+  const width = useWorkspaceStore(state => state.sidebarWidth);
+  const pane = useWorkspaceStore(state => state.sidebarPane);
+  const label = useWorkspaceStore(state => state.vaultLabel);
+  const sort = useWorkspaceStore(state => state.fileSort);
+  const tree = useNotesStore(state => state.tree);
+  const ordered = useMemo(() => sortTree(tree, sort), [tree, sort]);
+  const root = useRef<HTMLElement>(null), dragging = useRef(false), dragWidth = useRef(width);
+  const [menu, setMenu] = useState<{ x: number; y: number; items: ContextMenuItem[] } | null>(null);
+  const showPane = useWorkspaceStore(state => state.showSidebar);
+  const paneTabs: Array<{ id: "files" | "search" | "bookmarks"; icon: LucideIcon; title: string }> = [{ id: "files", icon: Folder, title: "Файлы" }, { id: "search", icon: Search, title: "Поиск" }, { id: "bookmarks", icon: Bookmark, title: "Закладки" }];
+  if (!visible) return null;
+  const collapseAll = () => {
+    const notes = useNotesStore.getState();
+    if (notes.expandedFolders.size) for (const path of notes.expandedFolders) useNotesStore.getState().toggleFolder(path);
+    else {
+      const visit = (nodes: TreeNode[]) => { for (const node of nodes) if (node.kind === "folder") { useNotesStore.getState().expandFolder(node.path); visit(node.children); } };
+      visit(notes.tree);
     }
-  }, [width]);
-
-  const beginResize = (e: React.MouseEvent) => {
-    e.preventDefault();
-    dragging.current = true;
-    document.body.style.cursor = "col-resize";
-    document.body.style.userSelect = "none";
   };
-
-  return (
-    <motion.aside
-      // Анимация появления на GPU: opacity и transform дешёвые.
-      initial={{ opacity: 0, x: -8 }}
-      animate={{ opacity: 1, x: 0 }}
-      transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-      aria-label={t("Боковая навигация")}
-      style={{ width }}
-      className={cn(
-        "relative shrink-0 border-r border-[var(--color-border)]",
-        // WebKitGTK перерисовывает backdrop-blur на каждую перерисовку, так что
-        // матовый сайдбар дёргает каждое переключение вкладок. Там берём
-        // непрозрачную заливку; матовое стекло оставляем на WebView2 (Windows),
-        // он композитит его бесплатно.
-        reducedFx
-          ? "bg-[var(--color-bg-elevated)]"
-          : "bg-[var(--color-bg-elevated)]/80 backdrop-blur-xl",
-        "flex flex-col",
-      )}
-    >
-      <BrandHeader />
-      <NavSection />
-      <FadedDivider />
-      <FavoritesSection />
-      <FolderTree />
-
-      {/* Хваталка сидит на правом крае. Двойной клик сбрасывает к дефолту. */}
-      <div
-        role="separator"
-        aria-orientation="vertical"
-        aria-label="Изменить ширину панели"
-        onMouseDown={beginResize}
-        onDoubleClick={() => setWidth(DEFAULT_WIDTH)}
-        title={t("Потяните, чтобы изменить ширину (двойной клик , сброс)")}
-        className="group absolute inset-y-0 right-0 z-10 w-1.5 translate-x-1/2 cursor-col-resize"
-      >
-        <div className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-transparent transition-colors group-hover:bg-[var(--color-accent)]" />
+  const sortMenu = (button: HTMLButtonElement) => {
+    const rect = button.getBoundingClientRect();
+    setMenu({ x: rect.left, y: rect.bottom + 6, items: [["name", "По имени"], ["modified", "По дате обновления"], ["created", "По дате создания"]].map(([order, title]) => ({ kind: "item" as const, label: t(title), icon: sort === order ? Check : undefined, onClick: () => useWorkspaceStore.getState().setFileSort(order as typeof sort) })) });
+  };
+  return <aside className="workspace-sidebar" ref={root} style={{ width }} aria-label={t("Левая панель")}>
+    <header className="workspace-sidebar-header" data-tauri-drag-region>
+      <div className="workspace-sidebar-tabs" role="tablist" aria-label={t("Панели хранилища")}>
+        {paneTabs.map(tab => <WorkspaceIconButton key={tab.id} icon={tab.icon} label={t(tab.title)} active={pane === tab.id} role="tab" aria-selected={pane === tab.id} aria-controls={`workspace-side-${tab.id}`} onClick={() => showPane(tab.id)} />)}
       </div>
-    </motion.aside>
-  );
-}
-
-function BrandHeader() {
-  return (
-    <div className="px-4 py-3.5 border-b border-[var(--color-border)] flex items-center gap-2">
-      <div
-        className={cn(
-          "w-6 h-6 rounded-md flex items-center justify-center",
-          "bg-gradient-to-br from-indigo-500 to-violet-600",
-          "shadow-lg shadow-indigo-500/30",
-        )}
-      >
-        <Sparkles size={13} strokeWidth={2.4} className="text-white" />
-      </div>
-      <h1 className="text-[13px] font-semibold text-zinc-200 tracking-tight">
-        {APP_NAME}
-      </h1>
+      <WorkspaceIconButton icon={PanelLeft} label={t("Свернуть левую панель")} onClick={() => useWorkspaceStore.getState().toggleSidebar()} />
+    </header>
+    <div className="workspace-sidebar-body" id={`workspace-side-${pane}`} role="tabpanel" aria-label={t(paneTabs.find(tab => tab.id === pane)!.title)}>
+      {pane === "files" ? <>
+        <div className="workspace-file-actions" aria-label={t("Действия с файлами")}>
+          <WorkspaceIconButton icon={FilePlus2} label={t("Новая заметка")} onClick={() => useNotesStore.getState().startCreateNote(useNotesStore.getState().currentFolder)} />
+          <WorkspaceIconButton icon={FolderPlus} label={t("Новая папка")} onClick={() => useNotesStore.getState().startCreateFolder(useNotesStore.getState().currentFolder)} />
+          <WorkspaceIconButton icon={SortAsc} label={t("Порядок файлов")} onClick={event => sortMenu(event.currentTarget)} />
+          <WorkspaceIconButton icon={PanelTop} label={t("Показать активный файл")} onClick={() => {
+            const note = useNotesStore.getState().activeNote; if (!note) return;
+            if (note.folder) useNotesStore.getState().expandFolder(note.folder);
+            requestAnimationFrame(() => { const item = [...(root.current?.querySelectorAll<HTMLElement>("[data-note-id]") ?? [])].find(element => element.dataset.noteId === note.id); item?.scrollIntoView({ block: "nearest" }); });
+          }} />
+          <WorkspaceIconButton icon={ChevronsDownUp} label={t("Свернуть или развернуть все папки")} onClick={collapseAll} />
+        </div>
+        <FolderTree compact orderedTree={ordered} />
+      </> : pane === "search" ? <WorkspaceSearch /> : <WorkspaceBookmarks />}
     </div>
-  );
+    <footer className="workspace-vault-footer">
+      <button className="workspace-vault-name" type="button" title={t("Переименовать хранилище")} onClick={() => {
+        void promptDialog(t("Название хранилища"), { defaultValue: label }).then(value => { if (value !== null) useWorkspaceStore.getState().setVaultLabel(value); });
+      }}><ChevronsUpDown size={15} aria-hidden="true" /><span>{label}</span></button>
+      <WorkspaceIconButton icon={HelpCircle} label={t("Помощь и сочетания клавиш")} onClick={() => useWorkspaceStore.getState().showHelp(true)} />
+      <WorkspaceIconButton icon={Settings2} label={t("Настройки")} onClick={() => void useWorkspaceStore.getState().openView("settings")} />
+    </footer>
+    <div role="separator" tabIndex={0} aria-orientation="vertical" aria-label={t("Изменить ширину панели")} aria-valuenow={Math.round(width)} aria-valuemin={220} aria-valuemax={Math.max(240, window.innerWidth - 368)} className="workspace-sidebar-resize" title={t("Потяните, чтобы изменить ширину (двойной клик , сброс)")}
+      onPointerDown={event => { event.preventDefault(); dragging.current = true; dragWidth.current = width; event.currentTarget.setPointerCapture(event.pointerId); document.body.style.cursor = "col-resize"; document.body.style.userSelect = "none"; }}
+      onPointerMove={event => { if (dragging.current) { const left = root.current?.getBoundingClientRect().left ?? 48; dragWidth.current = clampSidebarWidth(event.clientX - left); if (root.current) root.current.style.width = `${dragWidth.current}px`; } }}
+      onPointerUp={event => { if (!dragging.current) return; dragging.current = false; document.body.style.cursor = ""; document.body.style.userSelect = ""; if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId); useWorkspaceStore.getState().setSidebarWidth(dragWidth.current); }}
+      onPointerCancel={() => { dragging.current = false; document.body.style.cursor = ""; document.body.style.userSelect = ""; if (root.current) root.current.style.width = `${width}px`; }}
+      onDoubleClick={() => useWorkspaceStore.getState().setSidebarWidth(defaultSidebarWidth())}
+      onKeyDown={event => { if (["ArrowLeft", "ArrowRight", "Home"].includes(event.key)) { event.preventDefault(); useWorkspaceStore.getState().setSidebarWidth(event.key === "Home" ? defaultSidebarWidth() : width + (event.key === "ArrowRight" ? 16 : -16)); } }} />
+    <ContextMenu open={menu !== null} x={menu?.x ?? 0} y={menu?.y ?? 0} items={menu?.items ?? []} onClose={() => setMenu(null)} />
+  </aside>;
 }
 
-function FadedDivider() {
-  return (
-    <div className="h-px bg-gradient-to-r from-transparent via-[var(--color-border-strong)] to-transparent mx-3 my-1" />
-  );
+function WorkspaceNoteResult({ note, snippet }: { note: NoteMeta; snippet?: string | null }) {
+  const active = useNotesStore(state => state.view === "notes" && state.activeId === note.id);
+  return <button type="button" className={`workspace-note-result${active ? " is-active" : ""}`} onClick={() => void useWorkspaceStore.getState().openNote(note.id)} onAuxClick={event => { if (event.button === 1) { event.preventDefault(); void useWorkspaceStore.getState().openNote(note.id, true); } }} title={note.folder ? `${note.folder}/${note.title}` : note.title}>
+    <FileText size={15} aria-hidden="true" /><span><strong>{note.title || t("Без названия")}</strong>{snippet ? <small>{snippet}</small> : note.folder ? <small>{note.folder}</small> : null}</span>
+  </button>;
+}
+
+function WorkspaceSearch() {
+  const tree = useNotesStore(state => state.tree);
+  const notes = useMemo(() => flattenNotes(tree), [tree]);
+  const [query, setQuery] = useState(""), [documents, setDocuments] = useState<SearchDoc[]>([]), [loading, setLoading] = useState(true);
+  const deferred = useDeferredValue(query);
+  useEffect(() => {
+    let stale = false; setLoading(true);
+    void buildSearchDocs(notes).then(docs => { if (!stale) { setDocuments(docs); setLoading(false); } }).catch(() => { if (!stale) setLoading(false); });
+    return () => { stale = true; };
+  }, [notes]);
+  const results = useMemo(() => searchFullText(documents, deferred, 150), [documents, deferred]);
+  return <div className="workspace-side-search"><div className="workspace-search-field"><Search size={15} aria-hidden="true" /><input autoFocus value={query} onChange={event => setQuery(event.target.value)} placeholder={t("Поиск по заметкам…")} aria-label={t("Поиск по заметкам")} /></div>
+    {query.trim() ? <><p className="workspace-side-count">{loading ? t("Загрузка…") : t("Найдено: {n}", { n: results.length })}</p><div className="workspace-side-results">{results.map(hit => <WorkspaceNoteResult key={hit.note.id} note={hit.note} snippet={hit.snippet ? `${hit.snippet.before}${hit.snippet.text}${hit.snippet.after}` : null} />)}{!loading && !results.length ? <p className="workspace-side-empty">{t("Ничего не найдено")}</p> : null}</div></> : <p className="workspace-side-empty">{t("Введи текст, чтобы найти заметку или её содержимое.")}</p>}
+  </div>;
+}
+
+function WorkspaceBookmarks() {
+  const tree = useNotesStore(state => state.tree);
+  const notes = useMemo(() => flattenNotes(tree).filter(note => note.favorite).sort((a, b) => b.updatedAt - a.updatedAt), [tree]);
+  return <section className="workspace-bookmarks"><h2>{t("Закладки")}</h2>{notes.length ? notes.map(note => <WorkspaceNoteResult key={note.id} note={note} />) : <div className="workspace-side-empty"><Bookmark size={20} aria-hidden="true" /><p>{t("Добавляй заметки в избранное — они появятся здесь.")}</p></div>}</section>;
 }

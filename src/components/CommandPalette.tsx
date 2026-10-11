@@ -25,6 +25,8 @@ import { buildGraph } from "../lib/buildGraph";
 import { cn } from "../lib/cn";
 import { DEFAULT_NOTE_TITLE, EMOJI_FONT_STACK } from "../lib/format";
 import { requestGraphFocus } from "../lib/graphFocus";
+import { QUICK_SWITCHER_EVENT } from "../lib/workspaceCommands";
+import { useWorkspaceStore } from "../store/workspace";
 import { t } from "../lib/i18n";
 import {
   collectNoteMatches,
@@ -133,7 +135,7 @@ export function CommandPalette() {
   const view = useNotesStore((s) => s.view);
   const activeId = useNotesStore((s) => s.activeId);
   const setView = useNotesStore((s) => s.setView);
-  const selectNote = useNotesStore((s) => s.selectNote);
+  const selectNote = useWorkspaceStore((s) => s.openNote);
   const createNote = useNotesStore((s) => s.createNote);
   const startCreateFolder = useNotesStore((s) => s.startCreateFolder);
   const closeActive = useNotesStore((s) => s.closeActiveNote);
@@ -143,6 +145,12 @@ export function CommandPalette() {
   // переключают Ctrl+F / Tab (в заметке это заметка, в графе это граф).
   const noteSearchAvailable = view === "notes" && activeId !== null;
   const graphAvailable = view === "graph";
+
+  useEffect(() => {
+    const openSwitcher = () => { setMode("global"); setQuery(""); setSelected(0); setOpen(true); };
+    window.addEventListener(QUICK_SWITCHER_EVENT, openSwitcher);
+    return () => window.removeEventListener(QUICK_SWITCHER_EVENT, openSwitcher);
+  }, []);
 
   // ─── Глобальные клавиши: Ctrl/Cmd+K (везде), Ctrl/Cmd+F (в заметке, если
   //     она открыта, иначе везде), Tab (сменить область), Esc (закрыть).
