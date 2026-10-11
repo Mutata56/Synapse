@@ -15,13 +15,13 @@ const tauriPlugin = { name: "test-tauri-filesystem", setup(builder) {
       if (args.path === "@tauri-apps/api/path") return { contents: `const fs = globalThis.__synapseTestFs;
         export const appDataDir = async () => fs.root;
         export const join = async (...parts) => parts.join('/');` };
-      if (args.path === "@tauri-apps/api/core") return { contents: "export const convertFileSrc = path => 'asset:///' + encodeURIComponent(path); export const invoke = async (name) => { throw new Error('Unexpected invoke: ' + name); };" };
+      if (args.path === "@tauri-apps/api/core") return { contents: "export const isTauri = () => false; export const convertFileSrc = path => 'asset:///' + encodeURIComponent(path); export const invoke = async (name) => { throw new Error('Unexpected invoke: ' + name); };" };
       throw new Error(`Unexpected Tauri dependency: ${args.path}`);
     });
   } };
 const buildOptions = { bundle: true, write: false, platform: "node", format: "esm", plugins: [tauriPlugin] };
 const storageBuild = await build({ ...buildOptions, entryPoints: [path.join(project, "src/lib/storage.ts")] });
-const storeBuild = await build({ ...buildOptions, stdin: { contents: "export * from './src/lib/storage.ts'; export { useNotesStore } from './src/store/notes.ts'; export { useToastStore } from './src/store/toasts.ts';", resolveDir: project } });
+const storeBuild = await build({ ...buildOptions, stdin: { contents: "export * from './src/lib/storage.ts'; export { useNotesStore, registerFlusher, flushAllPending } from './src/store/notes.ts'; export { useToastStore } from './src/store/toasts.ts';", resolveDir: project } });
 
 export async function fixture(t, sources = {}, existingVault, withStore = false, trace = () => {}) {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "synapse-import-test-"));

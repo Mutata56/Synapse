@@ -5,7 +5,10 @@
 // `dataTableBlock()`.
 
 import { createReactBlockSpec } from "@blocknote/react";
-import { DataTableView } from "./DataTableView";
+import { lazy, Suspense } from "react";
+import { ModuleBlockGate } from "../../components/ModuleBlockGate";
+import { t } from "../../lib/i18n";
+const DataTableView = lazy(() => import("./DataTableView").then(module => ({ default: module.DataTableView })));
 import {
   emptyModel,
   modelToHtmlTable,
@@ -29,7 +32,7 @@ export const dataTableBlock = createReactBlockSpec(
     // а не NodeSelection на таблицу (фикс бага caret-after-block).
     meta: { isolating: false, selectable: false },
     render: (props) => (
-      <DataTableView block={props.block} editor={props.editor} />
+      <ModuleBlockGate module="database"><Suspense fallback={<div role="status">{t("Загрузка…")}</div>}><DataTableView block={props.block} editor={props.editor} /></Suspense></ModuleBlockGate>
     ),
     // Портативный статический <table> для HTML/markdown-экспорта (потерьный:
     // типы ячеек сворачиваются в текст). Богатая модель сохраняется через
