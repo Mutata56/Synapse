@@ -16,6 +16,26 @@
 // строках UI на местах. Главное - ключи тут должны совпадать со строками в
 // вызовах t(), иначе перевод молча не подхватится.
 const en: Record<string, string> = {
+  // All notes library
+  "Название, папка или тег…": "Title, folder or tag\u2026",
+  "Поиск заметок": "Search notes",
+  "Раздел библиотеки": "Library section",
+  "Вся библиотека": "Entire library",
+  "Все теги": "All tags",
+  "Фильтр по тегу": "Tag filter",
+  "Группировка заметок": "Note grouping",
+  "По разделам": "By section",
+  "По папкам": "By folder",
+  "Без группировки": "No grouping",
+  "Крупные карточки": "Large cards",
+  "Компактные карточки": "Compact cards",
+  "Карточки заметок": "Note cards",
+  "Быстрый просмотр": "Quick preview",
+  "Закрыть просмотр": "Close preview",
+  "Открыть раздел": "Open section",
+  "Без папки": "No folder",
+  "Измени запрос или сбрось фильтры": "Change your search or reset filters",
+  "Создай первую заметку": "Create your first note",
   "Поиск по заметкам, тегам…": "Search notes and tags…",
   "Найдено {n} заметок": "Found {n} notes",
   "По дате обновления": "Last updated",
