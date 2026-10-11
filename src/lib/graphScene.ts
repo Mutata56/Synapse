@@ -39,6 +39,7 @@ export class GraphScene {
   private width = 1;
   private height = 1;
   private hovered = -1;
+  private pointer: { clientX: number; clientY: number } | null = null;
   private selected = -1;
   private pins = new Set<number>();
   private focused: number | null = null;
@@ -337,6 +338,9 @@ export class GraphScene {
     }
     const breathe = this.mode === "volume" && this.appearance.breathing && !matchMedia("(prefers-reduced-motion: reduce)").matches && now - this.lastInteraction < 1600;
     const interacting = !!this.target || now - this.lastInteraction < 180;
+    // Layout and camera motion can move a node away from a stationary pointer.
+    // Reuse this requested frame; hover must never keep an idle loop running.
+    this.updateHover();
     this.painter.paint({ positions: this.positions, active: this.active, camera: this.camera, appearance: this.appearance, hovered: this.hovered, selected: this.selected, radii: this.radii, colors: this.colors, now, pulse: breathe ? 1 + Math.sin(now / 650) * 0.012 : 1, geometryVersion: this.geometryVersion, moving: this.moving, interacting });
     const workMs = performance.now() - started;
     recordGraphDiagnostic("paints"); recordGraphDiagnostic("paintMs", workMs);
@@ -382,6 +386,22 @@ export class GraphScene {
     return nearest;
   }
 
+  private updateHover(): boolean {
+    if (this.down || !this.painter) return false;
+    const canvas = this.painter.canvas;
+    let hovered = -1;
+    if (this.pointer) {
+      const rect = canvas.getBoundingClientRect();
+      const x = this.pointer.clientX - rect.left, y = this.pointer.clientY - rect.top;
+      if (x >= 0 && y >= 0 && x < this.width && y < this.height) hovered = this.hit(x, y);
+    }
+    const changed = hovered !== this.hovered;
+    this.hovered = hovered;
+    const cursor = hovered >= 0 ? "pointer" : "grab";
+    if (canvas.style.cursor !== cursor) canvas.style.cursor = cursor;
+    return changed;
+  }
+
   private bindEvents(canvas: HTMLCanvasElement) {
     const point = (event: MouseEvent | PointerEvent) => { const rect = canvas.getBoundingClientRect(); return { x: event.clientX - rect.left, y: event.clientY - rect.top }; };
     const listen = <K extends keyof HTMLElementEventMap>(kind: K, handler: (event: HTMLElementEventMap[K]) => void, options?: AddEventListenerOptions) => {
@@ -390,6 +410,7 @@ export class GraphScene {
     listen("pointerdown", (event) => {
       if (event.button !== 0 && event.button !== 1) return;
       this.background = document.hidden; this.synchronizeActivity(); canvas.focus({ preventScroll: true });
+      this.pointer = { clientX: event.clientX, clientY: event.clientY };
       const p = point(event); this.down = { ...p, camera: { ...this.camera } }; this.dragging = false;
       this.dragged = event.button === 0 ? this.hit(p.x, p.y) : -1;
       this.dragPinned = this.pins.has(this.dragged); this.target = null; this.userInteracted = true;
@@ -397,6 +418,7 @@ export class GraphScene {
     });
     listen("pointermove", (event) => {
       const p = point(event);
+      this.pointer = { clientX: event.clientX, clientY: event.clientY };
       if (this.down) {
         this.dragging ||= Math.hypot(p.x - this.down.x, p.y - this.down.y) > 4;
         if (this.dragged >= 0 && this.dragging) {
@@ -408,8 +430,7 @@ export class GraphScene {
         }
         this.lastInteraction = performance.now(); this.loop.request(); this.publishMap(true);
       } else {
-        const hover = this.hit(p.x, p.y);
-        if (hover !== this.hovered) { this.hovered = hover; canvas.style.cursor = hover >= 0 ? "pointer" : "grab"; this.loop.request(); }
+        if (this.updateHover()) this.loop.request();
       }
     });
     const release = (event: PointerEvent, canceled = false) => {
@@ -421,10 +442,13 @@ export class GraphScene {
         else { this.selected = this.dragged; this.callbacks.select(key); this.loop.request(); }
       }
       this.down = null; this.dragged = -1; this.dragging = false;
+      this.pointer = canceled ? null : { clientX: event.clientX, clientY: event.clientY };
       if (canvas.hasPointerCapture(event.pointerId)) canvas.releasePointerCapture(event.pointerId);
+      if (this.updateHover()) this.loop.request();
     };
     listen("pointerup", (event) => release(event)); listen("pointercancel", (event) => release(event, true));
-    listen("pointerleave", () => { if (!this.down && this.hovered >= 0) { this.hovered = -1; this.loop.request(); } });
+    listen("lostpointercapture", (event) => { if (this.down) release(event, true); });
+    listen("pointerleave", () => { this.pointer = null; if (this.updateHover()) this.loop.request(); });
     listen("dblclick", (event) => { const p = point(event), index = this.hit(p.x, p.y); if (index >= 0) this.callbacks.open(this.data.nodes[index].key); });
     listen("contextmenu", (event) => { event.preventDefault(); const p = point(event), index = this.hit(p.x, p.y); if (index >= 0) { event.stopPropagation(); this.callbacks.context(this.data.nodes[index].key, event.clientX, event.clientY, this.pins.has(index)); } });
     listen("wheel", (event) => { event.preventDefault(); const p = point(event); this.target = null; this.camera = zoomAt(this.camera, p.x, p.y, Math.exp(-clamp(event.deltaY, -120, 120) * 0.0025)); this.userInteracted = true; this.lastInteraction = performance.now(); this.loop.request(); this.publishMap(true); }, { passive: false });
@@ -440,7 +464,7 @@ export class GraphScene {
         this.userInteracted = true; this.loop.request(); this.publishMap(true);
       }
     });
-    const hide = () => { this.background = true; this.synchronizeActivity(); };
+    const hide = () => { this.pointer = null; this.background = true; this.synchronizeActivity(); };
     const show = () => { this.background = document.hidden; this.synchronizeActivity(); };
     window.addEventListener("blur", hide); window.addEventListener("focus", show); document.addEventListener("visibilitychange", show);
     this.cleanup.push(() => { window.removeEventListener("blur", hide); window.removeEventListener("focus", show); document.removeEventListener("visibilitychange", show); });
