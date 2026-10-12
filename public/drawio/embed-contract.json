@@ -1,0 +1,162 @@
+{
+  "version": "32.4.1",
+  "editorUrl": "/drawio/index.html?embed=1&proto=json&configure=1&lang=ru&dark=1&noSaveBtn=1&noExitBtn=1&spin=1&keepmodified=1&saveAndExit=0",
+  "defaultHostConfig": {
+    "compressXml": false,
+    "enableExportUrl": false,
+    "enableNativeClipboard": true,
+    "enableCustomLibraries": true,
+    "fitDiagramOnLoad": true,
+    "preserveViewState": true,
+    "suppressNewWindows": true,
+    "sidebarWidth": 200,
+    "darkColor": "#0e0e10",
+    "defaultDarkPageBackgroundColor": "#0e0e10"
+  },
+  "handshake": [
+    "editor event:configure -> host action:configure config",
+    "editor event:init -> host action:load xml/autosave=1/exportProtocol=1",
+    "editor event:load -> ready"
+  ],
+  "wireEncoding": "JSON.stringify, parsed as event.data in both directions",
+  "validateIncoming": "event.source must equal the chosen iframe.contentWindow, and event.origin must equal new URL(iframe.src).origin after actual runtime verification; do not hard-code a development origin or permit remote navigation",
+  "correlation": "Add requestId to each request; export responses echo the complete request in response.message (response.message.requestId)",
+  "exports": {
+    "xml": {
+      "request": {
+        "action": "export",
+        "format": "xml"
+      },
+      "response": "event:export format:xml xml=<all mxfile pages>"
+    },
+    "svg": {
+      "request": {
+        "action": "export",
+        "format": "xmlsvg",
+        "asText": true,
+        "embedImages": true,
+        "embedFonts": true,
+        "border": 16
+      },
+      "response": "event:export format:svg data=<SVG text> xml=<whole source file>",
+      "pageScope": "Active graph only; pageId/currentPage are not honored by SVG branch. Send a single-page mxfile as xml, or switch the editor page through an explicit host adapter."
+    },
+    "png": {
+      "request": {
+        "action": "export",
+        "format": "xmlpng",
+        "currentPage": true,
+        "scale": 2,
+        "border": 16,
+        "embedImages": true
+      },
+      "response": "event:export format:xmlpng data=<data:image/png;base64> xml=<whole source file>",
+      "pageScope": "pageId selects a page; currentPage=true selects active page; otherwise first page. Embedded XML retains all supplied pages. Test viewState/background fidelity for non-active page; one-page XML gives a stable host export boundary."
+    },
+    "multiPage": "XML retains all pages. For separate SVG/PNG pages use serialized one-page XML snapshots and separate requestIds, restoring the live document after export; for PDF the host owns pagination. No action:export PDF branch is present.",
+    "html": {
+      "request": {
+        "action": "export",
+        "format": "xml",
+        "requestId": "portable-html-1"
+      },
+      "response": "event:export format:xml xml=<all mxfile pages>, message=<original request>; host builds the portable viewer document from this XML.",
+      "hostBuild": "Create a .mxgraph element with data-mxgraph JSON containing xml, nav:true, resize:true, toolbar:\"pages zoom layers lightbox\" and desired initial page. Inline the complete published js/viewer-static.min.js as a classic script. Do not keep core html2 meta-refresh/editor logo link.",
+      "viewer": "js/viewer-static.min.js contains the pinned official viewer plus a local bootstrap and legacy compressed-div compatibility. js/embed-static.min.js is its small legacy alias.",
+      "coreHtml2": {
+        "request": {
+          "action": "export",
+          "format": "html2"
+        },
+        "response": "event:export format:html2 data=<HTML with editor meta-refresh in EmbedFile mode> xml=<whole mxfile>",
+        "portable": false,
+        "cause": "Export handler calls getFileData(...html=true). createFileData assigns its redirect URL to window.location.href for EmbedFile MODE_EMBED; getHtml2 emits meta-refresh and logo link instead of viewer script when redirect URL is non-null.",
+        "options": "No JSON export option to suppress this redirect is read by the shipped handler. allPages is not read by either HTML branch."
+      },
+      "legacySinglePage": {
+        "request": {
+          "action": "export",
+          "format": "html"
+        },
+        "requires": "Editor URL pages=0 AND this.pages absent or length <= 1. For >1 pages, html takes the same redirected html2 branch.",
+        "response": "event:export format:html data=<legacy compressed-div HTML with local embed-static script> xml=<active mxGraphModel>",
+        "scope": "Single active graph only; not the portable multi-page export contract."
+      },
+      "standalone": "Host owns portable document assembly and embedded images/fonts/math resources. Private Tauri or development URLs are not portable dependencies.",
+      "evidence": {
+        "member": "drawio/src/main/webapp/js/app.min.js",
+        "sha256": "6b459480290f96a8c345ee636523a86e6de6ef5ffb62532cfc04a5b4a896b7e0",
+        "analystReadableSource": "readable/app.js (formatting aid linked to the exact minified member)",
+        "ranges": {
+          "exportHtmlBranch": [
+            105532,
+            105541
+          ],
+          "getFileDataForwarding": [
+            96937,
+            96958
+          ],
+          "fileModeRedirectDecision": [
+            96792,
+            96799
+          ],
+          "getHtml2Output": [
+            96982,
+            96993
+          ],
+          "legacyGetHtmlOutput": [
+            96961,
+            96980
+          ]
+        },
+        "runtimeConfirmation": "Synthetic fixture-export.html contains a local editor meta-refresh and no viewer script, matching this EmbedFile path.",
+        "viewer": {
+          "officialSource": "src/main/webapp/js/viewer-static.min.js",
+          "commit": "9034053fba80a435e27d68d374bc564b83917ae9",
+          "sha256": "bc7586cb62eec98018c13b78619078d3a7179cc7bfc711c566dda19527520a30",
+          "lineRanges": {
+            "toolbarAndInitialPage": [
+              5432,
+              5435
+            ],
+            "diagramCollectionAndPageChange": [
+              5442,
+              5444
+            ],
+            "navFolding": [
+              5445,
+              5445
+            ],
+            "pagesToolbarControls": [
+              5477,
+              5479
+            ]
+          },
+          "basis": "Exact official source before local wrapper, classic-script static reads only."
+        }
+      },
+      "dataMxgraphExample": {
+        "xml": "<mxfile>...all diagram pages...</mxfile>",
+        "toolbar": "pages zoom layers lightbox",
+        "page": 0,
+        "nav": true,
+        "resize": true
+      },
+      "viewerKeys": {
+        "toolbar": "Space-separated item names. The pages token creates previous/next controls and an n / total counter, visible only when diagram count > 1. zoom/layers/lightbox add those tools.",
+        "page": "Zero-based initial page index; parsed with parseInt(config.page) || 0.",
+        "pageId": "Optional diagram ID read by the viewer initialization; page remains the simple initial index contract.",
+        "nav": "Controls editor folding/navigation behavior via urlParams.nav; it is not the page-switcher flag.",
+        "resize": "Controls viewer/container sizing; it is not the page-switcher flag.",
+        "pages_or_pageSwitcher": "No graphConfig.pages or pageSwitcher option is read by this exact viewer. Use the pages token in toolbar and retain all <diagram> nodes in xml."
+      }
+    }
+  },
+  "runtimeLimits": [
+    "PNG depends on the browser foreignObject-to-canvas probe. With no remote export server a failed probe yields the upstream blank image fallback; host should detect failure rather than claim success.",
+    "Passing export.xml replaces the live editor file data. Run host exports serially in a dedicated export iframe, or snapshot and restore the live document; do not overwrite accepted edits.",
+    "save clears modified immediately unless keepmodified=1; durable-write acknowledgment belongs to host and may set status.modified=false.",
+    "Standalone HTML must inline its viewer dependency and any required media/fonts/math resource; a Tauri-hosted resource URL cannot be assumed accessible outside the application.",
+    "Core action:export html2 in EmbedFile mode yields an editor-redirect HTML, not a portable viewer. Portable multi-page HTML must be assembled by the host from XML; there is no noRedirect JSON option in the shipped export handler."
+  ]
+}

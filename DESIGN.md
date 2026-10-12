@@ -264,6 +264,16 @@ typography:
     fontSize: "9px"
   calendar-narrow-hour:
     fontSize: "8px"
+  drawio-title:
+    fontFamily: "Inter, sans-serif"
+    fontSize: "13px"
+    fontWeight: 600
+  drawio-control:
+    fontFamily: "Inter, sans-serif"
+    fontSize: "13px"
+  drawio-context:
+    fontFamily: "Inter, sans-serif"
+    fontSize: "12px"
 rounded:
   note-callout: "10px"
   control: "6px"
@@ -530,6 +540,12 @@ components:
     rounded: "{rounded.calendar-week-chip}"
     padding: "3px 4px"
     height: "18px"
+  drawio-host-action:
+    backgroundColor: "var(--color-surface)"
+    textColor: "{colors.foreground}"
+    typography: "{typography.drawio-control}"
+    rounded: "{rounded.control}"
+    padding: "5px 8px"
 ---
 
 # Design System: Synapse
@@ -551,6 +567,8 @@ The implemented workspace shell supplies an approved shell extension, evidenced 
 The implemented Calendar workspace supplies a scoped extension, evidenced by src/components/calendar.css, CalendarView, CalendarTaskRow, CalendarWeek and the finished synthetic review captures. Its calendar- entries retain the incumbent Inter family, dark semantic surfaces and violet interaction states while recording local source colors, compact date context and bounded planning controls. Direction, composition, benchmark limits and review acceptance stay in .impeccable/surfaces/src-components-calendarview-tsx.md. Local light overrides were tested with synthetic semantic tokens; the application still ships the established dark palette.
 
 The optional AnuPpuccin · Dracula preset supplies a user-selected color system, evidenced by `src/themes/anuppuccin.css`, the current settings application and the reviewed desktop/narrow captures. The incumbent color tokens and violet descriptions below continue to describe the Synapse preset, which remains the default for new and older workspaces. AnuPpuccin rebinds those semantic roles only when selected: it preserves the established fonts, type ramp, shapes, layout and local surface behavior. The `anu-` tokens record the imported palette and supported reading/folder colors; the direction and verification scope stay in `.impeccable/surfaces/src-themes-anuppuccin-css.md`.
+
+The implemented Canvas supplies a scoped extension, evidenced by `DrawioCanvas.tsx`, `whiteboardBlock.tsx`, `drawio.css` and the synthetic desktop/narrow captures. The complete local draw.io 32.4.1 browser editor owns drawing interaction inside the existing fullscreen flow. The host inherits the workspace semantic palette and Inter UI family; the local iframe retains its separate dark editor chrome. The `drawio-` entries record host title, control and context roles while reusing the established control radius. Direction, recovery behavior and the browser/native verification boundary stay in `.impeccable/surfaces/src-editor2026-blocks-whiteboard-drawiocanvas-tsx.md`; integration details stay in `docs/drawio-canvas.md`.
 
 **Key Characteristics:**
 
@@ -831,6 +849,18 @@ The inline composer belongs to the selected day and supports all-day or timed cr
 The journal action opens or creates the selected day's daily note through the existing route, showing a bounded cached preview and mood when present. Dated-note and history actions use the existing editor. The calendar footer carries the writing streak and mood summary, not a decorative chart. Task-load and external-sync notices use labeled status/error text and retry actions; filtered-empty lists offer a filter reset.
 
 The connection menu exposes deliberate iCal refresh, configured CalDAV sending, settings and the last-sync time. It keeps external reading and task sending distinct. No demonstration entries or raster artwork are added to the user's content. The snippets in the sidecar use illustrative labels solely to show implemented controls.
+
+### Canvas host and embedded editor
+
+The host toolbar uses Inter through the existing UI role, a 13px semibold title, inherited 13px controls and 12px secondary status. Its semantic surface and border belong to the selected workspace appearance, including an explicitly selected AnuPpuccin preset. The iframe has a separate scoped dark stylesheet and upstream menu, palette, page bar and inspector; do not turn its fixed editor colors into global application tokens.
+
+The host bar is at least 48px high, with 8px/12px insets and a 12px region gap. Named icon actions and the export selector reuse the 6px control radius, a thin semantic border, 5px/8px inset and at least 32px dimensions. Hover uses the existing accent background, keyboard focus uses a 2px accent outline with a 2px offset, and unavailable actions use 0.45 opacity. Lucide outlines remain 16px for file/save/export/recovery and 18px for close. At 800px, bar spacing becomes 8px with 6px/8px insets, secondary status hides, title width is bounded to 30%, and actions retain accessible labels and at least 30px width. These compact values belong to the Canvas host.
+
+**The Canvas Host Rule.** Within Canvas, host controls and task states use Synapse semantic surface, foreground, border and accent variables. The embedded editor owns shape menus, properties and page navigation; document colors remain document data.
+
+Import confirmation and errors are labeled alert rows within the host; loading and save feedback are status regions. Import copy states that the chosen file replaces the current canvas and exposes Replace and Cancel. The single persisted previous-document slot supplies an explicit recovery action. The dialog makes background siblings inert, contains focus across the host and iframe, locks body scrolling and returns focus to its opener after successful save and close. The inline preview remains a 140px image or the existing legacy thumbnail.
+
+**The Canvas Recovery Rule.** Within Canvas, file import requires an explicit replacement action and preserves one previous document with the block. Keep the recovery action available after saving and reopening, and keep unreadable source data intact.
 
 ## Do's and Don'ts
 

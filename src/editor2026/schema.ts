@@ -80,7 +80,7 @@ export function createNotesSchema() {
       columnList: ColumnListBlock,
       column: ColumnBlock,
 
-      // Фаза 6: бесконечный холст whiteboard (наш Canvas-2D движок, ленивая загрузка).
+      // Фаза 6: холст whiteboard (локальный draw.io, ленивая загрузка).
       whiteboard: whiteboardBlock(),
 
       // Раскомментировать по мере создания спек:

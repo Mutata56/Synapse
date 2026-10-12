@@ -4,6 +4,7 @@ use std::sync::Mutex;
 mod single_instance_macos;
 mod image_previews;
 mod iconize_import;
+mod canvas_pdf;
 #[cfg(desktop)]
 mod image_inventory;
 #[cfg(desktop)]
@@ -530,6 +531,7 @@ pub fn run() {
         .manage(CaptureShortcut::default())
         .manage(image_previews::PreviewJobs::default())
         .invoke_handler(tauri::generate_handler![
+            canvas_pdf::canvas_render_pdf_page,
             iconize_import::read_iconize_import,
             image_previews::image_preview,
             image_inventory::image_inventory,

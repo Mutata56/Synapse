@@ -21,7 +21,7 @@ tauri-plugin-global-shortcut = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 image = { version = "0.25.8", default-features = false, features = ["png", "jpeg", "webp", "gif", "bmp", "tiff", "ico"] }
-tokio = { version = "1", features = ["sync"] }
+tokio = { version = "1", features = ["sync", "time"] }
 # Read-only iCalendar (.ics) fetch for calendar sync. Done in Rust so the
 # request isn't subject to the webview's CORS policy. native-tls uses schannel
 # on Windows (no OpenSSL); gzip handles compressed ICS exports.
@@ -32,3 +32,8 @@ tauri-plugin-single-instance = "2"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 fs2 = "0.4"
+# Offscreen SVG -> vector PDF using the system WebKit renderer.
+objc2 = "0.6.4"
+block2 = "0.6.2"
+objc2-foundation = { version = "0.3.2", default-features = false, features = ["std", "NSData", "NSError", "NSString", "NSGeometry", "objc2-core-foundation"] }
+objc2-web-kit = { version = "0.3.2", default-features = false, features = ["std", "WKWebView", "WKWebViewConfiguration", "WKWebsiteDataStore", "WKNavigation", "WKPDFConfiguration", "block2", "objc2-app-kit", "objc2-core-foundation"] }

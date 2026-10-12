@@ -161,6 +161,10 @@
       {
         "name": "calendar-small-container",
         "value": "450px"
+      },
+      {
+        "name": "drawio-compact-viewport",
+        "value": "800px"
       }
     ],
     "colorMeta": {
@@ -976,6 +980,18 @@
       "source-markdown": {
         "displayName": "Source Markdown",
         "purpose": "JetBrains Mono26px/1.5 matching the note base."
+      },
+      "drawio-title": {
+        "displayName": "Canvas host title",
+        "purpose": "Bounded single-line 13px semibold document title above the embedded editor."
+      },
+      "drawio-control": {
+        "displayName": "Canvas host controls",
+        "purpose": "Inherited 13px host file, export, save, recovery and error actions."
+      },
+      "drawio-context": {
+        "displayName": "Canvas host save context",
+        "purpose": "12px secondary load/save status, hidden at the compact viewport."
       }
     },
     "fontAssets": {
@@ -1323,11 +1339,19 @@
       "description": "Illustrative mixed crowded hour: two combined previews and a reachable +1 overflow within the implemented fixed slot.",
       "html": "<div class=\"ds-calendar-hour\"><span>11:00</span><div class=\"ds-calendar-slot\"><div class=\"ds-calendar-slot-items\"><button type=\"button\" class=\"ds-calendar-hour-chip ds-calendar-hour-task\">План</button><button type=\"button\" class=\"ds-calendar-hour-chip ds-calendar-hour-event\">Встреча</button><button type=\"button\" class=\"ds-calendar-more\" aria-label=\"Открыть ещё одну запись этого дня\">+1</button></div></div></div>",
       "css": ".ds-calendar-hour{display:grid;grid-template-columns:48px minmax(0,1fr);height:63px;border-bottom:1px solid var(--color-border);font-family:var(--font-sans,Inter,system-ui,sans-serif);font-size:13px}.ds-calendar-hour>span{display:flex;align-items:flex-start;justify-content:flex-end;padding:8px 8px 0 0;border-top:1px solid var(--color-border);color:var(--cal-muted,color-mix(in srgb,var(--color-text) 70%,var(--color-bg)));font-size:10px}.ds-calendar-slot{min-width:0;border-top:1px solid var(--color-border);border-right:1px solid var(--color-border)}.ds-calendar-slot-items{display:flex;flex-direction:column;gap:2px;margin:3px;max-height:57px;overflow:hidden}.ds-calendar-hour-chip{display:flex;align-items:center;flex:0 0 auto;height:18px;min-width:0;max-width:100%;padding:3px 4px;border:0;border-radius:3px;background:color-mix(in srgb,currentColor 9%,transparent);font-family:var(--font-sans,Inter,system-ui,sans-serif);font-size:13px;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer}.ds-calendar-hour-task{color:var(--cal-task,#e0af64)}.ds-calendar-hour-event{color:var(--cal-event,#86b6f6)}.ds-calendar-more{flex:0 0 auto;padding:1px 4px;border:0;background:transparent;color:var(--cal-muted,color-mix(in srgb,var(--color-text) 70%,var(--color-bg)));font-family:var(--font-sans,Inter,system-ui,sans-serif);font-size:13px;line-height:12px;text-align:left;cursor:pointer}.ds-calendar-hour-chip:focus-visible,.ds-calendar-more:focus-visible{outline:2px solid var(--color-accent);outline-offset:3px;}"
+    },
+    {
+      "name": "Canvas host outline action",
+      "kind": "button",
+      "refersTo": "drawio-host-action",
+      "description": "Scoped host action with the actual control geometry, Synapse semantic colors and a 16px Lucide outline icon.",
+      "html": "<button type=\"button\" class=\"ds-drawio-action\" aria-label=\"Сохранить холст\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z\"/><path d=\"M17 21v-7a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v7M7 3v4a1 1 0 0 0 1 1h7\"/></svg></button>",
+      "css": ".ds-drawio-action{display:inline-flex;align-items:center;justify-content:center;min-width:32px;min-height:32px;padding:5px 8px;border:1px solid var(--color-border);border-radius:6px;background:var(--color-surface);color:var(--color-text);font-family:var(--font-ui,Inter,sans-serif);font-size:13px}.ds-drawio-action:hover{background:var(--color-accent-bg)}.ds-drawio-action:focus-visible{outline:2px solid var(--color-accent);outline-offset:2px}.ds-drawio-action:disabled{opacity:.45;cursor:default}@media(max-width:800px){.ds-drawio-action{padding:4px;min-width:30px}}"
     }
   ],
   "narrative": {
     "northStar": "Existing Synapse desktop interface",
-    "overview": "This records the incumbent visual system, rather than a new identity. The authority is `src/index.css`, the existing Sidebar, TagsView, NoteCard, and the running desktop interface. New local surfaces inherit this shell; their own layout decisions stay in surface briefs.\n\nThe implemented Tags finder supplies a scoped extension, evidenced by `src/components/TagsView.css` and the approved actual viewport. Its dense rows, mint tag markers and quiet reading area use the incumbent shell and semantic tokens. The `tags-` entries below describe this surface; they do not replace the global type or shape vocabulary.\n\nThe implemented All Notes library supplies a second scoped extension, evidenced by `src/components/NotesGallery.css` and the finished desktop, narrow and reading captures. Its `library-` entries retain the incumbent palette and font family while recording the library's content cards, context contrast and compact controls. Surface composition and acceptance evidence stay in `.impeccable/surfaces/src-components-notesgallery-tsx.md`.\n\nThe implemented Files and Trash workspace supplies a scoped extension, evidenced by `src/components/fileBrowser.css`, the shared `FileBrowser` and the finished dark desktop, narrow and Trash captures. Its `files-` entries record a dense work table, a current-folder route, selection actions and a collapsible properties region. It inherits the same Inter family, dark surfaces and violet interaction states. Surface direction and delegated-choice provenance stay in `.impeccable/surfaces/src-components-filesview-tsx.md`; operation details stay in `docs/FILES_BROWSER.md`.\n\nThe implemented workspace shell supplies an approved shell extension, evidenced by `src/components/workspace.css`, `WorkspaceChrome`, `Sidebar`, and the finished desktop and narrow captures. It keeps the incumbent palette while adding docked utility chrome, document tabs and a bounded active work region. The `workspace-` entries describe the shell itself; the specific Obsidian reference, pinned composition and quality bar stay in `.impeccable/surfaces/src-app-tsx.md`. Existing local views retain their own scoped systems inside the work region.\n\nThe implemented Calendar workspace supplies a scoped extension, evidenced by src/components/calendar.css, CalendarView, CalendarTaskRow, CalendarWeek and the finished synthetic review captures. Its calendar- entries retain the incumbent Inter family, dark semantic surfaces and violet interaction states while recording local source colors, compact date context and bounded planning controls. Direction, composition, benchmark limits and review acceptance stay in .impeccable/surfaces/src-components-calendarview-tsx.md. Local light overrides were tested with synthetic semantic tokens; the application still ships the established dark palette.\n\nThe optional AnuPpuccin · Dracula preset supplies a user-selected color system, evidenced by `src/themes/anuppuccin.css`, the current settings application and the reviewed desktop/narrow captures. The incumbent color tokens and violet descriptions below continue to describe the Synapse preset, which remains the default for new and older workspaces. AnuPpuccin rebinds those semantic roles only when selected: it preserves the established fonts, type ramp, shapes, layout and local surface behavior. The `anu-` tokens record the imported palette and supported reading/folder colors; the direction and verification scope stay in `.impeccable/surfaces/src-themes-anuppuccin-css.md`.",
+    "overview": "This records the incumbent visual system, rather than a new identity. The authority is `src/index.css`, the existing Sidebar, TagsView, NoteCard, and the running desktop interface. New local surfaces inherit this shell; their own layout decisions stay in surface briefs.\n\nThe implemented Tags finder supplies a scoped extension, evidenced by `src/components/TagsView.css` and the approved actual viewport. Its dense rows, mint tag markers and quiet reading area use the incumbent shell and semantic tokens. The `tags-` entries below describe this surface; they do not replace the global type or shape vocabulary.\n\nThe implemented All Notes library supplies a second scoped extension, evidenced by `src/components/NotesGallery.css` and the finished desktop, narrow and reading captures. Its `library-` entries retain the incumbent palette and font family while recording the library's content cards, context contrast and compact controls. Surface composition and acceptance evidence stay in `.impeccable/surfaces/src-components-notesgallery-tsx.md`.\n\nThe implemented Files and Trash workspace supplies a scoped extension, evidenced by `src/components/fileBrowser.css`, the shared `FileBrowser` and the finished dark desktop, narrow and Trash captures. Its `files-` entries record a dense work table, a current-folder route, selection actions and a collapsible properties region. It inherits the same Inter family, dark surfaces and violet interaction states. Surface direction and delegated-choice provenance stay in `.impeccable/surfaces/src-components-filesview-tsx.md`; operation details stay in `docs/FILES_BROWSER.md`.\n\nThe implemented workspace shell supplies an approved shell extension, evidenced by `src/components/workspace.css`, `WorkspaceChrome`, `Sidebar`, and the finished desktop and narrow captures. It keeps the incumbent palette while adding docked utility chrome, document tabs and a bounded active work region. The `workspace-` entries describe the shell itself; the specific Obsidian reference, pinned composition and quality bar stay in `.impeccable/surfaces/src-app-tsx.md`. Existing local views retain their own scoped systems inside the work region.\n\nThe implemented Calendar workspace supplies a scoped extension, evidenced by src/components/calendar.css, CalendarView, CalendarTaskRow, CalendarWeek and the finished synthetic review captures. Its calendar- entries retain the incumbent Inter family, dark semantic surfaces and violet interaction states while recording local source colors, compact date context and bounded planning controls. Direction, composition, benchmark limits and review acceptance stay in .impeccable/surfaces/src-components-calendarview-tsx.md. Local light overrides were tested with synthetic semantic tokens; the application still ships the established dark palette.\n\nThe optional AnuPpuccin · Dracula preset supplies a user-selected color system, evidenced by `src/themes/anuppuccin.css`, the current settings application and the reviewed desktop/narrow captures. The incumbent color tokens and violet descriptions below continue to describe the Synapse preset, which remains the default for new and older workspaces. AnuPpuccin rebinds those semantic roles only when selected: it preserves the established fonts, type ramp, shapes, layout and local surface behavior. The `anu-` tokens record the imported palette and supported reading/folder colors; the direction and verification scope stay in `.impeccable/surfaces/src-themes-anuppuccin-css.md`.\n\nThe implemented Canvas supplies a scoped extension, evidenced by `DrawioCanvas.tsx`, `whiteboardBlock.tsx`, `drawio.css` and the synthetic desktop/narrow captures. The complete local draw.io 32.4.1 browser editor owns drawing interaction inside the existing fullscreen flow. The host inherits the workspace semantic palette and Inter UI family; the local iframe retains its separate dark editor chrome. The `drawio-` entries record host title, control and context roles while reusing the established control radius. Direction, recovery behavior and the browser/native verification boundary stay in `.impeccable/surfaces/src-editor2026-blocks-whiteboard-drawiocanvas-tsx.md`; integration details stay in `docs/drawio-canvas.md`.",
     "keyCharacteristics": [
       "Dark tonal surfaces",
       "Violet selection",
@@ -1410,6 +1434,16 @@
         "name": "The Reading Color Rule",
         "body": "Apply the six heading colors and supported code, quote and table roles as rendering styles. Preserve Markdown bytes, editor instances, the established type scale and each reader's local geometry when appearance changes.",
         "section": "components"
+      },
+      {
+        "name": "The Canvas Host Rule",
+        "body": "Within Canvas, host controls and task states use Synapse semantic surface, foreground, border and accent variables. The embedded editor owns shape menus, properties and page navigation; document colors remain document data.",
+        "section": "components"
+      },
+      {
+        "name": "The Canvas Recovery Rule",
+        "body": "Within Canvas, file import requires an explicit replacement action and preserves one previous document with the block. Keep the recovery action available after saving and reopening, and keep unreadable source data intact.",
+        "section": "components"
       }
     ],
     "dos": [
@@ -1447,5 +1481,5 @@
       "Don't treat Calendar's synthetic light-token capture as a shipped global application light theme."
     ]
   },
-  "generatedAt": "2026-10-11T18:55:25.239365+00:00"
+  "generatedAt": "2026-10-12T08:37:32.954707+00:00"
 }

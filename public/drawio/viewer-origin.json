@@ -1,0 +1,12 @@
+{
+  "repository": "https://github.com/jgraph/drawio",
+  "tag": "v32.4.1",
+  "tagObject": "ea90828c83b7a9c43208b9e3b9cc62036b518eb7",
+  "commit": "9034053fba80a435e27d68d374bc564b83917ae9",
+  "gitBlobSha": "1567641947042e5817b749e7193885ad5075041b",
+  "member": "src/main/webapp/js/viewer-static.min.js",
+  "url": "https://raw.githubusercontent.com/jgraph/drawio/9034053fba80a435e27d68d374bc564b83917ae9/src/main/webapp/js/viewer-static.min.js",
+  "sha256": "bc7586cb62eec98018c13b78619078d3a7179cc7bfc711c566dda19527520a30",
+  "bytes": 4360162,
+  "verification": "Official exact-tag commit resolved via GitHub API; SHA-256 and Git blob SHA matched. This is an additional official source, not an ASAR member."
+}

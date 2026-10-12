@@ -1,0 +1,23 @@
+/* Synapse iframe chrome only. Diagram colors and the surrounding app are untouched. */
+:root {
+  --dark-color: #0e0e10;
+  --ge-dark-panel-color: #16161b;
+  --dark-toolbar-color: #16161b;
+  --dark-dialog-color: #16161b;
+  --dark-header-color: #16161b;
+  --dark-field-color: #0e0e10;
+  --dark-card-color: #16161b;
+  --dark-border-color: #303039;
+  --dark-field-border-color: #303039;
+  --dark-strong-border-color: #484853;
+  --dark-text-color: #d4d4d8;
+  --dark-strong-text-color: #f4f4f5;
+  --dark-secondary-text-color: #a0a0ac;
+  --dark-faint-text-color: #9a9aa6;
+  --dark-accent-text-color: #818cf8;
+}
+.geEditor { font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+.geEditor input, .geEditor textarea, .geEditor select { caret-color: var(--dark-accent-text-color); }
+.geEditor :focus-visible { outline: 2px solid var(--dark-accent-text-color); outline-offset: 2px; }
+.geEditor ::selection { background: color-mix(in srgb, var(--dark-accent-text-color) 40%, transparent); color: var(--dark-strong-text-color); }
+@media (prefers-reduced-motion: reduce) { .geSplashLogo { animation: none; } }

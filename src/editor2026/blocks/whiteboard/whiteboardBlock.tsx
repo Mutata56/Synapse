@@ -1,274 +1,90 @@
-// src/editor2026/blocks/whiteboard/whiteboardBlock.tsx
-//
-// Бесконечный canvas whiteboard-блок (фаза 6). content:"non原子", non-atom.
-// Документ живёт как JSON-снапшот строкой в пропе `snapshot`, поэтому едет
-// внутри lossless BlockNote JSON заметки без изменений в хранилище.
-// Markdown-экспорт деградирует до плейсхолдера "[Доска]".
-//
-// В заметке блок это КОМПАКТНАЯ КАРТОЧКА: иконка, "Доска", количество шейпов
-// и маленький СТАТИЧЕСКИЙ превью доски (рендерится на offscreen canvas, без
-// движка, без rAF, дёшево). "Открыть доску" открывает FULLSCREEN модалку
-// через portal в document.body с live <WhiteboardCanvas/>. Canvas это source
-// of truth пока открыт; правки дебаунсятся обратно в проп `snapshot`.
-
 import { createReactBlockSpec } from "@blocknote/react";
-import { PenLine, X } from "lucide-react";
-import {
-  lazy,
-  Suspense,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { PenLine } from "lucide-react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { boardBounds, parseBoard, serializeBoard } from "./model";
+import { boardBounds, parseBoard } from "./model";
+import { readDrawioDocument, serializeDrawioDocument, type DrawioDocument } from "./drawioDocument";
+import type { DrawioCanvasHandle } from "./DrawioCanvas";
 import { t } from "../../../lib/i18n";
-import { registerFlusher } from "../../../store/notes";
+import { flushAllPending, registerFlusher, useNotesStore } from "../../../store/notes";
 import { ModuleBlockGate } from "../../../components/ModuleBlockGate";
 import type { Board, Shape } from "./model";
-
-const WhiteboardCanvas = lazy(() => import("./WhiteboardCanvas"));
-
-const PERSIST_DEBOUNCE_MS = 600;
-const THUMB_W = 320;
-const THUMB_H = 140;
-
-// ── Граница BlockNote (явный `any` допускается только тут) ───────────────────
-function WhiteboardView({ block, editor }: { block: any; editor: any }) {
-  const snapshot: string = block.props.snapshot ?? "";
-  const [open, setOpen] = useState(false);
-
-  // Доска парсится лениво из снапшота для превью карточки. Мемоизируем
-  // по сырой строке, чтобы правка снапшота пересчитывалась.
-  const board = useMemo<Board>(() => parseBoard(snapshot), [snapshot]);
-
-  // Имя доски живёт в СВОЁМ пропе блока (не в canvas-снапшоте), поэтому
-  // переименование не перезаписывает документ. Локальный state для быстрого
-  // ввода; коммитим в блон blur / Enter. BlockNote мержит частичные пропы,
-  // поэтому запись { name } не трогает `snapshot` (и запись snapshot не
-  // трогает name). Эффект пересинкается если проп поменялся извне.
-  const [name, setName] = useState<string>(block.props.name ?? "");
-  useEffect(() => {
-    setName(block.props.name ?? "");
-  }, [block.props.name]);
-
-  // Дебаунс-персистентность: live canvas вызывает onChange часто;
-  // консолидируем записи в editor.updateBlock чтобы не громить ProseMirror
-  // историю.
-  const timerRef = useRef<number | null>(null);
-  const persist = useCallback(
-    (b: Board) => {
-      if (timerRef.current !== null) window.clearTimeout(timerRef.current);
-      timerRef.current = window.setTimeout(() => {
-        timerRef.current = null;
-        editor.updateBlock(block, {
-          type: "whiteboard",
-          props: { snapshot: serializeBoard(b) },
-        });
-      }, PERSIST_DEBOUNCE_MS);
-    },
-    [editor, block],
-  );
-
-  // Флешим все незакоммиченные записи при закрытии модалки или анмаунте
-  // блока, чтобы быстрая правка с немедленным закрытием не теряла финальное
-  // состояние.
-  const flush = useCallback(
-    (b?: Board) => {
-      if (timerRef.current !== null) {
-        window.clearTimeout(timerRef.current);
-        timerRef.current = null;
-      }
-      if (b) {
-        editor.updateBlock(block, {
-          type: "whiteboard",
-          props: { snapshot: serializeBoard(b) },
-        });
-      }
-    },
-    [editor, block],
-  );
-
-  const latestRef = useRef<Board>(board);
-  const handleChange = useCallback(
-    (b: Board) => {
-      latestRef.current = b;
-      persist(b);
-    },
-    [persist],
-  );
-
-  const closeModal = useCallback(() => {
-    setOpen(false);
-    flush(latestRef.current);
-  }, [flush]);
-
-  const commitName = useCallback(() => {
-    const next = name.trim();
-    if (next === (block.props.name ?? "")) return;
-    editor.updateBlock(block, { type: "whiteboard", props: { name: next } });
-  }, [name, editor, block]);
-
-  useEffect(() => {
-    const commitPending = async () => {
-      if (timerRef.current !== null) flush(latestRef.current);
-    };
-    const unregister = registerFlusher(commitPending, "blocks");
-    return () => {
-      unregister();
-      // A disabled module unmounts this view; its rich state must survive.
-      void commitPending();
-    };
-  }, [flush]);
-
-  return (
-    // contentEditable=false + bubble stopPropagation: карточка и модалка
-    // владеют своим pointer/keyboard вводом; останавливаем события до
-    // ProseMirror, чтобы canvas и текстовый редактор не конфликтовали.
-    <div
-      className="e26-wb"
-      contentEditable={false}
-      // Останавливаем клавиши от ProseMirror ТОЛЬКО когда модалка закрыта
-      // (чтобы кнопка блока в заметке не триггерила шорткаты редактора).
-      // Когда модалка открыта, portal доски это React-tree ребёнок этой
-      // карточки, поэтому события всплывают сюда -- мы НЕ должны их
-      // останавливать, иначе глобальные шорткаты (Ctrl+K/F) не дойдут до
-      // command palette. Движок хватает свои hotkeys доски на capture-phase
-      // и останавливает только их.
-      onKeyDown={(e) => {
-        if (!open) e.stopPropagation();
-      }}
-      onPointerDown={(e) => e.stopPropagation()}
-    >
-      <div className="e26-wb__card">
-        <div className="e26-wb__namerow">
-          <PenLine size={15} className="e26-wb__nameicon" aria-hidden />
-          <input
-            className="e26-wb__name"
-            value={name}
-            placeholder="Без названия"
-            spellCheck={false}
-            onChange={(e) => setName(e.target.value)}
-            onBlur={commitName}
-            onKeyDown={(e) => {
-              // Enter коммитит (blur); Escape откатывает к сохранённому имени
-              // и снимает фокус, чтобы юзер мог быстро выйти из правки без
-              // Ctrl+Z. Остальное перехватывается wrapper'ом и не доходит
-              // до ProseMirror пока доска закрыта.
-              if (e.key === "Enter") {
-                e.preventDefault();
-                e.currentTarget.blur();
-              } else if (e.key === "Escape") {
-                e.preventDefault();
-                setName(block.props.name ?? "");
-                e.currentTarget.blur();
-              }
-            }}
-          />
-        </div>
-
-        <BoardThumb board={board} />
-
-        <button
-          type="button"
-          className="e26-wb__open"
-          onClick={() => setOpen(true)}
-        >
-          Открыть доску
-        </button>
-      </div>
-
-      {open && (
-        <WhiteboardModal
-          board={board}
-          name={name}
-          onChange={handleChange}
-          onClose={closeModal}
-        />
-      )}
+const DrawioCanvas=lazy(()=>import("./DrawioCanvas"));
+const PERSIST_DEBOUNCE_MS=600;
+const THUMB_W=320,THUMB_H=140;
+function WhiteboardView({block,editor}:{block:any;editor:any}){
+  const snapshot:string=block.props.snapshot??"";
+  const parsed=useMemo(()=>{try{return {document:readDrawioDocument(snapshot),error:null};}catch(e){return {document:null,error:e instanceof Error?e.message:String(e)};}},[snapshot]);
+  const latest=useRef<DrawioDocument|null>(parsed.document);
+  const blockRef=useRef(block);blockRef.current=block;
+  const canvasRef=useRef<DrawioCanvasHandle>(null);
+  const timer=useRef<ReturnType<typeof setTimeout>|null>(null);
+  const openButton=useRef<HTMLButtonElement>(null);
+  const [open,setOpen]=useState(false);
+  const [error,setError]=useState<string|null>(null);
+  const [name,setName]=useState<string>(block.props.name??"");
+  useEffect(()=>{setName(block.props.name??"");},[block.props.name]);
+  useEffect(()=>{if(!open)latest.current=parsed.document;},[parsed.document,open]);
+  const commit=useCallback(()=>{
+    if(timer.current!==null){clearTimeout(timer.current);timer.current=null;}
+    if(!latest.current)return;
+    const next=serializeDrawioDocument(latest.current);
+    if(blockRef.current.props.snapshot!==next)editor.updateBlock(blockRef.current,{type:"whiteboard",props:{snapshot:next}});
+  },[editor]);
+  const change=useCallback((doc:DrawioDocument)=>{latest.current=doc;if(timer.current!==null)clearTimeout(timer.current);timer.current=setTimeout(commit,PERSIST_DEBOUNCE_MS);},[commit]);
+  const flush=useCallback(async()=>{
+    // Commit the last autosave synchronously before awaiting a fresh frame snapshot.
+    commit();
+    if(canvasRef.current){latest.current=await canvasRef.current.flush();commit();}
+  },[commit]);
+  useEffect(()=>{const unregister=registerFlusher(flush,"blocks");return()=>{unregister();commit();};},[flush,commit]);
+  const save=useCallback(async(doc:DrawioDocument)=>{
+    latest.current=doc;commit();await flushAllPending();
+    const state=useNotesStore.getState();if(state.savingState==="error")throw new Error(state.lastSaveError||"Не удалось сохранить заметку. Холст остаётся открытым.");
+  },[commit]);
+  const close=useCallback(async()=>{
+    try{setError(null);await flush();if(latest.current)await save(latest.current);setOpen(false);requestAnimationFrame(()=>openButton.current?.focus());}
+    catch(e){setError(e instanceof Error?e.message:String(e));}
+  },[flush,save]);
+  const commitName=()=>{const next=name.trim();if(next!==blockRef.current.props.name)editor.updateBlock(blockRef.current,{type:"whiteboard",props:{name:next}});};
+  const preview=parsed.document?.preview;
+  const legacy=useMemo(()=>parseBoard(parsed.document?.legacySnapshot||snapshot),[parsed.document?.legacySnapshot,snapshot]);
+  return <div className="e26-wb" contentEditable={false} onKeyDown={e=>{if(!open)e.stopPropagation();}} onPointerDown={e=>e.stopPropagation()}>
+    <div className="e26-wb__card">
+      <div className="e26-wb__namerow"><PenLine size={15} className="e26-wb__nameicon" aria-hidden/><input className="e26-wb__name" value={name} placeholder={t("Без названия")} spellCheck={false} onChange={e=>setName(e.target.value)} onBlur={commitName} onKeyDown={e=>{if(e.key==="Enter"){e.preventDefault();e.currentTarget.blur();}else if(e.key==="Escape"){setName(blockRef.current.props.name??"");e.currentTarget.blur();}}}/></div>
+      {preview?<img className="e26-wb__preview-image" src={preview} alt={t("Предпросмотр холста")}/>:<BoardThumb board={legacy}/>}
+      {parsed.error?<p className="e26-wb__error" role="alert">{t("Не удалось прочитать холст. Исходные данные сохранены.")}</p>:null}
+      <button type="button" ref={openButton} className="e26-wb__open" disabled={!parsed.document} onClick={()=>setOpen(true)}>{t("Открыть доску")}</button>
     </div>
-  );
+    {open&&parsed.document?<WhiteboardModal name={name} error={error} onClose={()=>void close()}><Suspense fallback={<div className="e26-wb__loading">{t("Загрузка холста…")}</div>}><DrawioCanvas ref={canvasRef} document={latest.current||parsed.document} name={name} onChange={change} onSave={save} onClose={()=>void close()}/></Suspense></WhiteboardModal>:null}
+  </div>;
 }
-
-function WhiteboardModal({
-  board,
-  name,
-  onChange,
-  onClose,
-}: {
-  board: Board;
-  name: string;
-  onChange: (b: Board) => void;
-  onClose: () => void;
-}) {
-  // Esc закрывает; блокируем скролл body пока открыта.
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key !== "Escape") return;
-      // Защита в глубину: если фокусированный редактируемый элемент
-      // (textarea / input / contenteditable) не (или забыл) остановить
-      // всплытие своего Escape, НЕ закрываем всю доску -- юзер почти
-      // наверняка хотел закрыть поле, а не весь canvas. Движок и
-      // оверлейные Escape-хэндлеры останавливают всплытие когда обрабатывают
-      // Escape, поэтому тут ловится только "stray Escape над canvas",
-      // который должен закрыть доску.
-      const t = e.target as HTMLElement | null;
-      if (t) {
-        const tag = t.tagName;
-        if (
-          tag === "INPUT" ||
-          tag === "TEXTAREA" ||
-          tag === "SELECT" ||
-          t.isContentEditable
-        ) {
-          return;
-        }
-      }
-      e.stopPropagation();
-      e.preventDefault();
-      onClose();
+export function WhiteboardModal({name,error,onClose,children}:{name:string;error:string|null;onClose:()=>void;children:React.ReactNode}){
+  const modal=useRef<HTMLDivElement>(null);
+  useEffect(()=>{
+    const scope=modal.current;
+    if(!scope)return;
+    const previous=document.body.style.overflow;
+    document.body.style.overflow="hidden";
+    const background=Array.from(document.body.children).filter((node):node is HTMLElement=>node instanceof HTMLElement&&!node.contains(scope));
+    const inert=background.map(node=>node.inert);
+    background.forEach(node=>{node.inert=true;});
+    const containFocus=(event:FocusEvent)=>{
+      if(event.target instanceof Node&&!scope.contains(event.target))scope.focus();
     };
-    // BUBBLE-фаза (не capture): движок, style panel, color picker и
-    // текстовый/SQL оверлеи обрабатывают Escape первыми и останавливают
-    // всплытие когда обработали (закрыли себя / сняли выделение).
-    // Сюда доходит только необработанный Escape и закрывает всю доску.
-    window.addEventListener("keydown", onKey);
-    const prevOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      window.removeEventListener("keydown", onKey);
-      document.body.style.overflow = prevOverflow;
-    };
-  }, [onClose]);
-
-  return createPortal(
-    // NB: мы намеренно НЕ останавливаем всплытие keydown тут. Движок
-    // хватает hotkeys доски на capture-phase и останавливает только свои
-    // (undo/clipboard/delete), поэтому глобальные шорткаты приложения
-    // типа Ctrl+K / Ctrl+F по-прежнему доходят до своих window-листенеров
-    // пока доска открыта.
-    <div className="e26-wb__overlay" onPointerDown={(e) => e.stopPropagation()}>
-      <div className="e26-wb__modal">
-        <div className="e26-wb__modaltitle">{name.trim() || "Без названия"}</div>
-        <button
-          type="button"
-          className="e26-wb__close"
-          title="Закрыть (Esc)"
-          onClick={onClose}
-        >
-          <X size={18} />
-        </button>
-        <Suspense
-          fallback={<div className="e26-wb__loading">{t("Загрузка холста…")}</div>}
-        >
-          <WhiteboardCanvas board={board} onChange={onChange} />
-        </Suspense>
-      </div>
-    </div>,
-    document.body,
-  );
+    document.addEventListener("focusin",containFocus);
+    scope.focus();
+    return()=>{document.removeEventListener("focusin",containFocus);background.forEach((node,index)=>{node.inert=inert[index];});document.body.style.overflow=previous;};
+  },[]);
+  const containTab=(event:React.KeyboardEvent<HTMLDivElement>)=>{
+    if(event.key!=="Tab")return;
+    const controls=Array.from(event.currentTarget.querySelectorAll<HTMLElement>('button:not(:disabled),select:not(:disabled),input:not(:disabled),iframe,[tabindex="0"]')).filter(node=>node.getClientRects().length>0);
+    const first=controls[0],last=controls[controls.length-1];
+    if(!first||!last)return;
+    if(document.activeElement===event.currentTarget||(event.shiftKey&&document.activeElement===first)){event.preventDefault();(event.shiftKey?last:first).focus();}
+    else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus();}
+  };
+  return createPortal(<div className="e26-wb__overlay" onPointerDown={e=>e.stopPropagation()}><div ref={modal} tabIndex={-1} onKeyDown={containTab} className="e26-wb__modal e26-wb__drawio" role="dialog" aria-modal="true" aria-label={name||t("Холст")}>{error?<div className="drawio-error" role="alert">{error}<button type="button" onClick={onClose}>{t("Повторить сохранение")}</button></div>:null}{children}</div></div>,document.body);
 }
 
 function BoardThumb({ board }: { board: Board }) {

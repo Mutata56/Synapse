@@ -1,0 +1,2 @@
+/* Synapse local font registration. The font itself is the unmodified upstream asset. */
+@font-face { font-family: 'Architects Daughter'; src: url('fonts/ArchitectsDaughter-Regular.ttf') format('truetype'); font-style: normal; font-weight: 400; font-display: swap; }

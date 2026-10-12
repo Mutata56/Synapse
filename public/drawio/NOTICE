@@ -1,0 +1,20 @@
+Synapse local draw.io browser editor
+
+Upstream: draw.io Desktop 32.4.1, https://github.com/jgraph/drawio and https://github.com/jgraph/drawio-desktop.
+Exact app.asar SHA-256: e4245dea2cc2325dab61fcd2aa578e0a4bc539559d9c96160369cdb42eb19cc0.
+Copyright (c) JGraph Holdings Ltd and draw.io AG; original inline copyright notices are retained.
+
+The nested drawio source is distributed with its Apache License 2.0 (LICENSE).
+The source desktop distribution declares GPL-3.0-only; its license is retained in licenses/drawio-desktop-GPL-3.0-only.txt.
+Templates carry templates/LICENSE (CC BY 4.0). Icon/stencil assets retain their respective img/LICENSE, images notices and stencils/LICENSE, including the upstream Atlassian ecosystem restriction and its end-user output exception.
+libavoid-js retains its LGPL 2.1 license and README in js/libavoid-js. Other libraries retain the notices included in their shipped files.
+
+Only browser bootstrap, local configuration and iframe chrome are adapted. Electron adapters and cloud authentication callbacks are excluded. Raster PNGs receive origin metadata without changing pixel streams; GIF/ICO origins are retained in adjacent JSON sidecars. Every copied member has its upstream and published checksums in vendor-manifest.json.
+The HTML viewer is an additional official v32.4.1 source from commit 9034053fba80a435e27d68d374bc564b83917ae9, not a member of the ASAR. Its SHA-256 is bc7586cb62eec98018c13b78619078d3a7179cc7bfc711c566dda19527520a30; its Git blob SHA and origin are retained in viewer-origin.json. Its unchanged bytes are marked inside js/viewer-static.min.js, preceded by a local resource/legacy-HTML wrapper. The official embed-static path is absent at this tag; js/embed-static.min.js is an authored alias to the same viewer.
+No upstream instructions were executed. This artifact uses Synapse's postMessage host for persistence and exports; it does not use a public export or storage server. External media requested by a user-imported diagram may still be fetched to render or embed that media.
+
+Rebuild from the verified extraction (the existing retained viewer is reused offline):
+node scripts/vendor-drawio.mjs --source <drawio/src/main/webapp> --manifest <package-manifest.json>
+For a fresh destination, also supply --viewer <official viewer-static.min.js> from the exact pinned commit above. Its expected checksum is enforced.
+Verify the published copy:
+node scripts/vendor-drawio.mjs --check

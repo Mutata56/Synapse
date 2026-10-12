@@ -19,19 +19,22 @@ const hookApi = {
 };
 const directory=await mkdtemp(join(tmpdir(),'synapse-board-flush-'));
 const output=join(directory,'board.mjs');
+const codec=join(directory,'codec.mjs');
+await build({bundle:true,platform:'node',format:'esm',outfile:codec,entryPoints:['src/editor2026/blocks/whiteboard/drawioDocument.ts']});
+globalThis.boardCodecUrl=pathToFileURL(codec).href;
 after(()=>rm(directory,{recursive:true,force:true}));
 await build({bundle:true,platform:'node',format:'esm',outfile:output,entryPoints:['src/editor2026/blocks/whiteboard/whiteboardBlock.tsx'],plugins:[{name:'board-lifecycle',setup(builder){
   builder.onResolve({filter:/^(react|react\/jsx-runtime|react-dom|lucide-react|@blocknote\/react)$/},args=>({path:args.path,namespace:'board-mock'}));
   builder.onResolve({filter:/\/store\/notes$/},()=>({path:'notes',namespace:'board-mock'}));
   builder.onResolve({filter:/ModuleBlockGate$/},()=>({path:'gate',namespace:'board-mock'}));
-  builder.onResolve({filter:/WhiteboardCanvas$/},()=>({path:'canvas',namespace:'board-mock'}));
+  builder.onResolve({filter:/(WhiteboardCanvas|DrawioCanvas)$/},()=>({path:'canvas',namespace:'board-mock'}));
   builder.onLoad({filter:/.*/,namespace:'board-mock'},args=>{
     if(args.path==='react')return{contents:'const h=globalThis.boardFlushFixture.hooks;export const {useState,useRef,useMemo,useCallback,useEffect}=h;export const lazy=()=>()=>null;export const Suspense=({children})=>children;'};
     if(args.path==='react/jsx-runtime')return{contents:'export const jsx=(type,props)=>({type,props});export const jsxs=jsx;export const Fragment="fragment";'};
     if(args.path==='react-dom')return{contents:'export const createPortal=node=>node;'};
     if(args.path==='lucide-react')return{contents:'export const PenLine=()=>null;export const X=()=>null;'};
     if(args.path==='@blocknote/react')return{contents:'export const createReactBlockSpec=(_config,implementation)=>()=>implementation;'};
-    if(args.path==='notes')return{contents:'export const registerFlusher=(...args)=>globalThis.boardFlushFixture.storage.registerFlusher(...args);'};
+    if(args.path==='notes')return{contents:'export const registerFlusher=(...args)=>globalThis.boardFlushFixture.storage.registerFlusher(...args);export const flushAllPending=(...args)=>globalThis.boardFlushFixture.storage.flushAllPending(...args);export const useNotesStore=globalThis.boardFlushFixture.storage.useNotesStore;'};
     if(args.path==='gate')return{contents:'export const ModuleBlockGate=({children})=>children;'};
     return{contents:'export default ()=>null;'};
   });
@@ -59,8 +62,10 @@ for(const action of ['navigation','module unmount'])test(`the last board edit su
   let tree=render();
   const open=walk(tree,node=>node.props?.className==='e26-wb__open');
   assert(open,'board open action exists');open.props.onClick();tree=render();
-  const modal=walk(tree,node=>typeof node.props?.onChange==='function' && node.props?.board);
-  assert(modal,'board change callback is reachable');modal.props.onChange(finalBoard);
+  const modal=walk(tree,node=>typeof node.props?.onChange==='function' && node.props?.document);
+  assert(modal,'board change callback is reachable');const {readDrawioDocument}=await import(globalThis.boardCodecUrl);
+  const finalDocument=readDrawioDocument(JSON.stringify(finalBoard));
+  modal.props.onChange(finalDocument);
   assert.equal(block.props.snapshot,'','the edit is still pending, not pre-saved');
   if(action==='module unmount')hooks.unmount();
   await f.storage.flushAllPending();
@@ -70,6 +75,6 @@ for(const action of ['navigation','module unmount'])test(`the last board edit su
   await store.getState().selectNote(noteId);
   const reopened=store.getState().activeNote;
   const saved=JSON.parse(JSON.parse(reopened.blocknote)[0].props.snapshot);
-  assert.deepEqual(saved,finalBoard);
+  assert.equal(saved.engine,"drawio");assert.equal(saved.xml,finalDocument.xml);assert.equal(saved.legacySnapshot,JSON.stringify(finalBoard));
   assert.equal(dirty,false,'the enclosing note write finished before navigation');
 });
